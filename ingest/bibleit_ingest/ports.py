@@ -87,6 +87,27 @@ class Embedder(ABC):
         ...
 
 
+class Sink(ABC):
+    """Where the pipeline's output lands. This is the offline mirror of the
+    app's backend swap: the pipeline core never knows the destination.
+
+    v1: StaticArtifactSink (manifest.json + files for the in-browser engine).
+    Swap: VectorDbSink (Qdrant/pgvector/...) when a server backend appears —
+    same corpus, same chunks, same embeddings, different destination. Sinks can
+    also be stacked to publish both at once.
+    """
+
+    @abstractmethod
+    def write(
+        self,
+        meta: TranslationMeta,
+        verses: Sequence[Verse],
+        chunks: Sequence[Chunk],
+        embeddings: np.ndarray,  # (n_chunks, dim) float32, pre-quantization
+        embedder: "Embedder",
+    ) -> None: ...
+
+
 class Quantizer(ABC):
     """Compresses the embedding matrix for shipping.
 
