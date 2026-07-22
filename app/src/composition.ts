@@ -9,6 +9,7 @@ import type {
   QueryEmbedder,
   Ranker,
   RefParser,
+  SearchEngine,
   VectorIndex,
 } from './core/ports';
 import type { RetrievalResult } from './core/types';
@@ -23,12 +24,6 @@ import type { RetrievalResult } from './core/types';
 // import { RrfRanker } from './adapters/rrf-ranker';
 // import { NullAnswerProvider } from './adapters/null-answer-provider';
 
-export interface Engine {
-  ready: Promise<void>;
-  retrieve(query: string, k?: number): Promise<RetrievalResult>;
-  answers: AnswerProvider;
-}
-
 interface Ports {
   store: ArtifactStore;
   refParser: RefParser;
@@ -39,8 +34,12 @@ interface Ports {
   answers: AnswerProvider;
 }
 
-/** Generic engine over the ports — contains the retrieval flow, no adapter code. */
-export function buildEngine(p: Ports): Engine {
+/**
+ * LocalEngine: the fully in-browser SearchEngine, composed from the fine ports.
+ * A future RemoteEngine implements SearchEngine directly over HTTP instead —
+ * same interface, so the UI never changes.
+ */
+export function buildLocalEngine(p: Ports): SearchEngine {
   const ready = (async () => {
     const manifest = await p.store.manifest();
 
@@ -86,10 +85,14 @@ export function buildEngine(p: Ports): Engine {
   };
 }
 
-/** v1 wiring. Uncomment adapter imports as they are implemented. */
-export function createDefaultEngine(): Engine {
+/**
+ * v1 wiring. Uncomment adapter imports as they are implemented.
+ * Later, swapping to a server backend is exactly:
+ *   return new RemoteEngine('https://api.bibleit.example/search');
+ */
+export function createDefaultEngine(): SearchEngine {
   throw new Error('Adapters not implemented yet — see src/adapters/');
-  // return buildEngine({
+  // return buildLocalEngine({
   //   store: new OpfsArtifactStore('/artifacts/web@v1/'),
   //   refParser: new RegexRefParser(['en', 'fr']),
   //   lexical: new MiniSearchLexicalIndex(),

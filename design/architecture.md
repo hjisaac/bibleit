@@ -7,6 +7,7 @@
 | Decision | Choice | Rationale |
 |---|---|---|
 | Runtime | **Fully in-browser PWA** (no backend for v1) | Corpus is tiny (~31k verses); offline mode is a killer feature for a Bible app; free static hosting |
+| Frontend | **Astro** (+ `@vite-pwa/astro`) | Mostly-static shell with zero-JS pages; search UI is the single hydrated island; engine core stays framework-free plain TS |
 | Ingest | **Offline Python pipeline** run on a dev machine | Embeddings precomputed once, shipped as static artifacts |
 | LLM answers | **Deferred (v2)** via a swappable `AnswerProvider`. Target: **free-tier LLM APIs** (OpenRouter / Groq / Gemini free tier / GitHub Models) behind a Cloudflare Worker that holds the key; BYOK direct-from-browser as a power-user mode | Free tiers are OpenAI-compatible → one adapter covers them all; provider is Worker env config, not code |
 | Translations | Public domain first: **WEB** (English), **Louis Segond 1910** (French) | Freely redistributable; schema is multi-translation from day one |
@@ -18,6 +19,10 @@ Every runtime component is defined by a **TypeScript interface** in `app/src/cor
 and wired together in exactly one place (`app/src/composition.ts`). Implementations live in
 `app/src/adapters/`. Swapping a component = writing a new adapter + changing one line in the
 composition root. Nothing else imports adapters directly.
+
+The engine core (`core/`, `adapters/`, `composition.ts`) is framework-free plain TypeScript.
+Astro consumes it from a single hydrated search island; if the frontend framework ever changes,
+the engine moves untouched.
 
 The offline/runtime boundary is a **versioned artifact contract** (`manifest.json`), so the
 ingest pipeline and the PWA can evolve independently as long as both speak the manifest.
@@ -39,6 +44,21 @@ OFFLINE (Python, ingest/)                      RUNTIME (TypeScript PWA, app/)
                                                │                  → BYOK)        │
                                                └─────────────────────────────────┘
 ```
+
+### Two swap granularities (backend & search stack)
+
+The UI depends on exactly one interface: **`SearchEngine`** (`retrieve()`, `answers`).
+
+- **Coarse swap — the whole backend.** `LocalEngine` (v1, fully in-browser) and a future
+  `RemoteEngine` (HTTP call to any server: FastAPI + Qdrant, Supabase + pgvector, …) both
+  implement `SearchEngine`. Moving to a backend = ~30 lines of `RemoteEngine` + one line in
+  the composition root. The UI never changes.
+- **Fine swap — one piece of the search stack.** `LocalEngine` is composed of the fine ports
+  below (embedder, vector index, lexical index, ranker); each swaps independently.
+
+The ingest side mirrors this with a **`Sink`** port: v1 writes static artifacts for the
+in-browser engine; a `VectorDbSink` later pours the *same* corpus/chunks/embeddings into a
+vector DB for the server backend. Sinks stack, so both can be published from one run.
 
 ### Runtime ports (the seams)
 

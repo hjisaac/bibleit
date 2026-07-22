@@ -15,6 +15,23 @@ import type {
 } from './types';
 
 /**
+ * COARSE seam — the only contract the UI knows about.
+ *
+ * Swap granularity works at two levels:
+ *  - Swap the WHOLE search stack: implement this interface over HTTP
+ *    (RemoteEngine → any backend: FastAPI + Qdrant, pgvector, ...) and flip
+ *    one line in the composition root. The UI cannot tell the difference.
+ *  - Swap ONE piece (vector index, embedder, ranker...): the LocalEngine is
+ *    itself composed of the fine-grained ports below.
+ */
+export interface SearchEngine {
+  /** Resolves when the engine is usable (artifacts loaded / backend reachable). */
+  ready: Promise<void>;
+  retrieve(query: string, k?: number): Promise<RetrievalResult>;
+  answers: AnswerProvider;
+}
+
+/**
  * Fetches, caches, and serves the static artifacts (manifest, verses, chunks,
  * embeddings). Must survive cache eviction (iOS Safari) by re-downloading.
  * v1: OPFS + Cache API. Swap: IndexedDB fallback.
