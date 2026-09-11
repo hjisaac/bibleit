@@ -1,3 +1,0 @@
-log_dir: logs
-log_console_level: INFO
-log_file_level: DEBUG

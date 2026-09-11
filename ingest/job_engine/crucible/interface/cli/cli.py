@@ -1,15 +1,8 @@
-from enum import Enum
 from typing import Any
 
 import typer
 
 from crucible.interface.cli.utils import create_job_package, list_available_jobs, run_named_job
-
-
-class JobKind(str, Enum):
-	job = "job"
-	trainer = "trainer"
-
 
 app = typer.Typer(
 	no_args_is_help=True,
@@ -36,7 +29,7 @@ def _build_run_command(job_name: str) -> Any:
 			None,
 			"--override",
 			"-o",
-			help="Hydra-style override(s), e.g. -o trainer.lr=1e-3 (repeat flag for multiple).",
+			help="Hydra-style override(s), e.g. -o k=10 (repeat flag for multiple).",
 		),
 	) -> None:
 		"""Start a run of a discovered crucible job."""
@@ -71,7 +64,7 @@ def execute_named(
 		None,
 		"--override",
 		"-o",
-		help="Hydra-style override(s), e.g. -o trainer.lr=1e-3 (repeat flag for multiple).",
+		help="Hydra-style override(s), e.g. -o k=10 (repeat flag for multiple).",
 	),
 ) -> None:
 	"""Execute a discovered crucible job by name (produces one run)."""
@@ -80,18 +73,12 @@ def execute_named(
 
 @app.command("create")
 def create_job(
-	job_name: str = typer.Argument(..., help="Job package name under jobs/ (e.g. mlp_v2)."),
-	kind: JobKind = typer.Option(
-		JobKind.job,
-		"--kind",
-		help="Scaffold kind: job (plain) or trainer (ML training loop).",
-		case_sensitive=False,
-	),
+	job_name: str = typer.Argument(..., help="Job package name under jobs/ (e.g. question_to_passage_eval)."),
 	force: bool = typer.Option(False, "--force", help="Overwrite scaffold files if they already exist."),
 ) -> None:
 	"""Create a new job package with starter files under jobs/<name>/."""
 	try:
-		created = create_job_package(job_name, kind=kind.value, force=force)
+		created = create_job_package(job_name, force=force)
 	except (ValueError, FileExistsError) as exc:
 		raise typer.BadParameter(str(exc)) from exc
 
