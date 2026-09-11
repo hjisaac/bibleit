@@ -11,7 +11,6 @@ dependencies = [
     # way ranx isn't: eval's own code needs it to do its job.
     "crucible[wandb]",
     "fastembed>=0.8.0",
-    "python-box>=7.4.1",
     "ranx>=0.3.21",
     "usearch>=2.26.2",
 ]
