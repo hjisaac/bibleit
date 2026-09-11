@@ -1,3 +1,21 @@
+# Downloaded model weights (fastembed's cache, see FASTEMBED_CACHE_DIR in
+# bibleit_ingest/constants.py) -- large binaries fetched from HuggingFace,
+# not something to commit.
+ingest/data/models/
+
+# Derived/generated artifacts: each of these is reproducible by rerunning
+# the script that made it (pericopes.py's derivation, embed_chunks.py,
+# check_heading_alignment.py, pericope_sizes.py), so they're outputs, not
+# source. ingest/data/translations/ (the actual BSB/WEB source texts) is
+# deliberately NOT listed here -- nothing regenerates those from something
+# smaller, so they're committed for guaranteed reproducibility.
+ingest/data/derived/
+ingest/scripts/chunk_embeddings.json
+ingest/scripts/chunk_embeddings.npy
+ingest/scripts/heading_alignment.json
+ingest/scripts/pericope_sizes.json
+ingest/eval/results/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
