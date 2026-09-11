@@ -1,25 +1,13 @@
-"""
-Runs ingest/eval/data/question_to_passage.json against the currently
-embedded chunks (see embed_chunks.py) and reports recall@k and MRR.
-
-Every run's results and log are saved under
-ingest/eval/results/question_to_passage_eval/, timestamped together, so
-results from different chunking/model settings can be compared later
-instead of each run overwriting the last. Each result also records the
-exact conditions that produced it (input files, k, models), so a saved
-result is self-describing months later, not just a number with no context.
-
-Run from ingest/:
-    .venv/bin/python eval/question_to_passage_eval.py
-"""
 import json
-from datetime import datetime, timezone
+import logging
 from functools import partial
 from pathlib import Path
 
 import numpy as np
 from box import Box
 from codetiming import Timer
+from crucible.core.jobs import AbstractJob
+from crucible.core.trackers.wandb import WBTracker
 from fastembed import TextEmbedding
 
 from bibleit_ingest.chunking import (
@@ -38,91 +26,101 @@ from bibleit_ingest.constants import (
     EmbeddingModel,
 )
 from bibleit_ingest.embedding import embed_query
-from bibleit_ingest.logging_utils import setup_logger
 from bibleit_ingest.pericopes import derive_bsb_pericopes, project_pericopes
 from eval.helpers import trigger_eval
 
-frozen_box_cls = partial(Box, frozen_box=True)
+logger = logging.getLogger(__name__)
 
 # Derived from this file's own name instead of hardcoded, so a renamed
 # eval script automatically gets a matching results folder. Nothing to
-# keep in sync by hand.
+# keep in sync by hand. Doubles as AbstractJob's required config["log_dir"].
 RESULTS_DIR = REPO / "ingest/eval/results" / Path(__file__).stem
 
 EVAL_DATA_PATH = REPO / "ingest/eval/data/question_to_passage.json"
 K = 1
 
 
-@Timer(name=Path(__file__).stem, text="Eval run completed in {:.2f} seconds")
-def main():
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    logger = setup_logger(__name__, RESULTS_DIR / f"{timestamp}.log")
+class QuestionToPassageEvalJob(AbstractJob):
+    def on_prepare(self) -> None:
+        cached = json.loads(CHUNK_EMBEDDINGS_PATH.read_text())
+        self.run_conditions = Box(
+            frozen_box=True,
+            chunk_embeddings_path=CHUNK_EMBEDDINGS_PATH,
+            chunk_embeddings_npy_path=CHUNK_EMBEDDINGS_NPY_PATH,
+            web_path=WEB_PATH,
+            eval_data_path=EVAL_DATA_PATH,
+            k=K,
+            embedding_model=str(EmbeddingModel.NOMIC_EMBED_TEXT_V1_5),
+            chunk_source_model=cached["model"],
+        )
+        logger.info(
+            "Using run conditions:\n%s", self.run_conditions.to_json(indent=2, default=str)
+        )
 
-    cached = json.loads(CHUNK_EMBEDDINGS_PATH.read_text())
+        # Recomputed fresh rather than reconstructed from chunk_embeddings.json:
+        # the cache only keeps a flat `headings` list and one total
+        # `verse_count` per chunk, with no record of which verses belong to
+        # which heading within a merged chunk. Chunking is a pure function
+        # of the BSB/WEB source data and the floor/ceiling parameters, none
+        # of which change between runs, so recomputing it here reproduces
+        # the exact same chunks embed_chunks.py produced, with every
+        # pericope intact.
+        self.ordered_verses = load_web_verses(WEB_PATH)
+        self.address_index = index_verses_by_address(self.ordered_verses)
+        web_addresses_by_book = group_verse_addresses_by_book(self.ordered_verses)
+        bsb_native = derive_bsb_pericopes(BSB_DIR)
+        resolved, _ = project_pericopes(bsb_native, web_addresses_by_book)
+        self.chunks = FloorCeilingMergeChunker().chunk_bible(resolved)
 
-    run_conditions = frozen_box_cls(
-        frozen_box=True,
-        chunk_embeddings_path=CHUNK_EMBEDDINGS_PATH,
-        chunk_embeddings_npy_path=CHUNK_EMBEDDINGS_NPY_PATH,
-        web_path=WEB_PATH,
-        eval_data_path=EVAL_DATA_PATH,
-        k=K,
-        embedding_model=str(EmbeddingModel.NOMIC_EMBED_TEXT_V1_5),
-        chunk_source_model=cached["model"],
-    )
-    logger.info(
-        "Using run conditions:\n%s",
-        run_conditions.to_json(indent=2, default=str),
-    )
+        self.chunk_embeddings = np.load(CHUNK_EMBEDDINGS_NPY_PATH)
+        assert len(self.chunks) == self.chunk_embeddings.shape[0], (
+            f"recomputed {len(self.chunks)} chunks but {CHUNK_EMBEDDINGS_NPY_PATH} has "
+            f"{self.chunk_embeddings.shape[0]} rows - embeddings are stale, rerun embed_chunks.py"
+        )
+        logger.info("Loaded %d embedded chunks", len(self.chunks))
 
-    # Recomputed fresh rather than reconstructed from chunk_embeddings.json:
-    # the cached metadata only keeps an aggregate `headings` list and one
-    # total `verse_count` per chunk, with no record of where each
-    # individual pericope's own span starts within a merge. Building one
-    # Pericope per chunk from that (as this used to do) silently dropped
-    # every heading after the first. Chunking is a pure function of the
-    # BSB/WEB source data and the floor/ceiling parameters, none of which
-    # change between runs, so recomputing it here reproduces the exact
-    # same chunks embed_chunks.py produced, with every pericope intact.
-    ordered_verses = load_web_verses(WEB_PATH)
-    address_index = index_verses_by_address(ordered_verses)
-    web_addresses_by_book = group_verse_addresses_by_book(ordered_verses)
-    bsb_native = derive_bsb_pericopes(BSB_DIR)
-    resolved, _ = project_pericopes(bsb_native, web_addresses_by_book)
-    chunker = FloorCeilingMergeChunker()
-    chunks = chunker.chunk_bible(resolved)
+        self.model = TextEmbedding(
+            model_name=EmbeddingModel.NOMIC_EMBED_TEXT_V1_5,
+            cache_dir=str(FASTEMBED_CACHE_DIR),
+        )
 
-    # Row-aligned with `chunks` above: row i is chunk i's embedding.
-    # Loaded fully into memory here (not memory-mapped), since building
-    # the usearch index below needs every vector anyway.
-    chunk_embeddings = np.load(CHUNK_EMBEDDINGS_NPY_PATH)
-    assert len(chunks) == chunk_embeddings.shape[0], (
-        f"recomputed {len(chunks)} chunks but {CHUNK_EMBEDDINGS_NPY_PATH} has "
-        f"{chunk_embeddings.shape[0]} rows - embeddings are stale, rerun embed_chunks.py"
-    )
-    logger.info("Loaded %d embedded chunks", len(chunks))
+    def on_track(self) -> None:
+        self.tracker = WBTracker(
+            run_name=self.run_id,
+            project="bibleit-eval",
+            config=self.run_conditions.to_dict(),
+        )
 
-    model = TextEmbedding(
-        model_name=EmbeddingModel.NOMIC_EMBED_TEXT_V1_5,
-        cache_dir=str(FASTEMBED_CACHE_DIR),
-    )
+    def on_execute(self) -> dict:
+        return trigger_eval(
+            EVAL_DATA_PATH,
+            self.chunks,
+            self.chunk_embeddings,
+            self.address_index,
+            partial(embed_query, self.model),
+            k=K,
+        )
 
-    eval_results = trigger_eval(
-        EVAL_DATA_PATH,
-        chunks,
-        chunk_embeddings,
-        address_index,
-        partial(embed_query, model),
-        k=K,
-    )
-    logger.info("Metrics:\n%s", json.dumps(eval_results["metrics"], indent=2))
+    def on_finalize(self, result: dict) -> None:
+        logger.info("Metrics:\n%s", json.dumps(result["metrics"], indent=2))
 
-    results = {"run_conditions": run_conditions.to_dict(), **eval_results}
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = RESULTS_DIR / f"{timestamp}.json"
-    out_path.write_text(json.dumps(results, indent=2, default=str))
-    logger.info("Saved to %s", out_path)
+        payload = {"run_conditions": self.run_conditions.to_dict(), **result}
+        results_dir = Path(self.config["log_dir"])
+        results_dir.mkdir(parents=True, exist_ok=True)
+        out_path = results_dir / f"{self.run_id}.json"
+        out_path.write_text(json.dumps(payload, indent=2, default=str))
+        logger.info("Saved to %s", out_path)
+
+        if self.tracker is not None:
+            self.tracker.track_summary(
+                total_queries=result["total_queries"],
+                resolvable=result["resolvable"],
+                **result["metrics"],
+            )
+            self.tracker.track_artifact(out_path, name="eval-result", type="eval_result")
 
 
 if __name__ == "__main__":
-    main()
+    job = QuestionToPassageEvalJob(config={"log_dir": str(RESULTS_DIR)})
+    with Timer(text="Eval run completed in {:.2f} seconds", logger=logger.info):
+        job.execute()
