@@ -36,18 +36,14 @@ class Job(AbstractJob):
         self.embedding_model = EmbeddingModel(self.config["embedding_model"])
 
         cached = json.loads(chunk_embeddings_path.read_text())
-        # A plain dict, not wrapped in anything: Hydra already assembled
-        # every one of these from configs/default.yaml, so this is just
-        # self.config plus the one field config can't supply --
-        # chunk_source_model, read from the cache file itself, not chosen
-        # ahead of time. Recorded as the raw config values (REPO-relative
-        # path strings, not resolved absolute ones): a relative path
-        # survives a clone to a different machine or directory, an
-        # absolute one baked into an old run's saved JSON doesn't.
-        self.run_conditions = {**self.config, "chunk_source_model": cached["model"]}
-        logger.info(
-            "Using run conditions:\n%s", json.dumps(self.run_conditions, indent=2, default=str)
-        )
+        # The one thing config can't supply ahead of time: which model
+        # actually produced the cached embeddings, read from the cache
+        # file itself. Folded directly into self.config rather than kept
+        # as a separate run_conditions dict -- self.config is already
+        # everything else a saved run needs to be traced back to, so
+        # there's no reason for a second, near-identical name for it.
+        self.config["chunk_source_model"] = cached["model"]
+        logger.info("Using config:\n%s", json.dumps(self.config, indent=2, default=str))
 
         # Recomputed fresh rather than reconstructed from chunk_embeddings.json:
         # the cache only keeps a flat `headings` list and one total
@@ -80,7 +76,7 @@ class Job(AbstractJob):
         self.tracker = WBTracker(
             run_name=self.run_id,
             project="bibleit-eval",
-            config=self.run_conditions,
+            config=self.config,
         )
 
     def on_execute(self) -> dict:
@@ -96,7 +92,7 @@ class Job(AbstractJob):
     def on_finalize(self, result: dict) -> None:
         logger.info("Metrics:\n%s", json.dumps(result["metrics"], indent=2))
 
-        payload = {"run_conditions": self.run_conditions, **result}
+        payload = {"run_conditions": self.config, **result}
         results_dir = Path(self.config["log_dir"])
         results_dir.mkdir(parents=True, exist_ok=True)
         out_path = results_dir / f"{self.run_id}.json"
