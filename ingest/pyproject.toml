@@ -6,11 +6,22 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "codetiming>=1.4.0",
+    # eval/jobs/question_to_passage_eval actually calls into crucible
+    # (AbstractJob, WBTracker) to run -- not a dev-only tool, the same
+    # way ranx isn't: eval's own code needs it to do its job.
+    "crucible[wandb]",
     "fastembed>=0.8.0",
     "python-box>=7.4.1",
     "ranx>=0.3.21",
     "usearch>=2.26.2",
 ]
+
+[tool.uv.sources]
+# crucible (originally the run-crucible project) is vendored directly at
+# ingest/job_engine as first-party source, not an external dependency --
+# no separate repo, no submodule. Editable so an edit there is picked up
+# without reinstalling.
+crucible = { path = "job_engine", editable = true }
 
 [build-system]
 requires = ["hatchling"]

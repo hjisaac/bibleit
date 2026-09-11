@@ -15,6 +15,9 @@ ingest/scripts/chunk_embeddings.npy
 ingest/scripts/heading_alignment.json
 ingest/scripts/pericope_sizes.json
 ingest/eval/results/
+# Weights & Biases' own local run cache (see WBTracker) -- run data
+# already lives in eval/results/ and gets uploaded to W&B directly.
+ingest/wandb/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

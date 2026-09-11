@@ -5,7 +5,6 @@ from pathlib import Path
 
 import numpy as np
 from box import Box
-from codetiming import Timer
 from crucible.core.jobs import AbstractJob
 from crucible.core.trackers.wandb import WBTracker
 from fastembed import TextEmbedding
@@ -31,25 +30,24 @@ from eval.helpers import trigger_eval
 
 logger = logging.getLogger(__name__)
 
-# Derived from this file's own name instead of hardcoded, so a renamed
-# eval script automatically gets a matching results folder. Nothing to
-# keep in sync by hand. Doubles as AbstractJob's required config["log_dir"].
-RESULTS_DIR = REPO / "ingest/eval/results" / Path(__file__).stem
 
-EVAL_DATA_PATH = REPO / "ingest/eval/data/question_to_passage.json"
-K = 1
-
-
-class QuestionToPassageEvalJob(AbstractJob):
+class Job(AbstractJob):
     def on_prepare(self) -> None:
+        # REPO-anchored, not CWD-relative, unlike log_dir below: this path
+        # is read by our own code, not by AbstractJob before on_prepare
+        # even runs, so there's no reason to give up REPO's CWD-independence
+        # for it the way log_dir has to.
+        self.eval_data_path = REPO / self.config["eval_data_path"]
+        self.k = int(self.config["k"])
+
         cached = json.loads(CHUNK_EMBEDDINGS_PATH.read_text())
         self.run_conditions = Box(
             frozen_box=True,
             chunk_embeddings_path=CHUNK_EMBEDDINGS_PATH,
             chunk_embeddings_npy_path=CHUNK_EMBEDDINGS_NPY_PATH,
             web_path=WEB_PATH,
-            eval_data_path=EVAL_DATA_PATH,
-            k=K,
+            eval_data_path=self.eval_data_path,
+            k=self.k,
             embedding_model=str(EmbeddingModel.NOMIC_EMBED_TEXT_V1_5),
             chunk_source_model=cached["model"],
         )
@@ -93,12 +91,12 @@ class QuestionToPassageEvalJob(AbstractJob):
 
     def on_execute(self) -> dict:
         return trigger_eval(
-            EVAL_DATA_PATH,
+            self.eval_data_path,
             self.chunks,
             self.chunk_embeddings,
             self.address_index,
             partial(embed_query, self.model),
-            k=K,
+            k=self.k,
         )
 
     def on_finalize(self, result: dict) -> None:
@@ -120,7 +118,4 @@ class QuestionToPassageEvalJob(AbstractJob):
             self.tracker.track_artifact(out_path, name="eval-result", type="eval_result")
 
 
-if __name__ == "__main__":
-    job = QuestionToPassageEvalJob(config={"log_dir": str(RESULTS_DIR)})
-    with Timer(text="Eval run completed in {:.2f} seconds", logger=logger.info):
-        job.execute()
+JOB_CLASS = Job

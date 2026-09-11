@@ -1,0 +1,11 @@
+# Relative to CWD, same convention as every other script in this
+# project ("Run from ingest/"): crucible execute must be invoked from
+# ingest/ for this to land in the usual eval/results/ location.
+log_dir: eval/results/question_to_passage_eval
+log_console_level: INFO
+log_file_level: DEBUG
+
+k: 1
+# REPO-relative (see job.py), not CWD-relative -- read by our own code
+# after on_prepare, not by the framework before it.
+eval_data_path: ingest/eval/data/question_to_passage.json
