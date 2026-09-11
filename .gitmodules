@@ -1,3 +1,3 @@
-[submodule "ingest/run-crucible"]
-	path = ingest/run-crucible
+[submodule "ingest/job_engine"]
+	path = ingest/job_engine
 	url = https://github.com/hjisaac/run-crucible
