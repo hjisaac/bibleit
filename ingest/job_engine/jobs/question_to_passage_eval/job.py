@@ -15,15 +15,7 @@ from bibleit_ingest.chunking import (
     index_verses_by_address,
     load_web_verses,
 )
-from bibleit_ingest.constants import (
-    BSB_DIR,
-    CHUNK_EMBEDDINGS_NPY_PATH,
-    CHUNK_EMBEDDINGS_PATH,
-    FASTEMBED_CACHE_DIR,
-    REPO,
-    WEB_PATH,
-    EmbeddingModel,
-)
+from bibleit_ingest.constants import BSB_DIR, FASTEMBED_CACHE_DIR, REPO, EmbeddingModel
 from bibleit_ingest.embedding import embed_query
 from bibleit_ingest.pericopes import derive_bsb_pericopes, project_pericopes
 from eval.helpers import trigger_eval
@@ -33,23 +25,29 @@ logger = logging.getLogger(__name__)
 
 class Job(AbstractJob):
     def on_prepare(self) -> None:
-        # REPO-anchored, not CWD-relative, unlike log_dir below: this path
-        # is read by our own code, not by AbstractJob before on_prepare
-        # even runs, so there's no reason to give up REPO's CWD-independence
-        # for it the way log_dir has to.
+        # REPO-anchored, not CWD-relative, unlike log_dir: these are read
+        # by our own code, not by AbstractJob before on_prepare even
+        # runs, so there's no reason to give up REPO's CWD-independence
+        # for them the way log_dir has to.
         self.eval_data_path = REPO / self.config["eval_data_path"]
+        chunk_embeddings_path = REPO / self.config["chunk_embeddings_path"]
+        chunk_embeddings_npy_path = REPO / self.config["chunk_embeddings_npy_path"]
+        web_path = REPO / self.config["web_path"]
         self.k = int(self.config["k"])
+        self.embedding_model = EmbeddingModel(self.config["embedding_model"])
 
-        cached = json.loads(CHUNK_EMBEDDINGS_PATH.read_text())
+        cached = json.loads(chunk_embeddings_path.read_text())
+        # Built from self.config directly rather than re-declared field by
+        # field: Hydra already assembled every one of these from
+        # configs/default.yaml. Recorded as the raw config values (REPO-
+        # relative path strings, not resolved absolute ones) -- a relative
+        # path survives a clone to a different machine or directory, an
+        # absolute one baked into an old run's saved JSON doesn't.
+        # chunk_source_model is the one field config can't supply: it's
+        # read from the cache file itself, not chosen ahead of time.
         self.run_conditions = Box(
+            {**self.config, "chunk_source_model": cached["model"]},
             frozen_box=True,
-            chunk_embeddings_path=CHUNK_EMBEDDINGS_PATH,
-            chunk_embeddings_npy_path=CHUNK_EMBEDDINGS_NPY_PATH,
-            web_path=WEB_PATH,
-            eval_data_path=self.eval_data_path,
-            k=self.k,
-            embedding_model=str(EmbeddingModel.NOMIC_EMBED_TEXT_V1_5),
-            chunk_source_model=cached["model"],
         )
         logger.info(
             "Using run conditions:\n%s", self.run_conditions.to_json(indent=2, default=str)
@@ -63,22 +61,22 @@ class Job(AbstractJob):
         # of which change between runs, so recomputing it here reproduces
         # the exact same chunks embed_chunks.py produced, with every
         # pericope intact.
-        self.ordered_verses = load_web_verses(WEB_PATH)
+        self.ordered_verses = load_web_verses(web_path)
         self.address_index = index_verses_by_address(self.ordered_verses)
         web_addresses_by_book = group_verse_addresses_by_book(self.ordered_verses)
         bsb_native = derive_bsb_pericopes(BSB_DIR)
         resolved, _ = project_pericopes(bsb_native, web_addresses_by_book)
         self.chunks = FloorCeilingMergeChunker().chunk_bible(resolved)
 
-        self.chunk_embeddings = np.load(CHUNK_EMBEDDINGS_NPY_PATH)
+        self.chunk_embeddings = np.load(chunk_embeddings_npy_path)
         assert len(self.chunks) == self.chunk_embeddings.shape[0], (
-            f"recomputed {len(self.chunks)} chunks but {CHUNK_EMBEDDINGS_NPY_PATH} has "
+            f"recomputed {len(self.chunks)} chunks but {chunk_embeddings_npy_path} has "
             f"{self.chunk_embeddings.shape[0]} rows - embeddings are stale, rerun embed_chunks.py"
         )
         logger.info("Loaded %d embedded chunks", len(self.chunks))
 
         self.model = TextEmbedding(
-            model_name=EmbeddingModel.NOMIC_EMBED_TEXT_V1_5,
+            model_name=self.embedding_model,
             cache_dir=str(FASTEMBED_CACHE_DIR),
         )
 
