@@ -1,7 +1,10 @@
 # Relative to CWD, same convention as every other script in this
 # project ("Run from ingest/"): crucible execute must be invoked from
-# ingest/ for this to land in the usual eval/results/ location.
-log_dir: eval/results/question_to_passage_eval
+# ingest/ for this to land inside this job's own folder. Matches
+# run-crucible's own original scaffold convention (each job package got
+# its own outputs/ dir) -- the experiment folder holds its own results,
+# not a separate cross-job results/ tree.
+log_dir: eval/jobs/question_to_passage_eval/outputs
 log_console_level: INFO
 log_file_level: DEBUG
 
