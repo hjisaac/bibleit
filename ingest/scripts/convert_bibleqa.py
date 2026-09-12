@@ -1,30 +1,10 @@
-"""
-Converts the raw BibleQA source (ingest/eval/data/sources/bible_qa_no_context.csv)
-into question_to_passage.json's format: one entry per question, its correct
-verse address decoded from Verse_Code, no distractor rows, no stripped/
-preprocessed text carried over (the answer verse is resolved fresh against
-your own clean WEB corpus at eval time, not this file's mangled text).
-
-Verse_Code is 8 digits: 2-digit book number plus 3-digit chapter plus
-3-digit verse. For example, "40001018" is book 40, chapter 1, verse 18,
-which is Matthew 1:18. This was verified against known examples (Genesis
-2:8, Mark 15:25) before writing this script. Book numbering matches this
-project's own USFM_ORDER, already used throughout ingest/.
-
-Source: https://github.com/helen-jiahe-zhao/BibleQA. The repo carries no
-license, so keep that in mind before reusing this converted file anywhere
-outside this project's own local evaluation.
-
-Run from ingest/:
-    .venv/bin/python scripts/convert_bibleqa.py
-"""
 import csv
 import json
 
 from bibleit_ingest.constants import REPO, USFM_ORDER
 
-SOURCE = REPO / "ingest/eval/data/sources/bible_qa_no_context.csv"
-OUT_PATH = REPO / "ingest/eval/data/question_to_passage.json"
+SOURCE = REPO / "ingest/eval_engine/eval/data/sources/bible_qa_no_context.csv"
+OUT_PATH = REPO / "ingest/eval_engine/eval/data/question_to_passage.json"
 
 
 def decode_verse_code(code: str) -> tuple[str, int, int]:

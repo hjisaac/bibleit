@@ -1,12 +1,3 @@
-"""
-Retrieval-only evaluation: for each (question, relevant verse) pair in a
-question_to_passage.json-shaped eval set, embed the question, search the
-currently embedded chunks via usearch, and score with ranx.
-
-No generation is involved anywhere here. This measures retrieval quality
-only, the same scope as ingest/eval/data/question_to_passage.json.
-"""
-
 import json
 from pathlib import Path
 from typing import Sequence

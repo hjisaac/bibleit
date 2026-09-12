@@ -1,14 +1,14 @@
 # Relative to CWD, same convention as every other script in this
 # project ("Run from ingest/"): crucible execute must be invoked from
-# ingest/ for this to land in the usual eval/results/ location.
-log_dir: eval/results/question_to_passage_eval
+# ingest/ for this to land in the usual eval_engine/eval/results/ location.
+log_dir: eval_engine/eval/results/question_to_passage_eval
 log_console_level: INFO
 log_file_level: DEBUG
 
 k: 1
 # REPO-relative, not CWD-relative (see job.py: resolved via REPO / ...),
 # so these stay correct regardless of where crucible execute is run from.
-eval_data_path: ingest/eval/data/question_to_passage.json
+eval_data_path: ingest/eval_engine/eval/data/question_to_passage.json
 chunk_embeddings_path: ingest/scripts/chunk_embeddings.json
 chunk_embeddings_npy_path: ingest/scripts/chunk_embeddings.npy
 web_path: ingest/data/translations/web/en/web.json
