@@ -433,7 +433,7 @@ wheels = [
 [[package]]
 name = "crucible"
 version = "0.1.0"
-source = { editable = "eval_engine" }
+source = { editable = "eval" }
 dependencies = [
     { name = "dotenv" },
     { name = "hydra-core" },
@@ -766,7 +766,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "codetiming", specifier = ">=1.4.0" },
-    { name = "crucible", extras = ["wandb"], editable = "eval_engine" },
+    { name = "crucible", extras = ["wandb"], editable = "eval" },
     { name = "fastembed", specifier = ">=0.8.0" },
     { name = "ranx", specifier = ">=0.3.21" },
     { name = "usearch", specifier = ">=2.26.2" },

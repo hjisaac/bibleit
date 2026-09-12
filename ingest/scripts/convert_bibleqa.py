@@ -3,8 +3,8 @@ import json
 
 from bibleit_ingest.constants import REPO, USFM_ORDER
 
-SOURCE = REPO / "ingest/eval_engine/eval/data/sources/bible_qa_no_context.csv"
-OUT_PATH = REPO / "ingest/eval_engine/eval/data/question_to_passage.json"
+SOURCE = REPO / "ingest/eval/data/sources/bible_qa_no_context.csv"
+OUT_PATH = REPO / "ingest/eval/data/question_to_passage.json"
 
 
 def decode_verse_code(code: str) -> tuple[str, int, int]:

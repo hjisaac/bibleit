@@ -10,6 +10,7 @@ result -- a second, bibleit-owned template layer on top of crucible's
 lifecycle, handling REPO-relative config paths, the W&B tracker, and
 saving/tracking the result generically. A new eval job only needs
 `on_prepare`/`on_execute`; see
-`eval_engine/jobs/question_to_passage_eval/job.py` for the reference
-shape. Everything eval-related -- this file, crucible's vendored code,
-and discovered job packages -- lives together under `eval_engine/`.
+`eval/jobs/question_to_passage_eval/job.py` for the reference shape.
+Everything eval-related -- this file, crucible's vendored code, and
+discovered job packages -- lives together under `eval/`, one
+directory, not two.

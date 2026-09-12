@@ -17,10 +17,13 @@ dependencies = [
 
 [tool.uv.sources]
 # crucible (originally the run-crucible project) is vendored directly at
-# ingest/eval_engine as first-party source, not an external dependency --
-# no separate repo, no submodule. Editable so an edit there is picked up
-# without reinstalling.
-crucible = { path = "eval_engine", editable = true }
+# ingest/eval as first-party source, not an external dependency -- no
+# separate repo, no submodule. Editable so an edit there is picked up
+# without reinstalling. Nested one directory below eval's own pyproject
+# -- see ingest/eval/pyproject.toml, its own build config, package name
+# "crucible" -- so crucible/, jobs/, and eval's own helpers/job.py/data
+# all sit as direct siblings on disk, one directory, not two.
+crucible = { path = "eval", editable = true }
 
 [build-system]
 requires = ["hatchling"]
@@ -29,9 +32,6 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 # the project is named "ingest" but the actual importable packages are
 # "bibleit_ingest" (the ingest pipeline) and "eval" (retrieval evaluation,
-# a separate concern that consumes what ingest produces) — hatchling can't
-# infer either from the project name, so both are told explicitly. eval's
-# source now lives nested at eval_engine/eval (alongside the crucible-
-# derived job engine it depends on), but the import name is still eval --
-# hatchling takes it from the last path segment.
-packages = ["bibleit_ingest", "eval_engine/eval"]
+# a separate concern that consumes what ingest produces) — hatchling
+# can't infer either from the project name, so both are told explicitly.
+packages = ["bibleit_ingest", "eval"]
