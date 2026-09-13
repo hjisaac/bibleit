@@ -1,13 +1,3 @@
-"""
-Derives pericope verse-spans from heading_alignment.json + WEB, and writes a
-flat dataset (one record per pericope: book, testament, chapter, verse,
-heading, verse_count) plus summary stats, for downstream plotting.
-
-Depends on check_heading_alignment.py having already been run.
-
-Run from anywhere:
-    python3 ingest/scripts/pericope_sizes.py
-"""
 import json
 import statistics as st
 from pathlib import Path

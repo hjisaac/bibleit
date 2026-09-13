@@ -1,14 +1,3 @@
-"""
-Plots the two figures from the BSB/WEB pericope alignment check:
-  1. headings per book (66 bars, canonical order, OT/NT colored)
-  2. pericope verse-count distribution (histogram)
-
-Depends on check_heading_alignment.py and pericope_sizes.py having run.
-Writes both PNG and SVG for each into ingest/scripts/figures/.
-
-Run from anywhere:
-    python3 ingest/scripts/plot_pericope_analysis.py
-"""
 import json
 from pathlib import Path
 

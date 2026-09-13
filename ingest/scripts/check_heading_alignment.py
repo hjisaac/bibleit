@@ -1,14 +1,3 @@
-"""
-Checks every BSB pericope heading (s1 marker) address against WEB's verse
-list, using the key (bible_name, testament, book, chapter, verse).
-
-For each s1 heading in BSB, the "address" is the (chapter, verse) of the
-first verse marker that follows it. A hit means that exact address exists
-as a verse record in WEB too. A miss means it does not.
-
-Run from anywhere:
-    python3 ingest/scripts/check_heading_alignment.py
-"""
 import json
 import os
 import glob
