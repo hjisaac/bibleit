@@ -1,16 +1,10 @@
-# Relative to CWD, same convention as every other script in this
-# project ("Run from ingest/"): crucible execute must be invoked from
-# ingest/ for this to land inside this job's own folder. Matches
-# run-crucible's own original scaffold convention (each job package got
-# its own outputs/ dir) -- the experiment folder holds its own results,
-# not a separate cross-job results/ tree.
+# CWD-relative: run crucible execute from ingest/.
 log_dir: eval/jobs/question_to_passage_eval/outputs
 log_console_level: INFO
 log_file_level: DEBUG
 
 k: 1
-# REPO-relative, not CWD-relative (see job.py: resolved via REPO / ...),
-# so these stay correct regardless of where crucible execute is run from.
+# REPO-relative, not CWD-relative (see job.py).
 eval_data_path: ingest/eval/data/question_to_passage.json
 chunk_embeddings_path: ingest/scripts/chunk_embeddings.json
 chunk_embeddings_npy_path: ingest/scripts/chunk_embeddings.npy

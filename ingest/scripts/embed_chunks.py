@@ -1,30 +1,3 @@
-"""
-Chunks pericopes for every book of the Bible, embeds each chunk's
-rendered text, and caches the result as a reusable artifact, so analysis
-doesn't have to recompute embeddings (a real cost: model load plus
-inference time) every run.
-
-Pericope boundaries come from BSB's own headings, but the text actually
-being embedded is WEB's. Those two translations don't always agree on
-verse counts (BSB and WEB diverge in a handful of places, the same kind
-of manuscript-tradition difference as the well-known Romans 16 case), so
-BSB-native pericopes are projected onto WEB's own verse list before
-chunking. Using BSB's native counts directly against WEB's text would
-silently drop the last verse of every pericope where the two disagree.
-
-Chunk metadata (book, headings, verse span) is written to
-CHUNK_EMBEDDINGS_PATH as one JSON document, but the embedding vectors
-themselves go to CHUNK_EMBEDDINGS_NPY_PATH, one row per chunk in the same
-order. Writing floats through json.dumps and holding every embedding in a
-Python list until the run finishes would mean the whole Bible's worth of
-vectors sitting in memory twice over, once as Python objects and again as
-serialized text. A memory-mapped .npy avoids both: each row is written to
-disk as soon as its chunk is embedded, and only that one row is ever held
-in memory.
-
-Run from ingest/:
-    .venv/bin/python scripts/embed_chunks.py
-"""
 import json
 import logging
 import sys
@@ -52,12 +25,7 @@ from bibleit_ingest.constants import (
 from bibleit_ingest.embedding import embed_documents
 from bibleit_ingest.pericopes import derive_bsb_pericopes, project_pericopes
 
-# Console only, no file handler: unlike the eval scripts, this run isn't
-# something later runs get compared against, so there's no need to keep
-# its log around. Pointed at stdout explicitly (logging's own default is
-# stderr) so it stays on a different stream than tqdm's progress bar
-# below, the same separation the progress bar was added for in the first
-# place.
+# stdout, not logging's stderr default, to stay off tqdm's stream below.
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout
 )
@@ -88,9 +56,7 @@ def main():
             cache_dir=str(FASTEMBED_CACHE_DIR),
         )
 
-    # A generator, not a list: chunk text isn't rendered until the
-    # embedder actually asks for it, so we never hold every chunk's
-    # rendered text in memory at once either.
+    # Generator, not a list: text isn't rendered until the embedder asks.
     texts = (render_chunk_text(c, ordered_verses, address_index) for c in chunks)
     embeddings = embed_documents(model, texts)
 

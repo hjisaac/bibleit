@@ -32,20 +32,12 @@ class Job(EvalJob):
         self.k = int(self.config["k"])
         self.embedding_model = EmbeddingModel(self.config["embedding_model"])
 
-        # The one thing config can't supply ahead of time: which model
-        # actually produced the cached embeddings, read from the cache
-        # file itself.
+        # Which model actually produced the cache -- only knowable at runtime.
         cached = json.loads(self.chunk_embeddings_path.read_text())
         self.config["chunk_source_model"] = cached["model"]
 
-        # Recomputed fresh rather than reconstructed from chunk_embeddings.json:
-        # the cache only keeps a flat `headings` list and one total
-        # `verse_count` per chunk, with no record of which verses belong to
-        # which heading within a merged chunk. Chunking is a pure function
-        # of the BSB/WEB source data and the floor/ceiling parameters, none
-        # of which change between runs, so recomputing it here reproduces
-        # the exact same chunks embed_chunks.py produced, with every
-        # pericope intact.
+        # Recomputed, not reconstructed from the cache: it only keeps a
+        # flat headings list, no per-pericope boundaries.
         self.ordered_verses = load_web_verses(self.web_path)
         self.address_index = index_verses_by_address(self.ordered_verses)
         web_addresses_by_book = group_verse_addresses_by_book(self.ordered_verses)
