@@ -1,5 +1,3 @@
-from typing import Any
-
 import typer
 
 from crucible.interface.cli.utils import create_job_package, list_available_jobs, run_named_job
@@ -17,31 +15,8 @@ def _run_command(job_name: str, config: str = "default", overrides: list[str] | 
 		typer.echo(result)
 
 
-def _build_run_command(job_name: str) -> Any:
-	def command(
-		config: str = typer.Option(
-			"default",
-			"--config",
-			"-c",
-			help="YAML config name under jobs/<job>/configs, with or without extension.",
-		),
-		overrides: list[str] = typer.Option(
-			None,
-			"--override",
-			"-o",
-			help="Hydra-style override(s), e.g. -o k=10 (repeat flag for multiple).",
-		),
-	) -> None:
-		"""Start a run of a discovered crucible job."""
-		_run_command(job_name, config, overrides=overrides)
-
-	command.__name__ = f"run_{job_name}"
-	command.__doc__ = f"Start a run of the {job_name} job."
-	return command
-
-
-for discovered_job in list_available_jobs():
-	app.command(name=discovered_job)(_build_run_command(discovered_job))
+def _complete_job_name(incomplete: str) -> list[str]:
+	return [name for name in list_available_jobs() if name.startswith(incomplete)]
 
 
 @app.command("list")
@@ -53,7 +28,9 @@ def list_jobs() -> None:
 
 @app.command("execute")
 def execute_named(
-	job_name: str = typer.Argument(..., help="Discovered job name (e.g. mlp)."),
+	job_name: str = typer.Argument(
+		..., help="Discovered job name (e.g. mlp).", autocompletion=_complete_job_name
+	),
 	config: str = typer.Option(
 		"default",
 		"--config",
