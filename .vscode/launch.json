@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Current File (ingest venv)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "python": "${workspaceFolder}/ingest/.venv/bin/python",
+      "cwd": "${workspaceFolder}/ingest",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}

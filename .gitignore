@@ -1,3 +1,33 @@
+# Downloaded model weights (fastembed's cache, see FASTEMBED_CACHE_DIR in
+# bibleit_ingest/constants.py) -- large binaries fetched from HuggingFace,
+# not something to commit.
+ingest/data/models/
+
+# Derived/generated artifacts: each of these is reproducible by rerunning
+# the script that made it (pericopes.py's derivation, embed_chunks.py,
+# check_heading_alignment.py, pericope_sizes.py), so they're outputs, not
+# source. ingest/data/translations/ (the actual BSB/WEB source texts) is
+# deliberately NOT listed here -- nothing regenerates those from something
+# smaller, so they're committed for guaranteed reproducibility.
+ingest/data/derived/
+ingest/scripts/chunk_embeddings.json
+ingest/scripts/chunk_embeddings.npy
+ingest/scripts/heading_alignment.json
+ingest/scripts/pericope_sizes.json
+# Each eval job's own run history: log_dir points inside the job's own
+# folder (see configs/default.yaml), not a separate cross-job results/
+# tree, so this covers every job, not just the one that exists today.
+ingest/eval/jobs/*/outputs/
+# Weights & Biases' own local run cache (see WBTracker) -- run data
+# already lives in each job's outputs/ and gets uploaded to W&B directly.
+ingest/wandb/
+
+# Temporary safety copy from before eval/ and job_engine/ were
+# consolidated into one eval/ directory, kept until that migration is
+# confirmed solid. Not meant to be committed -- git history already has
+# the pre-migration state if it's ever needed.
+ingest/eval.back/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
