@@ -1,75 +1,49 @@
 import logging
-import logging.config
 from pathlib import Path
 from typing import Any
 
-__RUN_FILE_PREFIX = "run_file:"
+_FORMAT = "%(asctime)s [%(levelname)s] %(name)s - %(message)s"
+_DATEFMT = "%Y-%m-%d %H:%M:%S"
 
-def _get_run_file_handler_name(run_id: str) -> str:
-	return f"{__RUN_FILE_PREFIX}{run_id}"
-
-def _get_logging_config(
-	console_level: str,
-	file_level: str,
-	file_handler_name: str,
-	log_file: str,
-) -> dict[str, Any]:
-	return {
-		"version": 1,
-		"disable_existing_loggers": False,
-		"formatters": {
-			"standard": {
-				"format": "%(asctime)s [%(levelname)s] %(name)s - %(message)s",
-				"datefmt": "%Y-%m-%d %H:%M:%S",
-			}
-		},
-		"handlers": {
-			"console": {
-				"class": "logging.StreamHandler",
-				"level": console_level,
-				"formatter": "standard",
-			},
-			file_handler_name: {
-				"class": "logging.FileHandler",
-				"level": file_level,
-				"formatter": "standard",
-				"filename": log_file,
-			},
-		},
-		"root": {
-			"level": "DEBUG",
-			"handlers": ["console", file_handler_name],
-		},
-	}
+_console_configured = False
 
 
-def configure_logging(config: dict[str, Any], run_id: str) -> None:
-	"""Configure the root logger with a console handler and a per-run file handler.
+def _formatter() -> logging.Formatter:
+	return logging.Formatter(_FORMAT, datefmt=_DATEFMT)
 
-	Any logging.getLogger(__name__) call anywhere in the codebase will
-	propagate up to root and be captured automatically.
-	"""
+
+def ensure_console_configured(console_level: str = "INFO") -> None:
+	"""Attach the console handler once per process. Safe to call from every
+	job instantiation; later calls are no-ops, so console level is fixed by
+	whichever job runs first in a given process."""
+	global _console_configured
+	if _console_configured:
+		return
+
+	root = logging.getLogger()
+	root.setLevel(logging.DEBUG)
+	handler = logging.StreamHandler()
+	handler.setLevel(console_level)
+	handler.setFormatter(_formatter())
+	root.addHandler(handler)
+	_console_configured = True
+
+
+def attach_run_file_handler(config: dict[str, Any], run_id: str) -> logging.Handler:
+	"""Add a file handler scoped to this one job instance. Caller keeps the
+	returned handler and passes it to detach_run_file_handler in teardown --
+	never looked up by name, so concurrent instances never touch each other's
+	handler."""
 	log_dir = Path(config["log_dir"])
 	log_dir.mkdir(parents=True, exist_ok=True)
 
-	console_level = config.get("log_console_level", "INFO")
-	file_level = config.get("log_file_level", "DEBUG")
-	run_file_handler_name = _get_run_file_handler_name(run_id)
-
-	# Clean up any existing run_file: handler before reconfiguring
-	root = logging.getLogger()
-	for handler in list(root.handlers):
-		if (handler.get_name() or "").startswith(__RUN_FILE_PREFIX):
-			root.removeHandler(handler)
-			handler.close()
-
-	logging.config.dictConfig(
-		_get_logging_config(
-			console_level=console_level,
-			file_level=file_level,
-			file_handler_name=run_file_handler_name,
-			log_file=str(log_dir / f"{run_id}.log"),
-		)
-	)
+	handler = logging.FileHandler(str(log_dir / f"{run_id}.log"))
+	handler.setLevel(config.get("log_file_level", "DEBUG"))
+	handler.setFormatter(_formatter())
+	logging.getLogger().addHandler(handler)
+	return handler
 
 
+def detach_run_file_handler(handler: logging.Handler) -> None:
+	logging.getLogger().removeHandler(handler)
+	handler.close()

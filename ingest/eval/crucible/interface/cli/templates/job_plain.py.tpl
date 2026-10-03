@@ -17,11 +17,11 @@ logger = logging.getLogger(__name__)
 class Job(AbstractJob):
 	"""Scaffolded job '{job_name}'."""
 
-	def on_prepare(self) -> None:
-		self.data = {{"status": "ready"}}
+	def on_prepare(self) -> dict:
+		return {{"status": "ready"}}
 
-	def on_execute(self) -> dict[str, str]:
-		logger.info("Job '{job_name}' executed with data status: %s", self.data["status"])
+	def on_execute(self, prepared: dict) -> dict[str, str]:
+		logger.info("Job '{job_name}' executed with data status: %s", prepared["status"])
 		return {{"status": "ok", "job": "{job_name}", "kind": "job"}}
 
 

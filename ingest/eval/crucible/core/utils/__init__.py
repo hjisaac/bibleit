@@ -1,7 +1,17 @@
+import uuid
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 from typing import TypeVar
 
 TDefault = TypeVar("TDefault")
+
+
+def new_timestamped_id() -> str:
+    """A unique, roughly-sortable id: a human-readable timestamp plus a
+    short random suffix to rule out collisions under concurrent dispatch."""
+    now = datetime.now()
+    timestamp = f"{now.strftime('%Y-%b-%d_%H-%M-%S')}-{now.microsecond // 1000:03d}"
+    return f"{timestamp}-{uuid.uuid4().hex[:6]}"
 
 
 def smart_getattr(

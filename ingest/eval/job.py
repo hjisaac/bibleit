@@ -11,7 +11,7 @@ from bibleit_ingest.constants import REPO
 logger = logging.getLogger(__name__)
 
 
-class EvalJob(AbstractJob):
+class EvalJobBase(AbstractJob):
     """Base class for bibleit's retrieval-only eval jobs. A subclass only
     writes on_prepare and on_execute (returning trigger_eval's result
     unchanged); this handles config path resolution, the W&B tracker,
@@ -30,7 +30,7 @@ class EvalJob(AbstractJob):
         logger.info("Using config:\n%s", json.dumps(self.config, indent=2, default=str))
         self.tracker = WBTracker(run_name=self.run_id, project="bibleit-eval", config=self.config)
 
-    def on_finalize(self, result: dict[str, Any]) -> None:
+    def on_finalize(self, prepared: dict, result: dict[str, Any]) -> None:
         logger.info("Metrics:\n%s", json.dumps(result["metrics"], indent=2))
 
         payload = {"run_conditions": self.config, **result}

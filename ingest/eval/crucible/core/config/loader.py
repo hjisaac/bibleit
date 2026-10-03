@@ -23,6 +23,12 @@ def _resolve_config_path(job_name: str, config_name: str) -> tuple[Path, str, Pa
             "Only YAML configs are supported. Use .yaml/.yml or pass the config name without extension."
         )
 
+    # A path to an existing file is used as-is, so a config can live anywhere
+    # rather than only under the job's own configs/.
+    if requested_path.is_file():
+        resolved = requested_path.resolve()
+        return resolved.parent, resolved.stem, resolved
+
     config_stem = requested_path.stem if requested_path.suffix else config_name.strip()
     candidates = [config_dir / f"{config_stem}{extension}" for extension in SUPPORTED_CONFIG_EXTENSIONS]
     resolved = next((path for path in candidates if path.exists()), None)
@@ -54,12 +60,20 @@ def load_run_config(
     else:
         root_cfg = OmegaConf.create({})
 
+    # A config living outside the job's own configs/ layers on top of the
+    # job's default, so it only has to carry what it changes.
+    job_default_path = JOBS_ROOT / normalized_job_name / "configs" / "default.yaml"
+    if config_dir != job_default_path.parent and job_default_path.exists():
+        base_cfg = OmegaConf.load(str(job_default_path))
+    else:
+        base_cfg = OmegaConf.create({})
+
     # Load subconfig with Hydra
     with initialize_config_dir(version_base=None, config_dir=str(config_dir.resolve())):
         sub_cfg = compose(config_name=config_stem, overrides=resolved_overrides)
 
     # Merge: subconfig values take precedence
-    merged_cfg = OmegaConf.merge(root_cfg, sub_cfg)
+    merged_cfg = OmegaConf.merge(root_cfg, base_cfg, sub_cfg)
     resolved = OmegaConf.to_container(merged_cfg, resolve=True)
     if not isinstance(resolved, dict):
         raise ValueError(

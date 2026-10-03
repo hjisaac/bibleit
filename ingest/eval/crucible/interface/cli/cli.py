@@ -1,5 +1,8 @@
+from pathlib import Path
+
 import typer
 
+from crucible.core.runtime.sweeping import save_runs
 from crucible.interface.cli.utils import create_job_package, list_available_jobs, run_named_job
 
 app = typer.Typer(
@@ -7,12 +10,6 @@ app = typer.Typer(
 	help="Discover and run crucible jobs defined under jobs/.",
 	pretty_exceptions_enable=False,
 )
-
-
-def _run_command(job_name: str, config: str = "default", overrides: list[str] | None = None) -> None:
-	result = run_named_job(job_name, config, overrides=overrides)
-	if result is not None:
-		typer.echo(result)
 
 
 def _complete_job_name(incomplete: str) -> list[str]:
@@ -35,7 +32,7 @@ def execute_named(
 		"default",
 		"--config",
 		"-c",
-		help="YAML config name under jobs/<job>/configs, with or without extension.",
+		help="Config name under jobs/<job>/configs, or a path to a YAML file. Any list value in it is varied.",
 	),
 	overrides: list[str] = typer.Option(
 		None,
@@ -43,9 +40,22 @@ def execute_named(
 		"-o",
 		help="Hydra-style override(s), e.g. -o k=10 (repeat flag for multiple).",
 	),
+	n_jobs: int = typer.Option(1, "--n-jobs", help="Parallel workers (default 1 -- safe for shared model loading)."),
+	out: Path = typer.Option(None, "--out", help="Where to write the comparison table when there is more than one run."),
 ) -> None:
-	"""Execute a discovered crucible job by name (produces one run)."""
-	_run_command(job_name, config, overrides=overrides)
+	"""Execute a discovered crucible job. One run, or one per combination if
+	the config varies anything."""
+	runs = run_named_job(job_name, config, overrides=overrides, n_jobs=n_jobs)
+
+	if len(runs) == 1:
+		typer.echo(runs[0]["result"])
+		return
+
+	path = out or Path("runs") / f"{runs[0]['sweep_id']}.json"
+	typer.echo(f"{len(runs)} runs finished.")
+	for row in save_runs(runs, path):
+		typer.echo(row)
+	typer.echo(f"Saved to {path}")
 
 
 @app.command("create")

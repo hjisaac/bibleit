@@ -1,5 +1,8 @@
 import os
+import re
+from enum import Enum
 from pathlib import Path
+from typing import Literal
 
 # Name of the directory that holds user-authored jobs (can be changed for custom setups).
 JOBS_ROOT_NAME = "jobs"
@@ -15,6 +18,19 @@ JOBS_ROOT = (
     else Path(__file__).resolve().parents[3] / JOBS_ROOT_NAME
 )
 SUPPORTED_CONFIG_EXTENSIONS = (".yaml", ".yml")
+
+# Characters a run_id must not contain: it becomes a log and result filename,
+# and override values routinely hold '/' (model names).
+UNSAFE_IN_FILENAME = re.compile(r"[^A-Za-z0-9_.,=-]")
+
+# What to do with a run that raises: propagate it, or record it as a row and
+# let the remaining runs finish.
+OnError = Literal["raise", "record"]
+
+
+class RunState(Enum):
+    COMPLETE = "complete"
+    FAILED = "failed"
 
 # Constant for the root config filename
 ROOT_CONFIG_FILENAME = "root.config.yaml"
