@@ -28,6 +28,14 @@ ingest/wandb/
 # the pre-migration state if it's ever needed.
 ingest/eval.back/
 
+# joblib.Memory cache for question_to_passage_eval's chunking/indexing step
+# (see jobs/question_to_passage_eval/job.py) -- reproducible from source data.
+ingest/.crucible_cache/
+
+# Comparison tables written when one execute produces several runs; the
+# per-run results they summarise already live in each job's own outputs/.
+ingest/runs/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -246,3 +254,4 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+**/wandb/
