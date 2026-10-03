@@ -1,0 +1,14 @@
+# Chunking parameters
+floor: 5
+ceiling: 30
+
+# Context limit for truncation checks
+token_limit: 512
+
+# null = profiling only; string = profile and embed
+embedding_model: null
+
+# Path inputs relative to REPO
+web_path: "ingest/data/translations/en/web.json"
+bsb_dir: "ingest/data/translations/en/bsb"
+log_dir: "ingest/eval/jobs/chunk_profile/outputs"
