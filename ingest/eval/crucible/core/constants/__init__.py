@@ -18,6 +18,7 @@ JOBS_ROOT = (
     else Path(__file__).resolve().parents[3] / JOBS_ROOT_NAME
 )
 SUPPORTED_CONFIG_EXTENSIONS = (".yaml", ".yml")
+ROOT_CONFIG_FILENAME = "root.config.yaml"
 
 # Characters a run_id must not contain: it becomes a log and result filename,
 # and override values routinely hold '/' (model names).
@@ -31,6 +32,3 @@ OnError = Literal["raise", "record"]
 class RunState(Enum):
     COMPLETE = "complete"
     FAILED = "failed"
-
-# Constant for the root config filename
-ROOT_CONFIG_FILENAME = "root.config.yaml"

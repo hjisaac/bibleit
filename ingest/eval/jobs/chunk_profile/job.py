@@ -1,10 +1,12 @@
 import json
 import logging
+import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from crucible.core.jobs import AbstractJob
-from crucible.core.trackers.wandb import WBTracker
+import numpy as np
+from fastembed import TextEmbedding
 
 from bibleit_ingest.chunking import (
     FloorCeilingMergeChunker,
@@ -13,10 +15,22 @@ from bibleit_ingest.chunking import (
     load_web_verses,
     render_chunk_text,
 )
-from bibleit_ingest.constants import REPO
+from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, REPO
+from bibleit_ingest.embedding import embed_documents
 from bibleit_ingest.pericopes import derive_bsb_pericopes, project_pericopes
+from crucible.core.jobs import AbstractJob
+from crucible.core.trackers.wandb import WBTracker
 
 logger = logging.getLogger(__name__)
+
+
+def _get_git_commit() -> str | None:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=str(REPO), text=True
+        ).strip()
+    except Exception:
+        return None
 
 
 class Job(AbstractJob):
@@ -24,22 +38,164 @@ class Job(AbstractJob):
         self.web_path = REPO / self.config["web_path"]
         self.bsb_dir = REPO / self.config["bsb_dir"]
         self.log_dir = REPO / self.config["log_dir"]
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+
+        tag = self.config.get("tag")
+        tag_str = f"_{tag}" if tag else ""
+        floor = self.config["floor"]
+        ceiling = self.config["ceiling"]
+        self.slug = f"{self.run_id}{tag_str}_f{floor}_c{ceiling}"
+        self.run_dir = self.log_dir / self.slug
+
 
     def on_track(self) -> None:
         logger.info("Using config:\n%s", json.dumps(self.config, indent=2, default=str))
-        self.tracker = WBTracker(run_name=self.run_id, project="bibleit-chunk-profile", config=self.config)
+        self.tracker = WBTracker(
+            run_name=self.slug, project="bibleit-chunk-profile", config=self.config
+        )
 
     def on_prepare(self) -> dict:
-        # TODO: Load verses, project pericopes, and apply chunker with floor/ceiling
-        return {}
+        ordered_verses = load_web_verses(self.web_path)
+        address_index = index_verses_by_address(ordered_verses)
+        web_addresses_by_book = group_verse_addresses_by_book(ordered_verses)
+
+        bsb_native = derive_bsb_pericopes(self.bsb_dir)
+        resolved, _ = project_pericopes(bsb_native, web_addresses_by_book)
+
+        tok_model_name = self.config.get(
+            "tokenizer_model", "nomic-ai/nomic-embed-text-v1.5"
+        )
+        embed_model = TextEmbedding(
+            model_name=tok_model_name, cache_dir=str(FASTEMBED_CACHE_DIR)
+        )
+
+        return {
+            "resolved_pericopes": resolved,
+            "ordered_verses": ordered_verses,
+            "address_index": address_index,
+            "embed_model": embed_model,
+        }
 
     def on_execute(self, prepared: dict) -> dict[str, Any]:
-        # TODO: Calculate token/verse distributions, quantiles, and truncation counts
-        return {}
+        floor = int(self.config["floor"])
+        ceiling = int(self.config["ceiling"])
+        chunker = FloorCeilingMergeChunker(floor=floor, ceiling=ceiling)
+        chunks = chunker.chunk_bible(prepared["resolved_pericopes"])
+
+        tokenizer = prepared["embed_model"].model.tokenizer
+        ordered_verses = prepared["ordered_verses"]
+        address_index = prepared["address_index"]
+
+        texts = []
+        token_lengths = []
+        word_counts = []
+        verse_counts = [c.verse_count for c in chunks]
+
+        for chunk in chunks:
+            text = render_chunk_text(chunk, ordered_verses, address_index)
+            texts.append(text)
+            token_lengths.append(len(tokenizer.encode(text).ids))
+            word_counts.append(len(text.split()))
+
+        return {
+            "chunks": chunks,
+            "texts": texts,
+            "token_lengths": token_lengths,
+            "word_counts": word_counts,
+            "verse_counts": verse_counts,
+        }
 
     def on_finalize(self, prepared: dict, result: dict[str, Any]) -> None:
-        super().on_finalize(prepared, result)
-        # TODO: Save metrics artifact, and conditionally compute embeddings if embedding_model is set
+        chunks = result["chunks"]
+        token_lengths = result["token_lengths"]
+        limit = int(self.config.get("token_limit", 512))
+        truncated = sum(1 for t in token_lengths if t > limit)
+        trunc_pct = (truncated / len(chunks) * 100) if chunks else 0.0
+
+        metrics = {
+            "total_chunks": len(chunks),
+            "min_tokens": int(np.min(token_lengths)),
+            "max_tokens": int(np.max(token_lengths)),
+            "mean_tokens": round(float(np.mean(token_lengths)), 2),
+            "p50_tokens": round(float(np.percentile(token_lengths, 50)), 2),
+            "p90_tokens": round(float(np.percentile(token_lengths, 90)), 2),
+            "p95_tokens": round(float(np.percentile(token_lengths, 95)), 2),
+            "p99_tokens": round(float(np.percentile(token_lengths, 99)), 2),
+            "truncated_count": truncated,
+            "truncation_pct": round(trunc_pct, 2),
+            "mean_verses": round(float(np.mean(result["verse_counts"])), 2),
+            "mean_words": round(float(np.mean(result["word_counts"])), 2),
+        }
+        logger.info("Distribution metrics:\n%s", json.dumps(metrics, indent=2))
+
+        if self.tracker is not None:
+            self.tracker.track_summary(**metrics)
+
+        self._save_artifacts(prepared, result, metrics)
+
+    def _save_artifacts(
+        self, prepared: dict, result: dict[str, Any], metrics: dict[str, Any]
+    ) -> None:
+        self.run_dir.mkdir(parents=True, exist_ok=True)
+        chunks_file = self.run_dir / "chunks.jsonl"
+        with chunks_file.open("w", encoding="utf-8") as f:
+            for i, chunk in enumerate(result["chunks"]):
+                record = {
+                    "id": i,
+                    "book": chunk.book,
+                    "chapter": chunk.pericopes[0].chapter,
+                    "verse": chunk.pericopes[0].verse,
+                    "headings": chunk.headings,
+                    "verse_count": chunk.verse_count,
+                    "tokens": result["token_lengths"][i],
+                    "words": result["word_counts"][i],
+                    "text": result["texts"][i],
+                }
+                f.write(json.dumps(record) + "\n")
+
+        embeddings_file = None
+        if emb_model_name := self.config.get("embedding_model"):
+            logger.info("Computing embeddings for %d chunks using %s", len(result["chunks"]), emb_model_name)
+            embeddings = list(embed_documents(prepared["embed_model"], result["texts"]))
+            matrix = np.array(embeddings)
+            embeddings_file = self.run_dir / "embeddings.npy"
+            np.save(embeddings_file, matrix)
+            logger.info("Saved embeddings matrix of shape %s to %s", matrix.shape, embeddings_file)
+
+        manifest = {
+            "run_id": self.run_id,
+            "slug": self.slug,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "git_commit": _get_git_commit(),
+            "parameters": {
+                "floor": int(self.config["floor"]),
+                "ceiling": int(self.config["ceiling"]),
+                "token_limit": int(self.config["token_limit"]),
+                "embedding_model": self.config.get("embedding_model"),
+                "tag": self.config.get("tag"),
+            },
+            "metrics": metrics,
+            "artifacts": {
+                "chunks": str(chunks_file.relative_to(REPO)),
+                "embeddings": str(embeddings_file.relative_to(REPO)) if embeddings_file else None,
+            },
+        }
+        manifest_file = self.run_dir / "manifest.json"
+        manifest_file.write_text(json.dumps(manifest, indent=2))
+
+        index_file = self.log_dir / "index.jsonl"
+        with index_file.open("a", encoding="utf-8") as f:
+            index_record = {
+                "run_id": self.run_id,
+                "slug": self.slug,
+                "tag": self.config.get("tag"),
+                "timestamp": manifest["timestamp"],
+                "parameters": manifest["parameters"],
+                "metrics": metrics,
+                "dir": str(self.run_dir.relative_to(REPO)),
+            }
+            f.write(json.dumps(index_record) + "\n")
+        logger.info("Artifacts saved to %s", self.run_dir)
 
 
 JOB_CLASS = Job

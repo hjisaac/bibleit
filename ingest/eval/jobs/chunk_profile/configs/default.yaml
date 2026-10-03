@@ -1,14 +1,21 @@
-# Chunking parameters
+# Chunking parameters (verse-based)
 floor: 5
 ceiling: 30
 
 # Context limit for truncation checks
 token_limit: 512
 
+# Optional model to tokenize chunks (defaults to Nomic v1.5)
+tokenizer_model: "nomic-ai/nomic-embed-text-v1.5"
+
 # null = profiling only; string = profile and embed
 embedding_model: null
 
-# Path inputs relative to REPO
-web_path: "ingest/data/translations/en/web.json"
-bsb_dir: "ingest/data/translations/en/bsb"
+# Optional human tag for this run (e.g. baseline, psalm_tune)
+tag: null
+
+
+# Paths relative to REPO
+web_path: "ingest/data/translations/web/en/web.json"
+bsb_dir: "ingest/data/translations/bsb/en"
 log_dir: "ingest/eval/jobs/chunk_profile/outputs"
