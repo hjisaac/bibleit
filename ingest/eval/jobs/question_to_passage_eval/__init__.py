@@ -1,3 +1,4 @@
-from .job import JOB_CLASS, Job
+from .job import EvalJobQuestionToPassage, JOB_CLASS
+Job = EvalJobQuestionToPassage
 
-__all__ = ["Job", "JOB_CLASS"]
+__all__ = ["EvalJobQuestionToPassage", "Job", "JOB_CLASS"]

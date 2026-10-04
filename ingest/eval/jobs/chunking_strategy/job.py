@@ -16,32 +16,23 @@ from bibleit_ingest.chunking import (
 from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, REPO
 from bibleit_ingest.embedding import save_chunk_embeddings
 from bibleit_ingest.pericopes import derive_bsb_pericopes, project_pericopes
-from crucible.core.jobs import AbstractJob
-from crucible.core.trackers.wandb import WBTracker
+from eval.job import EvalJobBase
 
 logger = logging.getLogger(__name__)
 
 
-class Job(AbstractJob):
-    def on_start(self) -> None:
-        self.web_path = REPO / self.config["web_path"]
-        self.bsb_dir = REPO / self.config["bsb_dir"]
-        self.log_dir = REPO / self.config["log_dir"]
-        self.log_dir.mkdir(parents=True, exist_ok=True)
+class EvalJobChunkingStrategy(EvalJobBase):
+    category = "analysis"
+    path_config_keys = ("web_path", "bsb_dir")
 
+    def on_start(self) -> None:
+        super().on_start()
         tag = self.config.get("tag")
         tag_str = f"_{tag}" if tag else ""
         floor = self.config["floor"]
         ceiling = self.config["ceiling"]
         self.slug = f"{self.run_id}{tag_str}_f{floor}_c{ceiling}"
-        self.run_dir = self.log_dir / self.slug
-
-
-    def on_track(self) -> None:
-        logger.info("Using config:\n%s", json.dumps(self.config, indent=2, default=str))
-        self.tracker = WBTracker(
-            run_name=self.slug, project="bibleit-chunk-profile", config=self.config
-        )
+        self.run_dir = REPO / self.config["log_dir"] / self.slug
 
     def on_prepare(self) -> dict:
         ordered_verses = load_web_verses(self.web_path)
@@ -86,17 +77,6 @@ class Job(AbstractJob):
             token_lengths.append(len(tokenizer.encode(text).ids))
             word_counts.append(len(text.split()))
 
-        return {
-            "chunks": chunks,
-            "texts": texts,
-            "token_lengths": token_lengths,
-            "word_counts": word_counts,
-            "verse_counts": verse_counts,
-        }
-
-    def on_finalize(self, prepared: dict, result: dict[str, Any]) -> None:
-        chunks = result["chunks"]
-        token_lengths = result["token_lengths"]
         limit = int(self.config.get("token_limit", 512))
         truncated = sum(1 for t in token_lengths if t > limit)
         trunc_pct = (truncated / len(chunks) * 100) if chunks else 0.0
@@ -112,24 +92,23 @@ class Job(AbstractJob):
             "p99_tokens": round(float(np.percentile(token_lengths, 99)), 2),
             "truncated_count": truncated,
             "truncation_pct": round(trunc_pct, 2),
-            "mean_verses": round(float(np.mean(result["verse_counts"])), 2),
-            "mean_words": round(float(np.mean(result["word_counts"])), 2),
+            "mean_verses": round(float(np.mean(verse_counts)), 2),
+            "mean_words": round(float(np.mean(word_counts)), 2),
         }
-        logger.info("Distribution metrics:\n%s", json.dumps(metrics, indent=2))
 
-        self.run_dir.mkdir(parents=True, exist_ok=True)
-        payload = {"run_conditions": self.config, "slug": self.slug, "metrics": metrics}
-        out_path = self.run_dir / f"{self.run_id}.json"
-        out_path.write_text(json.dumps(payload, indent=2, default=str))
-        logger.info("Saved run summary to %s", out_path)
+        return {
+            "chunks": chunks,
+            "texts": texts,
+            "metrics": metrics,
+        }
 
+    def on_finalize(self, prepared: dict, result: dict[str, Any]) -> None:
+        super().on_finalize(prepared, result)
         if emb_model := self.config.get("embedding_model"):
-            logger.info("Embedding %d chunks with %s", len(chunks), emb_model)
-            save_chunk_embeddings(chunks, result["texts"], prepared["embed_model"], self.run_dir)
-
-        if self.tracker is not None:
-            self.tracker.track_summary(**metrics)
-            self.tracker.track_artifact(out_path, name="chunk-profile-summary", type="eval_result")
+            logger.info("Embedding %d chunks with %s", len(result["chunks"]), emb_model)
+            save_chunk_embeddings(
+                result["chunks"], result["texts"], prepared["embed_model"], self.run_dir
+            )
 
 
-JOB_CLASS = Job
+JOB_CLASS = EvalJobChunkingStrategy

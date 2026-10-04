@@ -39,7 +39,7 @@ def _build_chunks_and_index(web_path: Path, bsb_dir: Path):
     return chunks, address_index
 
 
-class Job(EvalJobBase):
+class EvalJobQuestionToPassage(EvalJobBase):
     path_config_keys = (
         "eval_data_path",
         "chunk_embeddings_path",
@@ -85,4 +85,4 @@ class Job(EvalJobBase):
         )
 
 
-JOB_CLASS = Job
+JOB_CLASS = EvalJobQuestionToPassage
