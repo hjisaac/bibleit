@@ -1,25 +1,18 @@
 import itertools
 import json
 import logging
-from enum import Enum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from joblib import Parallel, delayed
 
 from crucible.core.config.overrides import apply_overrides
 from crucible.core.constants import UNSAFE_IN_FILENAME
 from crucible.core.jobs import AbstractJob
+from crucible.core.types import OnError, RunState
 from crucible.core.utils import new_timestamped_id
 
 logger = logging.getLogger(__name__)
-
-OnError = Literal["raise", "record"]
-
-
-class RunState(Enum):
-	COMPLETE = "complete"
-	FAILED = "failed"
 
 
 def _slug(overrides: dict[str, Any]) -> str:
