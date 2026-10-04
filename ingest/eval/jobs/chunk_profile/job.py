@@ -14,7 +14,7 @@ from bibleit_ingest.chunking import (
     render_chunk_text,
 )
 from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, REPO
-from bibleit_ingest.embedding import embed_documents
+from bibleit_ingest.embedding import save_chunk_embeddings
 from bibleit_ingest.pericopes import derive_bsb_pericopes, project_pericopes
 from crucible.core.jobs import AbstractJob
 from crucible.core.trackers.wandb import WBTracker
@@ -117,54 +117,18 @@ class Job(AbstractJob):
         }
         logger.info("Distribution metrics:\n%s", json.dumps(metrics, indent=2))
 
-        if self.tracker is not None:
-            self.tracker.track_summary(**metrics)
-
-        self._save_artifacts(prepared, result, metrics)
-
-    def _save_artifacts(
-        self, prepared: dict, result: dict[str, Any], metrics: dict[str, Any]
-    ) -> None:
         self.run_dir.mkdir(parents=True, exist_ok=True)
-        chunks_file = self.run_dir / "chunks.jsonl"
-        with chunks_file.open("w", encoding="utf-8") as f:
-            for i, chunk in enumerate(result["chunks"]):
-                record = {
-                    "id": i,
-                    "book": chunk.book,
-                    "chapter": chunk.pericopes[0].chapter,
-                    "verse": chunk.pericopes[0].verse,
-                    "headings": chunk.headings,
-                    "verse_count": chunk.verse_count,
-                    "tokens": result["token_lengths"][i],
-                    "words": result["word_counts"][i],
-                    "text": result["texts"][i],
-                }
-                f.write(json.dumps(record) + "\n")
-
-        embeddings_file = None
-        if emb_model_name := self.config.get("embedding_model"):
-            logger.info("Computing embeddings for %d chunks using %s", len(result["chunks"]), emb_model_name)
-            embeddings = list(embed_documents(prepared["embed_model"], result["texts"]))
-            matrix = np.array(embeddings)
-            embeddings_file = self.run_dir / "embeddings.npy"
-            np.save(embeddings_file, matrix)
-            logger.info("Saved embeddings matrix of shape %s to %s", matrix.shape, embeddings_file)
-
-        payload = {
-            "run_conditions": self.config,
-            "slug": self.slug,
-            "metrics": metrics,
-            "artifacts": {
-                "chunks": str(chunks_file.relative_to(REPO)),
-                "embeddings": str(embeddings_file.relative_to(REPO)) if embeddings_file else None,
-            },
-        }
+        payload = {"run_conditions": self.config, "slug": self.slug, "metrics": metrics}
         out_path = self.run_dir / f"{self.run_id}.json"
         out_path.write_text(json.dumps(payload, indent=2, default=str))
         logger.info("Saved run summary to %s", out_path)
 
+        if emb_model := self.config.get("embedding_model"):
+            logger.info("Embedding %d chunks with %s", len(chunks), emb_model)
+            save_chunk_embeddings(chunks, result["texts"], prepared["embed_model"], self.run_dir)
+
         if self.tracker is not None:
+            self.tracker.track_summary(**metrics)
             self.tracker.track_artifact(out_path, name="chunk-profile-summary", type="eval_result")
 
 
