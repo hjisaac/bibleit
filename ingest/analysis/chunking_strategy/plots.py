@@ -52,14 +52,10 @@ def plot_token_distribution(records: list[dict[str, Any]], out_path: Path, token
 
 
 def plot_beeswarm_box(records: list[dict[str, Any]], out_path: Path, token_limit: int = 512) -> Path:
-    # OT vs NT breakdown
-    data = [
-        {
-            "testament": "Old Testament" if r.get("testament") == "OT" else "New Testament",
-            "token_count": r["token_count"],
-        }
-        for r in records
-    ]
+    data = {
+        "testament": ["Old Testament" if r.get("testament") == "OT" else "New Testament" for r in records],
+        "token_count": [r["token_count"] for r in records],
+    }
 
     fig, ax = plt.subplots(figsize=(8, 6))
     palette = {"Old Testament": "#4a7bb0", "New Testament": "#e07a5f"}
@@ -69,12 +65,14 @@ def plot_beeswarm_box(records: list[dict[str, Any]], out_path: Path, token_limit
         data=data,
         x="testament",
         y="token_count",
+        hue="testament",
         palette=palette,
         ax=ax,
         width=0.45,
         boxprops=dict(alpha=0.4),
         showmeans=True,
         meanprops={"marker": "o", "markerfacecolor": "white", "markeredgecolor": "black", "markersize": "6"},
+        legend=False,
     )
 
     # Jittered strip overlay giving beeswarm-style density & outlier visibility
@@ -82,11 +80,13 @@ def plot_beeswarm_box(records: list[dict[str, Any]], out_path: Path, token_limit
         data=data,
         x="testament",
         y="token_count",
+        hue="testament",
         palette=palette,
         ax=ax,
         jitter=0.25,
         size=3.5,
         alpha=0.35,
+        legend=False,
     )
 
     ax.axhline(token_limit, color="#d9534f", linestyle="--", linewidth=1.8, label=f"Token Limit ({token_limit})")
@@ -141,35 +141,36 @@ def plot_chunk_overview(records: list[dict[str, Any]], out_path: Path, token_lim
     ax_dist.grid(axis="y", alpha=0.3)
 
     # Panel 2: Box + Beeswarm
-    data = [
-        {
-            "testament": "Old Testament" if r.get("testament") == "OT" else "New Testament",
-            "token_count": r["token_count"],
-        }
-        for r in records
-    ]
+    data = {
+        "testament": ["Old Testament" if r.get("testament") == "OT" else "New Testament" for r in records],
+        "token_count": [r["token_count"] for r in records],
+    }
     palette = {"Old Testament": "#4a7bb0", "New Testament": "#e07a5f"}
 
     sns.boxplot(
         data=data,
         x="testament",
         y="token_count",
+        hue="testament",
         palette=palette,
         ax=ax_box,
         width=0.45,
         boxprops=dict(alpha=0.4),
         showmeans=True,
         meanprops={"marker": "o", "markerfacecolor": "white", "markeredgecolor": "black", "markersize": "6"},
+        legend=False,
     )
     sns.stripplot(
         data=data,
         x="testament",
         y="token_count",
+        hue="testament",
         palette=palette,
         ax=ax_box,
         jitter=0.25,
         size=3.5,
         alpha=0.35,
+        legend=False,
     )
     ax_box.axhline(token_limit, color="#d9534f", linestyle="--", linewidth=1.8, label=f"Limit ({token_limit})")
     ax_box.set_title("Density & Outliers by Testament", fontsize=12, fontweight="bold")
