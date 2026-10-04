@@ -21,23 +21,36 @@ The user is building this project to learn by doing and to have full ownership o
 
 ---
 
-## Code Quality & Style Guidelines
+## Code Quality & Engineering Standards
 
-### 1. Concise Comments
+### 1. Quality Over Volume (Avoid Code Bloat)
+- We strictly prioritize **code quality over volume**. Never generate unnecessary lines of code, boilerplate, or over-engineered abstractions.
+- **Lean Job Hooks**: Crucible job files (`job.py`) are orchestrators, not data transformers. Keep lifecycle hooks (`on_prepare`, `on_execute`, `on_finalize`) concise and focused (~10–20 lines max).
+- **Domain Logic Belongs in Domain Modules**: Heavy serialization, file I/O, or data processing belongs in reusable functions in `bibleit_ingest`, never inlined into job hooks.
+- **Do Not Duplicate Canonical Data**: Avoid writing duplicate copies of the entire Bible text into output files when IDs or verse pointers already map canonically to source data.
+
+### 2. Concise Comments
 - Keep comments short and focused: **1–2 lines max** stating the non-obvious *why*.
 - Avoid multi-line paragraphs, restating what the code does, or elaborating on alternatives.
 - If a comment takes more than 2 lines, the code itself should be made clearer.
 
-### 2. No Module Docstrings
+### 3. No Module Docstrings
 - Do not write file-level (`"""..."""`) module docstrings in Python files. They go stale and will not be maintained.
 - Class and function docstrings are allowed where useful, but keep them concise.
 
-### 3. Protect Vendored Code (`crucible/`)
+### 4. Protect Vendored Code (`crucible/`)
 - `ingest/eval/crucible/` is vendored external tooling.
-- **Never** style-groom, reformat, or trim comments in `crucible/`. Only edit it for functional bug fixes.
+- **Never** style-groom, reformat, or trim comments in `crucible/`. Only edit it for functional bug fixes or explicit user requests.
 
-### 4. Swappable Experiment Tracking
+### 5. Swappable & Lightweight Experiment Tracking
 - Weights & Biases (W&B) is not a hard lock-in. Any similar metrics/artifact tracker is acceptable.
+- **No heavy artifacts to remote trackers**: Never upload large files (embeddings matrices, raw text corpora) to W&B. Only track lightweight summaries (run JSON, summary metrics, small plots).
+- **Heavy files stay on disk**: Data files (`embeddings.npy`, chunk metadata) remain strictly on local disk within their isolated run directories (`outputs/{slug}/`).
+- **Let trackers handle tooling concerns**: Do not write bespoke subprocess calls to fetch git commits, branches, or machine info; remote trackers capture environment provenance automatically.
+
+### 6. Clean Typings & Constants Separation
+- `constants` modules must hold only true runtime immutable values (paths, filenames, regexes).
+- Types, type aliases (`Literal`, `TypeVar`), and Enums must never be placed in `constants/`; place them in dedicated `types.py` modules or scope them directly to the domain package that uses them.
 
 ---
 
