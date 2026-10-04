@@ -1,7 +1,5 @@
 import json
 import logging
-import subprocess
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -22,15 +20,6 @@ from crucible.core.jobs import AbstractJob
 from crucible.core.trackers.wandb import WBTracker
 
 logger = logging.getLogger(__name__)
-
-
-def _get_git_commit() -> str | None:
-    try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"], cwd=str(REPO), text=True
-        ).strip()
-    except Exception:
-        return None
 
 
 class Job(AbstractJob):
@@ -162,40 +151,21 @@ class Job(AbstractJob):
             np.save(embeddings_file, matrix)
             logger.info("Saved embeddings matrix of shape %s to %s", matrix.shape, embeddings_file)
 
-        manifest = {
-            "run_id": self.run_id,
+        payload = {
+            "run_conditions": self.config,
             "slug": self.slug,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "git_commit": _get_git_commit(),
-            "parameters": {
-                "floor": int(self.config["floor"]),
-                "ceiling": int(self.config["ceiling"]),
-                "token_limit": int(self.config["token_limit"]),
-                "embedding_model": self.config.get("embedding_model"),
-                "tag": self.config.get("tag"),
-            },
             "metrics": metrics,
             "artifacts": {
                 "chunks": str(chunks_file.relative_to(REPO)),
                 "embeddings": str(embeddings_file.relative_to(REPO)) if embeddings_file else None,
             },
         }
-        manifest_file = self.run_dir / "manifest.json"
-        manifest_file.write_text(json.dumps(manifest, indent=2))
+        out_path = self.run_dir / f"{self.run_id}.json"
+        out_path.write_text(json.dumps(payload, indent=2, default=str))
+        logger.info("Saved run summary to %s", out_path)
 
-        index_file = self.log_dir / "index.jsonl"
-        with index_file.open("a", encoding="utf-8") as f:
-            index_record = {
-                "run_id": self.run_id,
-                "slug": self.slug,
-                "tag": self.config.get("tag"),
-                "timestamp": manifest["timestamp"],
-                "parameters": manifest["parameters"],
-                "metrics": metrics,
-                "dir": str(self.run_dir.relative_to(REPO)),
-            }
-            f.write(json.dumps(index_record) + "\n")
-        logger.info("Artifacts saved to %s", self.run_dir)
+        if self.tracker is not None:
+            self.tracker.track_artifact(out_path, name="chunk-profile-summary", type="eval_result")
 
 
 JOB_CLASS = Job
