@@ -14,10 +14,9 @@ ingest/scripts/chunk_embeddings.json
 ingest/scripts/chunk_embeddings.npy
 ingest/scripts/heading_alignment.json
 ingest/scripts/pericope_sizes.json
-# Each eval job's own run history: log_dir points inside the job's own
-# folder (see configs/default.yaml), not a separate cross-job results/
-# tree, so this covers every job, not just the one that exists today.
-ingest/eval/jobs/*/outputs/
+# Each eval and analysis job's own run history:
+ingest/eval/*/outputs/
+ingest/analysis/*/outputs/
 # Weights & Biases' own local run cache (see WBTracker) -- run data
 # already lives in each job's outputs/ and gets uploaded to W&B directly.
 ingest/wandb/

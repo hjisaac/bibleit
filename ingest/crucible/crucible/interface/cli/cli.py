@@ -51,11 +51,15 @@ def execute_named(
 		typer.echo(runs[0]["result"])
 		return
 
-	path = out or Path("runs") / f"{runs[0]['sweep_id']}.json"
 	typer.echo(f"{len(runs)} runs finished.")
-	for row in save_runs(runs, path):
-		typer.echo(row)
-	typer.echo(f"Saved to {path}")
+	for r in runs:
+		run_id = r.get("run_id", "")
+		state = r.get("state", "").value if hasattr(r.get("state"), "value") else str(r.get("state", ""))
+		typer.echo(f"- Run {run_id} [{state}]")
+
+	if out is not None:
+		save_runs(runs, out)
+		typer.echo(f"Saved comparison table to {out}")
 
 
 @app.command("create")

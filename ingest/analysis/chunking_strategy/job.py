@@ -13,16 +13,16 @@ from bibleit_ingest.chunking import (
     load_web_verses,
     render_chunk_text,
 )
-from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, REPO
+from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, OLD_TESTAMENT_BOOKS, REPO
 from bibleit_ingest.embedding import save_chunk_embeddings
 from bibleit_ingest.pericopes import derive_bsb_pericopes, project_pericopes
-from eval.job import EvalJobBase
+from analysis.chunking_strategy.plots import generate_chunk_plots
+from analysis.job import AnalysisJobBase
 
 logger = logging.getLogger(__name__)
 
 
-class EvalJobChunkingStrategy(EvalJobBase):
-    category = "analysis"
+class AnalysisJobChunkingStrategy(AnalysisJobBase):
     path_config_keys = ("web_path", "bsb_dir")
 
     def on_start(self) -> None:
@@ -32,7 +32,7 @@ class EvalJobChunkingStrategy(EvalJobBase):
         floor = self.config["floor"]
         ceiling = self.config["ceiling"]
         self.slug = f"{self.run_id}{tag_str}_f{floor}_c{ceiling}"
-        self.run_dir = REPO / self.config["log_dir"] / self.slug
+        self.run_dir = Path(self.config["log_dir"]).resolve() / self.slug
 
     def on_prepare(self) -> dict:
         ordered_verses = load_web_verses(self.web_path)
@@ -96,14 +96,48 @@ class EvalJobChunkingStrategy(EvalJobBase):
             "mean_words": round(float(np.mean(word_counts)), 2),
         }
 
+        records = [
+            {
+                "book": chunk.book,
+                "testament": "OT" if chunk.book in OLD_TESTAMENT_BOOKS else "NT",
+                "token_count": t_len,
+                "word_count": w_len,
+                "verse_count": chunk.verse_count,
+            }
+            for chunk, t_len, w_len in zip(chunks, token_lengths, word_counts)
+        ]
+
+        corpus_stats = {}
+        try:
+            from datalens import AnalysisConfig, run_analysis
+            lens_cfg = AnalysisConfig(
+                columns={
+                    "token_count": "numeric",
+                    "word_count": "numeric",
+                    "verse_count": "numeric",
+                    "book": "categorical",
+                }
+            )
+            corpus_stats = run_analysis(lens_cfg, source=records).to_dict()
+        except ImportError:
+            pass
+
         return {
             "chunks": chunks,
             "texts": texts,
+            "records": records,
             "metrics": metrics,
+            "corpus_stats": corpus_stats,
         }
 
     def on_finalize(self, prepared: dict, result: dict[str, Any]) -> None:
         super().on_finalize(prepared, result)
+        token_limit = int(self.config.get("token_limit", 512))
+        plot_paths = generate_chunk_plots(result["records"], self.run_dir, token_limit=token_limit)
+        if self.tracker is not None:
+            for name, path in plot_paths.items():
+                self.tracker.track_artifact(path, name=name, type="plot")
+
         if emb_model := self.config.get("embedding_model"):
             logger.info("Embedding %d chunks with %s", len(result["chunks"]), emb_model)
             save_chunk_embeddings(
@@ -111,4 +145,5 @@ class EvalJobChunkingStrategy(EvalJobBase):
             )
 
 
-JOB_CLASS = EvalJobChunkingStrategy
+Job = AnalysisJobChunkingStrategy
+JOB_CLASS = AnalysisJobChunkingStrategy

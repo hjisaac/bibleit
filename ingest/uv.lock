@@ -442,7 +442,7 @@ wheels = [
 [[package]]
 name = "crucible"
 version = "0.1.0"
-source = { editable = "eval" }
+source = { editable = "crucible" }
 dependencies = [
     { name = "dotenv" },
     { name = "hydra-core" },
@@ -479,6 +479,32 @@ sdist = { url = "https://files.pythonhosted.org/packages/a9/95/a3dbbb5028f35eafb
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e7/05/c19819d5e3d95294a6f5947fb9b9629efb316b96de511b418c53d245aae6/cycler-0.12.1-py3-none-any.whl", hash = "sha256:85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30", size = 8321 },
 ]
+
+[[package]]
+name = "datalens"
+version = "0.1.0"
+source = { directory = "../../dataset_stats" }
+dependencies = [
+    { name = "numpy" },
+    { name = "omegaconf" },
+    { name = "pyyaml" },
+    { name = "rich" },
+    { name = "typer" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy", specifier = ">=1.20.0" },
+    { name = "omegaconf", specifier = ">=2.3.0" },
+    { name = "pyarrow", marker = "extra == 'all'", specifier = ">=10.0.0" },
+    { name = "pyarrow", marker = "extra == 'dev'", specifier = ">=10.0.0" },
+    { name = "pyarrow", marker = "extra == 'parquet'", specifier = ">=10.0.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "rich", specifier = ">=13.0.0" },
+    { name = "typer", specifier = ">=0.9.0" },
+]
+provides-extras = ["parquet", "dev", "all"]
 
 [[package]]
 name = "dotenv"
@@ -769,17 +795,23 @@ source = { editable = "." }
 dependencies = [
     { name = "codetiming" },
     { name = "crucible", extra = ["wandb"] },
+    { name = "datalens" },
     { name = "fastembed" },
+    { name = "matplotlib" },
     { name = "ranx" },
+    { name = "seaborn" },
     { name = "usearch" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "codetiming", specifier = ">=1.4.0" },
-    { name = "crucible", extras = ["wandb"], editable = "eval" },
+    { name = "crucible", extras = ["wandb"], editable = "crucible" },
+    { name = "datalens", directory = "../../dataset_stats" },
     { name = "fastembed", specifier = ">=0.8.0" },
+    { name = "matplotlib", specifier = ">=3.8.0" },
     { name = "ranx", specifier = ">=0.3.21" },
+    { name = "seaborn", specifier = ">=0.13.0" },
     { name = "usearch", specifier = ">=2.26.2" },
 ]
 

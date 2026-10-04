@@ -28,7 +28,7 @@ crucible = "crucible.interface.cli:main"
 package = true
 
 [tool.setuptools.packages.find]
-include = ["crucible*", "jobs*"]
+include = ["crucible*"]
 
 [tool.setuptools.package-data]
 "interface.cli" = ["templates/*.tpl"]

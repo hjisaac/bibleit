@@ -6,13 +6,11 @@ from hydra import compose, initialize_config_dir
 from omegaconf import OmegaConf
 
 from crucible.core.config.overrides import sanitize_overrides
-from crucible.core.constants import JOBS_ROOT, SUPPORTED_CONFIG_EXTENSIONS, ROOT_CONFIG_FILENAME
+from crucible.core.constants import SUPPORTED_CONFIG_EXTENSIONS, ROOT_CONFIG_FILENAME, WORKSPACE_ROOT
+from crucible.core.runtime.discovery import find_job_dir
 
 def _resolve_config_path(job_name: str, config_name: str) -> tuple[Path, str, Path]:
-    job_dir = JOBS_ROOT / job_name
-    if not job_dir.exists():
-        raise FileNotFoundError(f"Job folder was not found: {job_dir}")
-
+    job_dir, _ = find_job_dir(job_name)
     config_dir = job_dir / "configs"
     if not config_dir.exists():
         raise FileNotFoundError(f"Config folder was not found: {config_dir}")
@@ -49,12 +47,13 @@ def load_run_config(
     """Load a job's config from the jobs root (default: jobs)/<name>/configs, merging with root.config.yaml.
     Subconfig values override root config."""
     normalized_job_name = job_name.strip().lower()
+    job_dir, _ = find_job_dir(normalized_job_name)
     config_dir, config_stem, config_path = _resolve_config_path(normalized_job_name, config_name)
     resolved_overrides = sanitize_overrides(overrides)
 
     # Load root config (if present)
 
-    root_config_path = Path(__file__).resolve().parents[3] / ROOT_CONFIG_FILENAME
+    root_config_path = WORKSPACE_ROOT / ROOT_CONFIG_FILENAME
     if root_config_path.exists():
         root_cfg = OmegaConf.load(str(root_config_path))
     else:
@@ -62,7 +61,7 @@ def load_run_config(
 
     # A config living outside the job's own configs/ layers on top of the
     # job's default, so it only has to carry what it changes.
-    job_default_path = JOBS_ROOT / normalized_job_name / "configs" / "default.yaml"
+    job_default_path = job_dir / "configs" / "default.yaml"
     if config_dir != job_default_path.parent and job_default_path.exists():
         base_cfg = OmegaConf.load(str(job_default_path))
     else:
