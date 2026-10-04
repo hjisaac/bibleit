@@ -20,7 +20,7 @@ dependencies = [
 
 [tool.uv.sources]
 crucible = { path = "crucible", editable = true }
-datalens = { path = "/home/hjisaac/Devs/dataset_stats", editable = false }
+datalens = { git = "https://github.com/hjisaac/datalens.git" }
 
 [build-system]
 requires = ["hatchling"]

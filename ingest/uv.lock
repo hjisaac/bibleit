@@ -483,7 +483,7 @@ wheels = [
 [[package]]
 name = "datalens"
 version = "0.1.0"
-source = { directory = "../../dataset_stats" }
+source = { git = "https://github.com/hjisaac/datalens.git#7ec26abd4c8dc000fdc9f75a5a5c20de477921ff" }
 dependencies = [
     { name = "numpy" },
     { name = "omegaconf" },
@@ -491,20 +491,6 @@ dependencies = [
     { name = "rich" },
     { name = "typer" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "numpy", specifier = ">=1.20.0" },
-    { name = "omegaconf", specifier = ">=2.3.0" },
-    { name = "pyarrow", marker = "extra == 'all'", specifier = ">=10.0.0" },
-    { name = "pyarrow", marker = "extra == 'dev'", specifier = ">=10.0.0" },
-    { name = "pyarrow", marker = "extra == 'parquet'", specifier = ">=10.0.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "rich", specifier = ">=13.0.0" },
-    { name = "typer", specifier = ">=0.9.0" },
-]
-provides-extras = ["parquet", "dev", "all"]
 
 [[package]]
 name = "dotenv"
@@ -807,7 +793,7 @@ dependencies = [
 requires-dist = [
     { name = "codetiming", specifier = ">=1.4.0" },
     { name = "crucible", extras = ["wandb"], editable = "crucible" },
-    { name = "datalens", directory = "../../dataset_stats" },
+    { name = "datalens", git = "https://github.com/hjisaac/datalens.git" },
     { name = "fastembed", specifier = ">=0.8.0" },
     { name = "matplotlib", specifier = ">=3.8.0" },
     { name = "ranx", specifier = ">=0.3.21" },
