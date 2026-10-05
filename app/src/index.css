@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body.theme-paper {
+  --bg-page: #FBFBF9;
+  --bg-surface: #FFFFFF;
+  --bg-surface-elevated: #F5F5F0;
+  --border-subtle: #E8E8E2;
+  --text-main: #1C1917;
+  --text-muted: #78716C;
+  --text-subtle: #A8A29E;
+  --accent: #292524;
+  --highlight-verse: #FEF3C7;
+  --badge-ref-bg: #ECFDF5;
+  --badge-ref-text: #065F46;
+  --badge-sem-bg: #FEF3C7;
+  --badge-sem-text: #92400E;
+  --badge-key-bg: #F1F5F9;
+  --badge-key-text: #334155;
+}
+
+body.theme-sepia {
+  --bg-page: #F4EEDD;
+  --bg-surface: #FAF6ED;
+  --bg-surface-elevated: #EFE8D3;
+  --border-subtle: #E2D7C0;
+  --text-main: #2D241E;
+  --text-muted: #766557;
+  --text-subtle: #9E8D7F;
+  --accent: #4A3B32;
+  --highlight-verse: #E9DCBD;
+  --badge-ref-bg: #E1EAD8;
+  --badge-ref-text: #2C4E28;
+  --badge-sem-bg: #EFE0C2;
+  --badge-sem-text: #734F1A;
+  --badge-key-bg: #E7DFD5;
+  --badge-key-text: #4E4237;
+}
+
+body.theme-obsidian {
+  --bg-page: #0C0A09;
+  --bg-surface: #171412;
+  --bg-surface-elevated: #24201D;
+  --border-subtle: #292524;
+  --text-main: #F5F5F4;
+  --text-muted: #A8A29E;
+  --text-subtle: #78716C;
+  --accent: #E7E5E4;
+  --highlight-verse: #451A03;
+  --badge-ref-bg: #064E3B;
+  --badge-ref-text: #A7F3D0;
+  --badge-sem-bg: #78350F;
+  --badge-sem-text: #FDE68A;
+  --badge-key-bg: #1E293B;
+  --badge-key-text: #CBD5E1;
+}
+
+body {
+  background-color: var(--bg-page);
+  color: var(--text-main);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}

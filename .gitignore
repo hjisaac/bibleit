@@ -255,3 +255,8 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 **/wandb/
+
+# Node / Frontend
+node_modules/
+app/dist/
+app/dev-dist/

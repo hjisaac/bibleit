@@ -90,15 +90,9 @@ export function buildLocalEngine(p: Ports): SearchEngine {
  * Later, swapping to a server backend is exactly:
  *   return new RemoteEngine('https://api.bibleit.example/search');
  */
+import { MockSearchEngine } from './adapters/mock-search-engine';
+
 export function createDefaultEngine(): SearchEngine {
-  throw new Error('Adapters not implemented yet — see src/adapters/');
-  // return buildLocalEngine({
-  //   store: new OpfsArtifactStore('/artifacts/web@v1/'),
-  //   refParser: new RegexRefParser(['en', 'fr']),
-  //   lexical: new MiniSearchLexicalIndex(),
-  //   embedder: new TransformersQueryEmbedder(),
-  //   vectors: new BruteForceVectorIndex(),
-  //   ranker: new RrfRanker(),
-  //   answers: new NullAnswerProvider(),
-  // });
+  // Use mock engine until offline artifacts and adapters are completed.
+  return new MockSearchEngine();
 }
