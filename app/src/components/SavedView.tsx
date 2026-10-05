@@ -13,7 +13,7 @@ interface SavedViewProps {
 
 export function SavedView({ savedVerses, onOpenVerse }: SavedViewProps): JSX.Element {
   return (
-    <section class="flex-1 flex flex-col p-5 overflow-y-auto space-y-4">
+    <section class="flex-1 flex flex-col p-4 sm:p-8 overflow-y-auto space-y-4 max-w-2xl mx-auto w-full">
       <div>
         <h1 class="text-lg font-bold" style={{ color: 'var(--text-main)' }}>
           Saved Passages

@@ -47,7 +47,7 @@ export function SearchView({
   };
 
   return (
-    <section class="flex-1 flex flex-col p-4 overflow-y-auto">
+    <section class="flex-1 flex flex-col p-4 sm:p-8 overflow-y-auto max-w-2xl mx-auto w-full">
       {/* Search Input Bar */}
       <div class="relative mb-2 shrink-0">
         <div

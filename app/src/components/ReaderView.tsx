@@ -94,7 +94,7 @@ export function ReaderView({
       </div>
 
       {/* Chapter Text */}
-      <div class="p-6 font-serif text-[18px] leading-[1.8] space-y-4" style={{ color: 'var(--text-main)' }}>
+      <div class="p-5 sm:p-8 font-serif text-[18px] sm:text-[19px] leading-[1.85] space-y-4 max-w-2xl mx-auto w-full" style={{ color: 'var(--text-main)' }}>
         <h1 class="text-xl font-bold tracking-tight mb-1 text-center">
           {book === 'PHP' ? 'Philippians' : book} Chapter {chapter}
         </h1>

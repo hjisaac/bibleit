@@ -36,7 +36,7 @@ export function App(): JSX.Element {
 
   // Sync theme class to document body.
   useEffect(() => {
-    document.body.className = `antialiased font-sans flex justify-center min-h-screen p-2 sm:p-6 theme-${theme}`;
+    document.body.className = `antialiased font-sans flex justify-center min-h-screen theme-${theme}`;
   }, [theme]);
 
   const showToast = (message: string) => {
@@ -60,7 +60,7 @@ export function App(): JSX.Element {
 
   return (
     <div
-      class="w-full max-w-md flex flex-col h-[840px] rounded-[36px] shadow-2xl border overflow-hidden relative transition-colors"
+      class="w-full max-w-3xl min-h-screen flex flex-col sm:border-x shadow-sm relative transition-colors"
       style={{
         backgroundColor: 'var(--bg-surface)',
         borderColor: 'var(--border-subtle)',
@@ -106,6 +106,8 @@ export function App(): JSX.Element {
 
         {activeTab === 'settings' && (
           <SettingsView
+            currentTheme={theme}
+            onThemeChange={setTheme}
             isInspectorMode={isInspectorMode}
             onToggleInspector={setIsInspectorMode}
             onClearStorage={() => showToast('Offline artifacts cleared.')}

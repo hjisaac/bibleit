@@ -1,25 +1,92 @@
 import { h, type JSX } from 'preact';
+import type { Theme } from './Header';
 
 interface SettingsViewProps {
+  currentTheme: Theme;
+  onThemeChange: (theme: Theme) => void;
   isInspectorMode: boolean;
   onToggleInspector: (enabled: boolean) => void;
   onClearStorage: () => void;
 }
 
 export function SettingsView({
+  currentTheme,
+  onThemeChange,
   isInspectorMode,
   onToggleInspector,
   onClearStorage,
 }: SettingsViewProps): JSX.Element {
   return (
-    <section class="flex-1 flex flex-col p-5 overflow-y-auto space-y-6">
+    <section class="flex-1 flex flex-col p-4 sm:p-8 overflow-y-auto space-y-6 max-w-2xl mx-auto w-full">
       <div>
-        <h1 class="text-lg font-bold" style={{ color: 'var(--text-main)' }}>
+        <h1 class="text-xl font-bold tracking-tight" style={{ color: 'var(--text-main)' }}>
           Settings
         </h1>
         <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-          Preferences, retrieval inspector, and offline storage.
+          Preferences, reading atmosphere, retrieval inspector, and offline storage.
         </p>
+      </div>
+
+      {/* Reading Theme Section */}
+      <div
+        class="p-4 rounded-2xl border space-y-3"
+        style={{
+          backgroundColor: 'var(--bg-surface-elevated)',
+          borderColor: 'var(--border-subtle)',
+        }}
+      >
+        <span class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+          Reading Atmosphere
+        </span>
+        <div class="grid grid-cols-3 gap-2.5">
+          <button
+            type="button"
+            onClick={() => onThemeChange('paper')}
+            class={`p-3 rounded-xl border text-left transition-all ${
+              currentTheme === 'paper' ? 'ring-2 ring-amber-500/60 font-semibold' : 'hover:opacity-80'
+            }`}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderColor: '#E8E8E2',
+              color: '#1C1917',
+            }}
+          >
+            <div class="text-xs font-semibold">Day</div>
+            <div class="text-[10px] text-stone-500 mt-0.5">Crisp linen</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onThemeChange('sepia')}
+            class={`p-3 rounded-xl border text-left transition-all ${
+              currentTheme === 'sepia' ? 'ring-2 ring-amber-700/60 font-semibold' : 'hover:opacity-80'
+            }`}
+            style={{
+              backgroundColor: '#FAF6ED',
+              borderColor: '#E2D7C0',
+              color: '#2D241E',
+            }}
+          >
+            <div class="text-xs font-semibold">Warm</div>
+            <div class="text-[10px] text-stone-600 mt-0.5">Parchment</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onThemeChange('obsidian')}
+            class={`p-3 rounded-xl border text-left transition-all ${
+              currentTheme === 'obsidian' ? 'ring-2 ring-stone-400 font-semibold' : 'hover:opacity-80'
+            }`}
+            style={{
+              backgroundColor: '#171412',
+              borderColor: '#292524',
+              color: '#F5F5F4',
+            }}
+          >
+            <div class="text-xs font-semibold">Dark</div>
+            <div class="text-[10px] text-stone-400 mt-0.5">OLED black</div>
+          </button>
+        </div>
       </div>
 
       {/* Retrieval Inspector Mode Toggle */}
