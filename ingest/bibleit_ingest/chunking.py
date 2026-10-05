@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -5,6 +7,8 @@ from pathlib import Path
 from typing import Sequence
 
 from .constants import USFM_ORDER
+
+VerseAddress = tuple[str, int, int]  # (book, chapter, verse)
 
 
 @dataclass(frozen=True)
@@ -16,6 +20,7 @@ class Pericope:
     verse: int  # First verse of this pericope.
     heading: str
     verse_count: int
+    is_overlap: bool = False
 
 
 @dataclass(frozen=True)
@@ -40,78 +45,113 @@ class Chunk:
 
 
 class Chunker(ABC):
-    """A pluggable rule for grouping one book's pericopes into chunks."""
+    """A pluggable rule for grouping pericopes into chunks."""
 
     @abstractmethod
     def chunk(self, pericopes: Sequence[Pericope]) -> list[Chunk]: ...
 
-    def chunk_bible(
-        self, pericopes_by_book: dict[str, list[Pericope]]
-    ) -> list[Chunk]:
-        """Applies this strategy to every book, in canonical order. Same
-        for every subclass, so it lives here once, not per strategy."""
-        chunks = []
-        for book in USFM_ORDER:
-            chunks.extend(self.chunk(pericopes_by_book[book]))
-        return chunks
 
+class AdaptiveWindowChunker(Chunker):
+    """Merges pericopes under `floor` verses with neighbors, never past `ceiling`.
 
-class FloorCeilingMergeChunker(Chunker):
-    """Merges pericopes under `floor` verses with their neighbors, never
-    past `ceiling`. Pericopes already >= ceiling are left unsplit
-    (splitting them is deferred, out of scope here).
+    Consecutive chunks can share trailing verses from the previous chunk as
+    overlap context. Chunks never cross book boundaries.
 
-    1. A pericope already at floor is its own chunk.
-    2. Otherwise merge forward up to the floor, never past the ceiling.
-    3. A last-in-book pericope still undersized merges backward instead,
-       or stands alone if that would exceed the ceiling.
+    Args:
+        floor: Minimum verse target a chunk merges forward to satisfy.
+        ceiling: Maximum verse limit a chunk will not exceed.
+        overlap: Number of trailing verses prepended from the previous chunk.
+        ordered_verses: Optional verse list for resolving exact chapter/verse addresses.
+        address_index: Optional mapping from verse address to index in ordered_verses.
     """
 
-    DEFAULT_FLOOR = 5  # Placeholder, not a final decision.
-    DEFAULT_CEILING = 30  # Placeholder, not a final decision.
+    DEFAULT_FLOOR = 5
+    DEFAULT_CEILING = 30
+    DEFAULT_OVERLAP = 0
 
-    def __init__(self, floor: int = DEFAULT_FLOOR, ceiling: int = DEFAULT_CEILING):
+    def __init__(
+        self,
+        floor: int = DEFAULT_FLOOR,
+        ceiling: int = DEFAULT_CEILING,
+        overlap: int = DEFAULT_OVERLAP,
+        ordered_verses: Sequence[tuple[VerseAddress, str]] | None = None,
+        address_index: dict[VerseAddress, int] | None = None,
+    ):
         if floor <= 0 or ceiling <= 0:
             raise ValueError("floor and ceiling must be positive")
         if floor > ceiling:
             raise ValueError("floor cannot exceed ceiling")
+        if overlap < 0:
+            raise ValueError("overlap cannot be negative")
         self.floor = floor
         self.ceiling = ceiling
+        self.overlap = overlap
+        self.ordered_verses = ordered_verses
+        self.address_index = address_index
 
     def chunk(self, pericopes: Sequence[Pericope]) -> list[Chunk]:
         chunks: list[Chunk] = []
         i = 0
-        pericopes_count = len(pericopes)
+        n = len(pericopes)
 
-        while i < pericopes_count:
-            group = [pericopes[i]]
-            size = pericopes[i].verse_count
+        while i < n:
+            current_book = pericopes[i].book
+            group: list[Pericope] = []
+            size = 0
 
-            # Rule 2: merge forward until the floor is met, or the next
-            # merge would break the ceiling.
-            while size < self.floor and i + len(group) < pericopes_count:
-                nxt = pericopes[i + len(group)]
+            # Prepend trailing verses from previous chunk if within same book and ceiling
+            if self.overlap > 0 and chunks and chunks[-1].book == current_book:
+                prev_last_p = chunks[-1].pericopes[-1]
+                slice_len = min(self.overlap, prev_last_p.verse_count)
+                if slice_len + pericopes[i].verse_count <= self.ceiling:
+                    offset = prev_last_p.verse_count - slice_len
+                    if self.address_index is not None and self.ordered_verses is not None:
+                        prev_idx = self.address_index[(prev_last_p.book, prev_last_p.chapter, prev_last_p.verse)]
+                        slice_addr = self.ordered_verses[prev_idx + offset][0]
+                        ch, v = slice_addr[1], slice_addr[2]
+                    else:
+                        ch, v = prev_last_p.chapter, prev_last_p.verse + offset
+                    group.append(
+                        Pericope(
+                            book=current_book,
+                            chapter=ch,
+                            verse=v,
+                            heading=prev_last_p.heading,
+                            verse_count=slice_len,
+                            is_overlap=True,
+                        )
+                    )
+                    size += slice_len
+
+            # Fresh pericope advancement
+            group.append(pericopes[i])
+            size += pericopes[i].verse_count
+            step = 1
+
+            # Merge forward until floor is met, ceiling is reached, or book boundary reached
+            while size < self.floor and (i + step) < n:
+                nxt = pericopes[i + step]
+                if nxt.book != current_book:
+                    break
                 if size + nxt.verse_count > self.ceiling:
                     break
                 group.append(nxt)
                 size += nxt.verse_count
+                step += 1
 
-            # Rule 3: last pericope in the book, still undersized, nothing
-            # left to pull forward. Try merging backward instead.
-            if size < self.floor and i + len(group) == pericopes_count and chunks:
+            # Last-in-book backward merge if undersized
+            is_last_in_book = (i + step == n) or (pericopes[i + step].book != current_book)
+            if size < self.floor and is_last_in_book and chunks and chunks[-1].book == current_book:
                 prev = chunks[-1]
                 if prev.verse_count + size <= self.ceiling:
                     chunks[-1] = Chunk(pericopes=[*prev.pericopes, *group])
-                    i += len(group)
+                    i += step
                     continue
 
             chunks.append(Chunk(pericopes=group))
-            i += len(group)
+            i += step
 
         return chunks
-
-
-VerseAddress = tuple[str, int, int]  # (book, chapter, verse)
 
 
 def load_web_verses(web_path: Path) -> list[tuple[VerseAddress, str]]:
@@ -129,17 +169,6 @@ def load_web_verses(web_path: Path) -> list[tuple[VerseAddress, str]]:
     return ordered
 
 
-def group_verse_addresses_by_book(
-    ordered_verses: Sequence[tuple[VerseAddress, str]],
-) -> dict[str, list[VerseAddress]]:
-    """Buckets every verse address by book, in reading order -- the shape
-    project_pericopes expects for its target translation."""
-    by_book: dict[str, list[VerseAddress]] = {b: [] for b in USFM_ORDER}
-    for addr, _ in ordered_verses:
-        by_book[addr[0]].append(addr)
-    return by_book
-
-
 def index_verses_by_address(
     ordered_verses: Sequence[tuple[VerseAddress, str]],
 ) -> dict[VerseAddress, int]:
@@ -148,23 +177,59 @@ def index_verses_by_address(
     return {addr: i for i, (addr, _) in enumerate(ordered_verses)}
 
 
+class ChunkRenderer:
+    """Serializes chunks into formatted text strings for embedding models.
+
+    Args:
+        ordered_verses: Complete list of translation verses in canonical order.
+        address_index: Mapping from (book, chapter, verse) to index in ordered_verses.
+        include_headings: Whether to prepend section headings before verse text.
+        include_overlap_headings: Whether overlap slices retain their section headings.
+    """
+
+    def __init__(
+        self,
+        ordered_verses: Sequence[tuple[VerseAddress, str]],
+        address_index: dict[VerseAddress, int],
+        include_headings: bool = True,
+        include_overlap_headings: bool = True,
+    ):
+        self.ordered_verses = ordered_verses
+        self.address_index = address_index
+        self.include_headings = include_headings
+        self.include_overlap_headings = include_overlap_headings
+
+    def render(self, chunk: Chunk) -> str:
+        blocks = []
+        for p in chunk.pericopes:
+            start = self.address_index[(p.book, p.chapter, p.verse)]
+            verses_text = " ".join(
+                self.ordered_verses[start + k][1] for k in range(p.verse_count)
+            )
+            show_heading = self.include_headings and (
+                not p.is_overlap or self.include_overlap_headings
+            )
+            if show_heading and p.heading:
+                blocks.append(f"{p.heading}\n{verses_text}")
+            else:
+                blocks.append(verses_text)
+        return "\n\n".join(blocks)
+
+
 def render_chunk_text(
     chunk: Chunk,
     ordered_verses: Sequence[tuple[VerseAddress, str]],
     address_index: dict[VerseAddress, int],
+    include_headings: bool = True,
+    include_overlap_headings: bool = True,
 ) -> str:
-    """Builds the text fed to the embedder: each pericope's own heading
-    followed by its own verses. `ordered_verses` must be every verse of
-    one translation in reading order, so a span resolves correctly even
-    across a chapter boundary."""
-    blocks = []
-    for p in chunk.pericopes:
-        start = address_index[(p.book, p.chapter, p.verse)]
-        verses_text = " ".join(
-            ordered_verses[start + k][1] for k in range(p.verse_count)
-        )
-        blocks.append(f"{p.heading}\n{verses_text}")
-    return "\n\n".join(blocks)
+    """Convenience helper delegating to ChunkRenderer."""
+    return ChunkRenderer(
+        ordered_verses=ordered_verses,
+        address_index=address_index,
+        include_headings=include_headings,
+        include_overlap_headings=include_overlap_headings,
+    ).render(chunk)
 
 
 def resolve_verse_to_chunk_index(
@@ -188,21 +253,16 @@ def resolve_verse_to_chunk_index(
     return None
 
 
-def load_pericopes_by_book(
-    pericopes_path: Path,
-) -> dict[str, list[Pericope]]:
-    """Reads a pericopes artifact and groups its pericopes by book, each
-    list in reading order -- the shape every strategy expects."""
+def load_pericopes(pericopes_path: Path) -> list[Pericope]:
+    """Reads a pericopes artifact and returns all pericopes in reading order."""
     data = json.loads(pericopes_path.read_text())
-    by_book: dict[str, list[Pericope]] = {}
-    for p in data["pericopes"]:
-        by_book.setdefault(p["book"], []).append(
-            Pericope(
-                book=p["book"],
-                chapter=p["chapter"],
-                verse=p["verse"],
-                heading=p["heading"],
-                verse_count=p["verse_count"],
-            )
+    return [
+        Pericope(
+            book=p["book"],
+            chapter=p["chapter"],
+            verse=p["verse"],
+            heading=p["heading"],
+            verse_count=p["verse_count"],
         )
-    return by_book
+        for p in data["pericopes"]
+    ]

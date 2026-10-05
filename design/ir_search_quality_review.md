@@ -38,9 +38,9 @@ This immediately boosts disambiguation and query-passage alignment for book-spec
 ## 2. Verse-Count vs. Token-Density Asymmetry
 
 ### Location
-[`ingest/bibleit_ingest/chunking.py`](file:///home/hjisaac/Devs/bibleit/ingest/bibleit_ingest/chunking.py) (`FloorCeilingMergeChunker`):
+[`ingest/bibleit_ingest/chunking.py`](file:///home/hjisaac/Devs/bibleit/ingest/bibleit_ingest/chunking.py) (`AdaptiveWindowChunker`):
 ```python
-FloorCeilingMergeChunker(floor=5, ceiling=30)
+AdaptiveWindowChunker(floor=5, ceiling=30, overlap=1)
 ```
 
 ### The Issue

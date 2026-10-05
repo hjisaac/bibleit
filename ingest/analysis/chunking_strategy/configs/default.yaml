@@ -1,6 +1,7 @@
 # Chunking parameters (verse-based)
 floor: 5
 ceiling: 30
+overlap: 1
 
 # Context limit for truncation checks
 token_limit: 512

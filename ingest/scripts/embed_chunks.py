@@ -8,11 +8,8 @@ from fastembed import TextEmbedding
 from tqdm import tqdm
 
 from bibleit_ingest.chunking import (
-    FloorCeilingMergeChunker,
-    group_verse_addresses_by_book,
-    index_verses_by_address,
-    load_web_verses,
-    render_chunk_text,
+    AdaptiveWindowChunker,
+    ChunkRenderer,
 )
 from bibleit_ingest.constants import (
     BSB_DIR,
@@ -23,7 +20,7 @@ from bibleit_ingest.constants import (
     EmbeddingModel,
 )
 from bibleit_ingest.embedding import embed_documents
-from bibleit_ingest.pericopes import derive_bsb_pericopes, project_pericopes
+from bibleit_ingest.pericopes import get_or_prepare_corpus
 
 # stdout, not logging's stderr default, to stay off tqdm's stream below.
 logging.basicConfig(
@@ -33,20 +30,13 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    ordered_verses = load_web_verses(WEB_PATH)
-    address_index = index_verses_by_address(ordered_verses)
-    web_addresses_by_book = group_verse_addresses_by_book(ordered_verses)
-
-    bsb_native = derive_bsb_pericopes(BSB_DIR)
-    resolved, unresolved = project_pericopes(bsb_native, web_addresses_by_book)
-
-    chunker = FloorCeilingMergeChunker()
-    chunks = chunker.chunk_bible(resolved)
+    corpus = get_or_prepare_corpus(WEB_PATH, BSB_DIR)
+    chunker = AdaptiveWindowChunker(
+        ordered_verses=corpus.ordered_verses,
+        address_index=corpus.address_index,
+    )
+    chunks = chunker.chunk(corpus.pericopes)
     logger.info("chunking the whole Bible: %d chunks", len(chunks))
-    if unresolved:
-        logger.info("%d pericope(s) had no valid WEB start address, skipped:", len(unresolved))
-        for p in unresolved:
-            logger.info('  %s %d:%d  "%s"', p.book, p.chapter, p.verse, p.heading)
 
     with Timer(
         text=f"loaded {EmbeddingModel.NOMIC_EMBED_TEXT_V1_5} in {{:.1f}}s", logger=logger.info
@@ -57,7 +47,8 @@ def main():
         )
 
     # Generator, not a list: text isn't rendered until the embedder asks.
-    texts = (render_chunk_text(c, ordered_verses, address_index) for c in chunks)
+    renderer = ChunkRenderer(corpus.ordered_verses, corpus.address_index)
+    texts = (renderer.render(c) for c in chunks)
     embeddings = embed_documents(model, texts)
 
     metadata = []
