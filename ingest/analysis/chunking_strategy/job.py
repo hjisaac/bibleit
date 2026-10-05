@@ -140,5 +140,4 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
             )
 
 
-Job = AnalysisJobChunkingStrategy
 JOB_CLASS = AnalysisJobChunkingStrategy

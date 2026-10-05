@@ -1,3 +1,3 @@
-from .job import AnalysisJobChunkingStrategy, Job, JOB_CLASS
-
-__all__ = ["AnalysisJobChunkingStrategy", "Job", "JOB_CLASS"]
+from .job import AnalysisJobChunkingStrategy, JOB_CLASS
+ 
+__all__ = ["AnalysisJobChunkingStrategy", "JOB_CLASS"]
