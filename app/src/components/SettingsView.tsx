@@ -1,4 +1,4 @@
-import { h, type JSX } from 'preact';
+import type { JSX } from 'preact';
 import type { Theme } from './Header';
 
 interface SettingsViewProps {

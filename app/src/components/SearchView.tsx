@@ -1,4 +1,4 @@
-import { h, type JSX } from 'preact';
+import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { SearchEngine } from '../core/ports';
 import type { ScoredPassage } from '../core/types';

@@ -1,4 +1,4 @@
-import { h, type JSX } from 'preact';
+import type { JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { createDefaultEngine } from './composition';
 import { Header, type Theme } from './components/Header';
