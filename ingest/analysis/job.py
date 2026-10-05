@@ -11,12 +11,11 @@ from bibleit_ingest.constants import REPO
 logger = logging.getLogger(__name__)
 
 
-class EvalJobBase(AbstractJob):
-    """Base class for all bibleit evaluation and profiling jobs.
-    Handles path resolution, W&B tracking under bibleit-eval, and saving results."""
+class AnalysisJobBase(AbstractJob):
+    """Base class for bibleit analysis and profiling jobs."""
 
     path_config_keys: tuple[str, ...] = ()
-    category: str = "eval"
+    category: str = "analysis"
 
     @property
     def project_name(self) -> str:
@@ -38,7 +37,8 @@ class EvalJobBase(AbstractJob):
         metrics = result.get("metrics", {})
         logger.info("Metrics:\n%s", json.dumps(metrics, indent=2))
 
-        payload = {"run_conditions": self.config, **result}
+        summary = {k: v for k, v in result.items() if k not in ("chunks", "texts", "records")}
+        payload = {"run_conditions": self.config, **summary}
         target_dir = getattr(self, "run_dir", Path(self.config.get("log_dir", "outputs")))
         target_dir.mkdir(parents=True, exist_ok=True)
         out_path = target_dir / f"{self.run_id}.json"
@@ -46,9 +46,5 @@ class EvalJobBase(AbstractJob):
         logger.info("Saved to %s", out_path)
 
         if self.tracker is not None:
-            summary = dict(metrics)
-            for k in ("total_queries", "resolvable"):
-                if k in result:
-                    summary[k] = result[k]
-            self.tracker.track_summary(**summary)
-            self.tracker.track_artifact(out_path, name="eval-result", type="eval_result")
+            self.tracker.track_summary(**metrics)
+            self.tracker.track_artifact(out_path, name="analysis-result", type="analysis_result")
