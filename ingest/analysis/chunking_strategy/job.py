@@ -3,7 +3,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 from fastembed import TextEmbedding
 
 from bibleit_ingest.chunking import (
@@ -65,62 +64,59 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         tokenizer = prepared["embed_model"].model.tokenizer
         ordered_verses = prepared["ordered_verses"]
         address_index = prepared["address_index"]
+        limit = int(self.config.get("token_limit", 512))
 
         texts = []
-        token_lengths = []
-        word_counts = []
-        verse_counts = [c.verse_count for c in chunks]
+        records = []
+        truncated = 0
 
+        # Single pass: render, tokenize, and record metadata
         for chunk in chunks:
             text = render_chunk_text(chunk, ordered_verses, address_index)
+            t_len = len(tokenizer.encode(text).ids)
+            if t_len > limit:
+                truncated += 1
+
             texts.append(text)
-            token_lengths.append(len(tokenizer.encode(text).ids))
-            word_counts.append(len(text.split()))
-
-        limit = int(self.config.get("token_limit", 512))
-        truncated = sum(1 for t in token_lengths if t > limit)
-        trunc_pct = (truncated / len(chunks) * 100) if chunks else 0.0
-
-        metrics = {
-            "total_chunks": len(chunks),
-            "min_tokens": int(np.min(token_lengths)),
-            "max_tokens": int(np.max(token_lengths)),
-            "mean_tokens": round(float(np.mean(token_lengths)), 2),
-            "p50_tokens": round(float(np.percentile(token_lengths, 50)), 2),
-            "p90_tokens": round(float(np.percentile(token_lengths, 90)), 2),
-            "p95_tokens": round(float(np.percentile(token_lengths, 95)), 2),
-            "p99_tokens": round(float(np.percentile(token_lengths, 99)), 2),
-            "truncated_count": truncated,
-            "truncation_pct": round(trunc_pct, 2),
-            "mean_verses": round(float(np.mean(verse_counts)), 2),
-            "mean_words": round(float(np.mean(word_counts)), 2),
-        }
-
-        records = [
-            {
+            records.append({
                 "book": chunk.book,
                 "testament": "OT" if chunk.book in OLD_TESTAMENT_BOOKS else "NT",
                 "token_count": t_len,
-                "word_count": w_len,
+                "word_count": len(text.split()),
                 "verse_count": chunk.verse_count,
-            }
-            for chunk, t_len, w_len in zip(chunks, token_lengths, word_counts)
-        ]
+            })
 
-        corpus_stats = {}
-        try:
-            from datalens import AnalysisConfig, run_analysis
-            lens_cfg = AnalysisConfig(
-                columns={
-                    "token_count": "numeric",
-                    "word_count": "numeric",
-                    "verse_count": "numeric",
-                    "book": "categorical",
-                }
-            )
-            corpus_stats = run_analysis(lens_cfg, source=records).to_dict()
-        except ImportError:
-            pass
+        # Unified streaming corpus stats via datalens (with T-Digest quantiles)
+        from datalens import AnalysisConfig, run_analysis
+
+        lens_cfg = AnalysisConfig(
+            columns={
+                "token_count": "quantile",
+                "word_count": "numeric",
+                "verse_count": "numeric",
+                "book": "categorical",
+            },
+            quantiles=[0.50, 0.90, 0.95, 0.99],
+        )
+        corpus_stats = run_analysis(lens_cfg, source=records).to_dict()
+        group = corpus_stats.get("groups", {}).get("_all", {})
+        tok = group.get("token_count", {})
+        words = group.get("word_count", {})
+        verses = group.get("verse_count", {})
+
+        metrics = {
+            "total_chunks": len(chunks),
+            "min_tokens": int(tok.get("min", 0)),
+            "max_tokens": int(tok.get("max", 0)),
+            "p50_tokens": round(float(tok.get("p50", 0)), 2),
+            "p90_tokens": round(float(tok.get("p90", 0)), 2),
+            "p95_tokens": round(float(tok.get("p95", 0)), 2),
+            "p99_tokens": round(float(tok.get("p99", 0)), 2),
+            "truncated_count": truncated,
+            "truncation_pct": round((truncated / len(chunks) * 100), 2) if chunks else 0.0,
+            "mean_words": round(float(words.get("mean", 0)), 2),
+            "mean_verses": round(float(verses.get("mean", 0)), 2),
+        }
 
         return {
             "chunks": chunks,
