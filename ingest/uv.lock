@@ -483,7 +483,7 @@ wheels = [
 [[package]]
 name = "datalens"
 version = "0.1.0"
-source = { git = "https://github.com/hjisaac/datalens.git#7ec26abd4c8dc000fdc9f75a5a5c20de477921ff" }
+source = { git = "https://github.com/hjisaac/datalens.git#65fb674e7b1ea93bd0f72d042f3d13a9bf908161" }
 dependencies = [
     { name = "numpy" },
     { name = "omegaconf" },
