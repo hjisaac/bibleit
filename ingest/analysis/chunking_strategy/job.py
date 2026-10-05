@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from datalens import AnalysisConfig, run_analysis
 from fastembed import TextEmbedding
 
 from bibleit_ingest.chunking import (
@@ -87,8 +88,6 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
             })
 
         # Unified streaming corpus stats via datalens (with T-Digest quantiles)
-        from datalens import AnalysisConfig, run_analysis
-
         lens_cfg = AnalysisConfig(
             columns={
                 "token_count": "quantile",
