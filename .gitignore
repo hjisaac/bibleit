@@ -17,6 +17,7 @@ ingest/scripts/pericope_sizes.json
 # Each eval and analysis job's own run history:
 ingest/eval/*/outputs/
 ingest/analysis/*/outputs/
+**/outputs/
 # Weights & Biases' own local run cache (see WBTracker) -- run data
 # already lives in each job's outputs/ and gets uploaded to W&B directly.
 ingest/wandb/
