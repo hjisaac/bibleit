@@ -114,12 +114,24 @@ export function ReaderView({
     <section class="flex-1 flex flex-col overflow-y-auto">
       {/* Reader Navigation Header */}
       <div
-        class="px-5 py-3 border-b flex items-center justify-between sticky top-0 z-10 backdrop-blur-md"
+        class="px-4 sm:px-6 py-3 border-b flex items-center justify-between sticky top-0 z-10 backdrop-blur-md"
         style={{
           backgroundColor: 'var(--bg-surface)',
           borderColor: 'var(--border-subtle)',
         }}
       >
+        <button
+          type="button"
+          onClick={onBackToSearch}
+          class="flex items-center gap-1.5 text-xs font-medium px-2 py-1.5 rounded-lg transition-opacity hover:opacity-75"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+          <span>Back to search</span>
+        </button>
+
         <button
           type="button"
           onClick={onOpenSelector}
@@ -136,22 +148,34 @@ export function ReaderView({
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
           </svg>
         </button>
-
-        <button
-          type="button"
-          onClick={onBackToSearch}
-          class="text-xs font-medium hover:underline"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          ← Back to search
-        </button>
       </div>
 
       {/* Chapter Text */}
       <div class="p-5 sm:p-8 font-serif text-[18px] sm:text-[19px] leading-[1.85] space-y-4 max-w-2xl mx-auto w-full" style={{ color: 'var(--text-main)' }}>
-        <h1 class="text-xl font-bold tracking-tight mb-6 text-center">
-          {bookTitle} Chapter {chapter}
-        </h1>
+        <div class="flex flex-col items-center mb-6">
+          <button
+            type="button"
+            onClick={onOpenSelector}
+            title="Tap to select book or chapter"
+            class="group inline-flex items-center justify-center gap-2.5 px-4 py-1.5 rounded-2xl transition-all hover:bg-stone-500/10 active:scale-[0.98]"
+          >
+            <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-center font-serif" style={{ color: 'var(--text-main)' }}>
+              {bookTitle} Chapter {chapter}
+            </h1>
+            <svg
+              class="w-5 h-5 transition-transform group-hover:translate-y-0.5 opacity-40 group-hover:opacity-80"
+              style={{ color: 'var(--text-main)' }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <span class="text-[11px] font-sans mt-0.5 tracking-wide font-normal" style={{ color: 'var(--text-subtle)' }}>
+            Tap to change book & chapter
+          </span>
+        </div>
 
         {isLoading && (
           <div class="py-12 text-center text-sm font-sans" style={{ color: 'var(--text-muted)' }}>

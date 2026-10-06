@@ -80,7 +80,6 @@ export function App(): JSX.Element {
             engine={engine}
             isInspectorMode={isInspectorMode}
             onOpenReader={handleOpenReader}
-            onOpenSelector={() => setIsSelectorOpen(true)}
             onToast={showToast}
           />
         )}
