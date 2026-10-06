@@ -220,6 +220,39 @@ export function SearchView({
         </div>
       )}
 
+      {/* Empty Guidance State */}
+      {query.trim().length === 0 && (
+        <div class="py-16 flex flex-col items-center justify-center text-center animate-fadeIn">
+          <div
+            class="w-12 h-12 rounded-2xl flex items-center justify-center text-xl mb-3 border shadow-sm"
+            style={{
+              backgroundColor: 'var(--bg-surface-elevated)',
+              borderColor: 'var(--border-subtle)',
+            }}
+          >
+            <span>📖</span>
+          </div>
+          <p class="font-serif text-lg font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
+            Search Scripture
+          </p>
+          <p class="text-xs max-w-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            Search by book & verse reference (e.g. <i>John 3:16</i>), topic, or phrase. Or tap <b>Books</b> above to jump directly to any chapter.
+          </p>
+        </div>
+      )}
+
+      {/* No Results State */}
+      {query.trim().length > 0 && passages.length === 0 && (
+        <div class="py-16 flex flex-col items-center justify-center text-center animate-fadeIn">
+          <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
+            No matching passages found
+          </p>
+          <p class="text-xs max-w-sm" style={{ color: 'var(--text-muted)' }}>
+            Try checking spelling, searching for a book name, or using broader keywords.
+          </p>
+        </div>
+      )}
+
       {/* Results Stream */}
       <div class="flex flex-col space-y-3 pb-4">
         {passages.map((p) => {

@@ -38,7 +38,7 @@ export function App(): JSX.Element {
 
   // Sync theme class to document body.
   useEffect(() => {
-    document.body.className = `antialiased font-sans flex justify-center min-h-screen theme-${theme}`;
+    document.body.className = `antialiased font-sans min-h-screen theme-${theme}`;
   }, [theme]);
 
   const showToast = (message: string) => {
