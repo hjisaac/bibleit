@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 def dict_to_slug(params: dict[str, Any]) -> str:
-    """Format dict key-values into {key}{value} pairs joined by underscores."""
-    return "_".join(f"{k}{v}" for k, v in params.items() if v is not None)
+    """Format dict key-values into {key}-{value} pairs joined by underscores."""
+    return "_".join(f"{k}-{v}" for k, v in params.items() if v is not None)
 
 
 class AnalysisJobBase(AbstractJob):
@@ -60,7 +60,7 @@ class AnalysisJobBase(AbstractJob):
 
         if self.tracker is not None:
             self.tracker.track_summary(**metrics)
-            self.tracker.track_artifact(out_path, name="analysis-result", type="analysis_result")
+            self.tracker.track_artifact(out_path, name="artifact-outputs", type="run-summary")
 
     def on_teardown(self) -> None:
         super().on_teardown()

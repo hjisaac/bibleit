@@ -7,6 +7,7 @@ interface ReaderViewProps {
   book: string;
   chapter: number;
   targetVerse?: number;
+  scrollKey?: number;
   onBackToSearch: () => void;
   onOpenSelector: () => void;
   onSaveVerse: (ref: string, text: string) => void;
@@ -30,6 +31,7 @@ export function ReaderView({
   book,
   chapter,
   targetVerse,
+  scrollKey,
   onBackToSearch,
   onOpenSelector,
   onSaveVerse,
@@ -90,10 +92,26 @@ export function ReaderView({
   }, [book, chapter]);
 
   useEffect(() => {
-    if (targetVerse && targetVerseRef.current) {
-      targetVerseRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (targetVerse === undefined) {
+      return;
     }
-  }, [targetVerse, verses]);
+
+    const timer = setTimeout(() => {
+      if (targetVerse <= 1) {
+        const container = document.getElementById('reader-scroll-container');
+        if (container) {
+          container.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+      }
+      const el = document.getElementById(`verse-${targetVerse}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 70);
+
+    return () => clearTimeout(timer);
+  }, [targetVerse, verses, scrollKey, book, chapter]);
 
   const handleCopy = () => {
     if (selectedVerse) {
@@ -111,10 +129,10 @@ export function ReaderView({
   };
 
   return (
-    <section class="flex-1 flex flex-col overflow-y-auto">
+    <section id="reader-scroll-container" class="flex-1 flex flex-col overflow-y-auto">
       {/* Reader Navigation Header */}
       <div
-        class="px-4 sm:px-6 py-3 border-b flex items-center justify-between sticky top-0 z-10 backdrop-blur-md"
+        class="px-4 sm:px-6 py-3 border-b flex items-center sticky top-0 z-10 backdrop-blur-md"
         style={{
           backgroundColor: 'var(--bg-surface)',
           borderColor: 'var(--border-subtle)',
@@ -130,23 +148,6 @@ export function ReaderView({
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
           </svg>
           <span>Back to search</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={onOpenSelector}
-          title="Change book or chapter"
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold hover:opacity-80 transition-opacity"
-          style={{
-            backgroundColor: 'var(--bg-surface-elevated)',
-            borderColor: 'var(--border-subtle)',
-            color: 'var(--text-main)',
-          }}
-        >
-          <span>{bookTitle} {chapter}</span>
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
         </button>
       </div>
 
@@ -202,9 +203,10 @@ export function ReaderView({
           return (
             <p
               key={v.num}
+              id={`verse-${v.num}`}
               ref={isTarget ? targetVerseRef : undefined}
               onClick={() => setSelectedVerse(v)}
-              class={`cursor-pointer transition-all p-2 rounded-xl ${
+              class={`cursor-pointer transition-all p-2 rounded-xl scroll-mt-16 ${
                 isTarget ? 'ring-2 ring-amber-500/40' : ''
               } ${isSelected ? 'ring-2 ring-stone-500/40' : ''}`}
               style={{

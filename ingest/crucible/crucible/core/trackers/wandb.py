@@ -46,6 +46,9 @@ class WBTracker(AbstractTracker):
             artifact.add_file(str(path))
             self._run.log_artifact(artifact)
 
+            if type == "plot":
+                self._run.log({f"plots/{artifact.name}": wandb.Image(str(path))})
+
     def finish(self) -> None:
         if self._run is not None:
             self._run.finish()

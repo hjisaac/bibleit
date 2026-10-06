@@ -34,17 +34,33 @@ const FIXTURE_PASSAGES: ScoredPassage[] = [
   },
 ];
 
-const nullAnswerProvider: AnswerProvider = {
-  available: false,
-  async *answer(): AsyncIterable<string> {
-    // Retrieval-only in mock mode.
+const mockAnswerProvider: AnswerProvider = {
+  available: true,
+  async *answer(_query: string, _context: RetrievalResult): AsyncIterable<string> {
+    const tokens = [
+      'According', 'to', 'Scripture,', 'peace', 'is', 'not', 'merely', 'the', 'absence',
+      'of', 'conflict,', 'but', 'a', 'gift', 'rooted', 'in', "God's", 'presence.',
+      '\n\n',
+      'In', 'Philippians 4:7,', 'believers', 'are', 'assured', 'that', "God's",
+      'peace,', 'which', 'surpasses', 'all', 'human', 'understanding,', 'guards',
+      'both', 'heart', 'and', 'mind.', 'Similarly,', 'Jesus', 'promises', 'His',
+      'disciples', 'in', 'John 14:27:', '"Peace', 'I', 'leave', 'with', 'you;',
+      'my', 'peace', 'I', 'give', 'to', 'you."',
+      '\n\n',
+      'Through', 'prayer', 'and', 'trust,', 'this', 'steadfast', 'peace', 'remains',
+      'anchored', 'even', 'in', 'adversity', '(Isaiah 26:3).'
+    ];
+    for (const token of tokens) {
+      await new Promise((r) => setTimeout(r, 35));
+      yield token + (token.endsWith('\n\n') ? '' : ' ');
+    }
   },
 };
 
 /** Mock engine providing realistic retrieval results while offline artifacts build. */
 export class MockSearchEngine implements SearchEngine {
   readonly ready: Promise<void> = Promise.resolve();
-  readonly answers: AnswerProvider = nullAnswerProvider;
+  readonly answers: AnswerProvider = mockAnswerProvider;
 
   async retrieve(query: string, k: number = 10): Promise<RetrievalResult> {
     // Simulate typical 30ms local dot-product + BM25 latency.

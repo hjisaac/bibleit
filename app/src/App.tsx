@@ -8,6 +8,7 @@ import { ReaderView } from './components/ReaderView';
 import { SavedView, type SavedVerse } from './components/SavedView';
 import { SettingsView } from './components/SettingsView';
 import { BookSelectorModal } from './components/BookSelectorModal';
+import { HelpModal } from './components/HelpModal';
 
 export function App(): JSX.Element {
   const engine = useMemo(() => createDefaultEngine(), []);
@@ -17,15 +18,18 @@ export function App(): JSX.Element {
   const [isInspectorMode, setIsInspectorMode] = useState<boolean>(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   const [readerLocation, setReaderLocation] = useState<{
     book: string;
     chapter: number;
     targetVerse?: number;
+    scrollKey: number;
   }>({
     book: 'PHP',
     chapter: 4,
     targetVerse: 7,
+    scrollKey: 0,
   });
 
   const [savedVerses, setSavedVerses] = useState<SavedVerse[]>([
@@ -49,7 +53,7 @@ export function App(): JSX.Element {
   };
 
   const handleOpenReader = (book: string, chapter: number, verse: number) => {
-    setReaderLocation({ book, chapter, targetVerse: verse });
+    setReaderLocation({ book, chapter, targetVerse: verse, scrollKey: Date.now() });
     setActiveTab('reader');
   };
 
@@ -69,9 +73,9 @@ export function App(): JSX.Element {
       }}
     >
       <Header
-        currentTheme={theme}
-        onThemeChange={setTheme}
         isOfflineReady={true}
+        onOpenHelp={() => setIsHelpOpen(true)}
+        onOpenAccount={() => showToast('Offline profile (Guest mode)')}
       />
 
       <main class="flex-1 flex flex-col overflow-hidden">
@@ -89,6 +93,7 @@ export function App(): JSX.Element {
             book={readerLocation.book}
             chapter={readerLocation.chapter}
             targetVerse={readerLocation.targetVerse}
+            scrollKey={readerLocation.scrollKey}
             onBackToSearch={() => setActiveTab('search')}
             onOpenSelector={() => setIsSelectorOpen(true)}
             onSaveVerse={handleSaveVerse}
@@ -120,12 +125,17 @@ export function App(): JSX.Element {
 
       <Navbar activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* Book & Chapter Selection Modal */}
+      {/* Book, Chapter & Verse Selection Modal */}
       <BookSelectorModal
         isOpen={isSelectorOpen}
+        initialBookId={readerLocation.book}
+        initialChapter={readerLocation.chapter}
         onClose={() => setIsSelectorOpen(false)}
-        onSelectChapter={(bookId, chapter) => handleOpenReader(bookId, chapter, 1)}
+        onSelectPassage={(bookId, chapter, verse) => handleOpenReader(bookId, chapter, verse)}
       />
+
+      {/* Quick Help & Shortcuts Modal */}
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
 
       {/* Floating Toast Notification */}
       {toastMessage && (
