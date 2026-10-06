@@ -8,7 +8,6 @@ interface SearchViewProps {
   engine: SearchEngine;
   isInspectorMode: boolean;
   onOpenReader: (book: string, chapter: number, verse: number) => void;
-  onOpenSelector: () => void;
   onToast: (message: string) => void;
 }
 
@@ -16,7 +15,6 @@ export function SearchView({
   engine,
   isInspectorMode,
   onOpenReader,
-  onOpenSelector,
   onToast,
 }: SearchViewProps): JSX.Element {
   const [query, setQuery] = useState('peace that surpasses understanding');
@@ -84,39 +82,24 @@ export function SearchView({
             style={{ color: 'var(--text-main)' }}
             onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
           />
-          <div class="flex items-center gap-1.5 shrink-0">
-            {query.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setQuery('')}
-                class="text-xs p-1 rounded-full hover:opacity-75"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            )}
+          {query.length > 0 && (
             <button
               type="button"
-              onClick={onOpenSelector}
-              title="Open Bible book & chapter picker"
-              class="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg border transition-opacity hover:opacity-80"
-              style={{
-                backgroundColor: 'var(--bg-surface)',
-                borderColor: 'var(--border-subtle)',
-                color: 'var(--text-main)',
-              }}
+              onClick={() => setQuery('')}
+              class="text-xs p-1 rounded-full hover:opacity-75 shrink-0 ml-1.5"
+              style={{ color: 'var(--text-muted)' }}
+              title="Clear search"
             >
-              <span>📖</span>
-              <span class="hidden sm:inline">Books</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
             </button>
-          </div>
+          )}
         </div>
       </div>
 
@@ -217,6 +200,39 @@ export function SearchView({
         >
           <span>MiniLM-L6 (int8) · 31,102 verses</span>
           <span class="text-emerald-600 font-semibold">{latencyMs}ms latency</span>
+        </div>
+      )}
+
+      {/* Empty Guidance State */}
+      {query.trim().length === 0 && (
+        <div class="py-16 flex flex-col items-center justify-center text-center animate-fadeIn">
+          <div
+            class="w-12 h-12 rounded-2xl flex items-center justify-center text-xl mb-3 border shadow-sm"
+            style={{
+              backgroundColor: 'var(--bg-surface-elevated)',
+              borderColor: 'var(--border-subtle)',
+            }}
+          >
+            <span>📖</span>
+          </div>
+          <p class="font-serif text-lg font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
+            Search Scripture
+          </p>
+          <p class="text-xs max-w-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            Search by book & verse reference (e.g. <i>John 3:16</i>), topic, or phrase. Switch to the <b>Reader</b> tab to browse full chapters.
+          </p>
+        </div>
+      )}
+
+      {/* No Results State */}
+      {query.trim().length > 0 && passages.length === 0 && (
+        <div class="py-16 flex flex-col items-center justify-center text-center animate-fadeIn">
+          <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
+            No matching passages found
+          </p>
+          <p class="text-xs max-w-sm" style={{ color: 'var(--text-muted)' }}>
+            Try checking spelling, searching for a book name, or using broader keywords.
+          </p>
         </div>
       )}
 

@@ -56,6 +56,21 @@ body.theme-obsidian {
   --badge-key-text: #CBD5E1;
 }
 
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+#app {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+}
+
 body {
   background-color: var(--bg-page);
   color: var(--text-main);
