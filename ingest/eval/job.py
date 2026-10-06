@@ -64,7 +64,7 @@ class EvalJobBase(AbstractJob):
                 if k in result:
                     summary[k] = result[k]
             self.tracker.track_summary(**summary)
-            self.tracker.track_artifact(out_path, name="artifact-outputs", type="run-summary")
+            self.tracker.track_artifact(out_path, name="run-summary", type="artifact-outputs")
 
     def on_teardown(self) -> None:
         super().on_teardown()

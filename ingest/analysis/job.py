@@ -60,7 +60,7 @@ class AnalysisJobBase(AbstractJob):
 
         if self.tracker is not None:
             self.tracker.track_summary(**metrics)
-            self.tracker.track_artifact(out_path, name="artifact-outputs", type="run-summary")
+            self.tracker.track_artifact(out_path, name="run-summary", type="artifact-outputs")
 
     def on_teardown(self) -> None:
         super().on_teardown()

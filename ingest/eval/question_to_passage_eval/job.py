@@ -85,7 +85,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
             )
             logger.info("Saved retrieval inspection report to %s", report_path)
             if self.tracker is not None:
-                self.tracker.track_artifact(report_path, name="retrieval-inspect", type="report")
+                self.tracker.track_artifact(report_path, name="retrieval-report", type="artifact-outputs")
 
         filtered = {k: v for k, v in result.items() if k != "diagnostics"}
         super().on_finalize(prepared, filtered)
