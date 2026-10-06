@@ -72,9 +72,9 @@ def main():
             metadata.append(
                 {
                     "book": chunk.book,
-                    "chapter": chunk.pericopes[0].chapter,
-                    "verse": chunk.pericopes[0].verse,
-                    "headings": chunk.headings,
+                    "chapter": chunk.chapter,
+                    "verse": chunk.verse,
+                    "headings": list(chunk.headings),
                     "verse_count": chunk.verse_count,
                 }
             )

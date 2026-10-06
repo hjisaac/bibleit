@@ -24,12 +24,11 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
 
     def on_start(self) -> None:
         super().on_start()
-        tag = self.config.get("tag")
-        tag_str = f"_{tag}" if tag else ""
-        floor = self.config["floor"]
-        ceiling = self.config["ceiling"]
-        overlap = self.config.get("overlap", 1)
-        self.slug = f"{self.run_id}{tag_str}_f{floor}_c{ceiling}_o{overlap}"
+        self.slug = self.make_slug({
+            "f": self.config["floor"],
+            "c": self.config["ceiling"],
+            "o": self.config.get("overlap", 1),
+        })
         self.run_dir = Path(self.config["log_dir"]).resolve() / self.slug
 
     def on_prepare(self) -> dict:
@@ -71,7 +70,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
             ordered_verses=ordered_verses,
             address_index=address_index,
             include_headings=bool(self.config.get("include_headings", True)),
-            include_overlap_headings=bool(self.config.get("include_overlap_headings", True)),
+            include_incomplete_headings=bool(self.config.get("include_incomplete_headings", True)),
         )
 
         texts = []

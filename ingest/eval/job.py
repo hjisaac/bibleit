@@ -11,12 +11,25 @@ from bibleit_ingest.constants import REPO
 logger = logging.getLogger(__name__)
 
 
+def dict_to_slug(params: dict[str, Any]) -> str:
+    """Format dict key-values into {key}{value} pairs joined by underscores."""
+    return "_".join(f"{k}{v}" for k, v in params.items() if v is not None)
+
+
 class EvalJobBase(AbstractJob):
     """Base class for all bibleit evaluation and profiling jobs.
     Handles path resolution, W&B tracking under bibleit-eval, and saving results."""
 
     path_config_keys: tuple[str, ...] = ()
     category: str = "eval"
+
+    def make_slug(self, params: dict[str, Any] | None = None) -> str:
+        parts = [self.run_id]
+        if tag := self.config.get("tag"):
+            parts.append(str(tag))
+        if params and (param_str := dict_to_slug(params)):
+            parts.append(param_str)
+        return "_".join(parts)
 
     @property
     def project_name(self) -> str:
@@ -52,3 +65,14 @@ class EvalJobBase(AbstractJob):
                     summary[k] = result[k]
             self.tracker.track_summary(**summary)
             self.tracker.track_artifact(out_path, name="eval-result", type="eval_result")
+
+    def on_teardown(self) -> None:
+        super().on_teardown()
+        if hasattr(self, "run_dir"):
+            log_dir = Path(self.config.get("log_dir", "outputs"))
+            src_log = log_dir / f"{self.run_id}.log"
+            dst_log = self.run_dir / f"{self.run_id}.log"
+            if src_log.exists() and self.run_dir != log_dir:
+                import shutil
+                self.run_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src_log, dst_log)
