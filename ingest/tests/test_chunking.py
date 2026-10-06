@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import pytest
 
@@ -170,8 +171,29 @@ def test_chunk_multi_book_boundaries() -> None:
     assert list(chunks[1].headings) == ["Israel Multiplies"]
 
 
-def test_load_pericopes() -> None:
-    pericopes = load_pericopes(BSB_PERICOPES_PATH)
+def test_load_pericopes(tmp_path: Path) -> None:
+    sample_file = tmp_path / "sample_pericopes.json"
+    sample_file.write_text(
+        json.dumps({
+            "pericopes": [
+                {
+                    "book": "GEN",
+                    "chapter": 1,
+                    "verse": 1,
+                    "heading": "The Creation",
+                    "verse_count": 31,
+                }
+            ]
+        })
+    )
+    pericopes = load_pericopes(sample_file)
     assert isinstance(pericopes, list)
-    assert len(pericopes) > 3000
+    assert len(pericopes) == 1
     assert pericopes[0].book == "GEN"
+    assert pericopes[0].heading == "The Creation"
+    assert pericopes[0].verse_count == 31
+
+    if BSB_PERICOPES_PATH.exists():
+        real_pericopes = load_pericopes(BSB_PERICOPES_PATH)
+        assert len(real_pericopes) > 3000
+
