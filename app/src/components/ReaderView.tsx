@@ -6,6 +6,7 @@ interface ReaderViewProps {
   chapter: number;
   targetVerse?: number;
   onBackToSearch: () => void;
+  onOpenSelector: () => void;
   onSaveVerse: (ref: string, text: string) => void;
   onToast: (msg: string) => void;
 }
@@ -31,6 +32,7 @@ export function ReaderView({
   chapter,
   targetVerse,
   onBackToSearch,
+  onOpenSelector,
   onSaveVerse,
   onToast,
 }: ReaderViewProps): JSX.Element {
@@ -70,7 +72,9 @@ export function ReaderView({
       >
         <button
           type="button"
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold"
+          onClick={onOpenSelector}
+          title="Change book or chapter"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold hover:opacity-80 transition-opacity"
           style={{
             backgroundColor: 'var(--bg-surface-elevated)',
             borderColor: 'var(--border-subtle)',

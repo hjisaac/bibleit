@@ -3,6 +3,7 @@ import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  base: process.env.BASE_URL || '/',
   plugins: [
     preact(),
     VitePWA({
@@ -32,5 +33,6 @@ export default defineConfig({
   ],
   server: {
     port: 3000,
+    host: true,
   },
 });

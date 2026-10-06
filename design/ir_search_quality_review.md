@@ -7,9 +7,9 @@
 ## 1. The "Disembodied Chunk" Problem (Semantic Dilution)
 
 ### Location
-[`ingest/bibleit_ingest/chunking.py`](file:///home/hjisaac/Devs/bibleit/ingest/bibleit_ingest/chunking.py) (`render_chunk_text`):
+[`ingest/bibleit_ingest/chunking.py`](file:///home/hjisaac/Devs/bibleit/ingest/bibleit_ingest/chunking.py) (`ChunkRenderer.render`):
 ```python
-def render_chunk_text(chunk, ordered_verses, address_index):
+def render(self, chunk: Chunk) -> str:
     blocks = []
     for p in chunk.pericopes:
         ...
@@ -38,9 +38,9 @@ This immediately boosts disambiguation and query-passage alignment for book-spec
 ## 2. Verse-Count vs. Token-Density Asymmetry
 
 ### Location
-[`ingest/bibleit_ingest/chunking.py`](file:///home/hjisaac/Devs/bibleit/ingest/bibleit_ingest/chunking.py) (`FloorCeilingMergeChunker`):
+[`ingest/bibleit_ingest/chunking.py`](file:///home/hjisaac/Devs/bibleit/ingest/bibleit_ingest/chunking.py) (`AdaptiveWindowChunker`):
 ```python
-FloorCeilingMergeChunker(floor=5, ceiling=30)
+AdaptiveWindowChunker(floor=5, ceiling=30, overlap=1)
 ```
 
 ### The Issue

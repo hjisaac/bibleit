@@ -40,9 +40,9 @@ def save_chunk_embeddings(
     meta = [
         {
             "book": c.book,
-            "chapter": c.pericopes[0].chapter,
-            "verse": c.pericopes[0].verse,
-            "headings": c.headings,
+            "chapter": c.chapter,
+            "verse": c.verse,
+            "headings": list(c.headings),
             "verse_count": c.verse_count,
         }
         for c in chunks

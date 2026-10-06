@@ -8,9 +8,9 @@ ifneq ($(NVM_NODE_BIN),)
   export PATH := $(NVM_NODE_BIN):$(PATH)
 endif
 
-# Run the frontend PWA dev server
+# Run the frontend PWA dev server (exposed on local network)
 dev:
-	pnpm --prefix app dev
+	pnpm --prefix app dev --host
 
 # Install frontend dependencies
 install:

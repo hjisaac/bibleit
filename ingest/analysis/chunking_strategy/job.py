@@ -7,15 +7,12 @@ from datalens import AnalysisConfig, run_analysis
 from fastembed import TextEmbedding
 
 from bibleit_ingest.chunking import (
-    FloorCeilingMergeChunker,
-    group_verse_addresses_by_book,
-    index_verses_by_address,
-    load_web_verses,
-    render_chunk_text,
+    AdaptiveWindowChunker,
+    ChunkRenderer,
 )
 from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, OLD_TESTAMENT_BOOKS, REPO
 from bibleit_ingest.embedding import save_chunk_embeddings
-from bibleit_ingest.pericopes import derive_bsb_pericopes, project_pericopes
+from bibleit_ingest.pericopes import get_or_prepare_corpus
 from analysis.chunking_strategy.plots import generate_chunk_plots
 from analysis.job import AnalysisJobBase
 
@@ -27,20 +24,15 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
 
     def on_start(self) -> None:
         super().on_start()
-        tag = self.config.get("tag")
-        tag_str = f"_{tag}" if tag else ""
-        floor = self.config["floor"]
-        ceiling = self.config["ceiling"]
-        self.slug = f"{self.run_id}{tag_str}_f{floor}_c{ceiling}"
+        self.slug = self.make_slug({
+            "f": self.config["floor"],
+            "c": self.config["ceiling"],
+            "o": self.config.get("overlap", 1),
+        })
         self.run_dir = Path(self.config["log_dir"]).resolve() / self.slug
 
     def on_prepare(self) -> dict:
-        ordered_verses = load_web_verses(self.web_path)
-        address_index = index_verses_by_address(ordered_verses)
-        web_addresses_by_book = group_verse_addresses_by_book(ordered_verses)
-
-        bsb_native = derive_bsb_pericopes(self.bsb_dir)
-        resolved, _ = project_pericopes(bsb_native, web_addresses_by_book)
+        corpus = get_or_prepare_corpus(self.web_path, self.bsb_dir)
 
         tok_model_name = self.config.get(
             "tokenizer_model", "nomic-ai/nomic-embed-text-v1.5"
@@ -50,22 +42,36 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         )
 
         return {
-            "resolved_pericopes": resolved,
-            "ordered_verses": ordered_verses,
-            "address_index": address_index,
+            "pericopes": corpus.pericopes,
+            "ordered_verses": corpus.ordered_verses,
+            "address_index": corpus.address_index,
             "embed_model": embed_model,
         }
 
     def on_execute(self, prepared: dict) -> dict[str, Any]:
         floor = int(self.config["floor"])
         ceiling = int(self.config["ceiling"])
-        chunker = FloorCeilingMergeChunker(floor=floor, ceiling=ceiling)
-        chunks = chunker.chunk_bible(prepared["resolved_pericopes"])
-
-        tokenizer = prepared["embed_model"].model.tokenizer
+        overlap = int(self.config.get("overlap", 1))
         ordered_verses = prepared["ordered_verses"]
         address_index = prepared["address_index"]
+
+        chunker = AdaptiveWindowChunker(
+            floor=floor,
+            ceiling=ceiling,
+            overlap=overlap,
+            ordered_verses=ordered_verses,
+            address_index=address_index,
+        )
+        chunks = chunker.chunk(prepared["pericopes"])
+
+        tokenizer = prepared["embed_model"].model.tokenizer
         limit = int(self.config.get("token_limit", 512))
+        renderer = ChunkRenderer(
+            ordered_verses=ordered_verses,
+            address_index=address_index,
+            include_headings=bool(self.config.get("include_headings", True)),
+            include_incomplete_headings=bool(self.config.get("include_incomplete_headings", True)),
+        )
 
         texts = []
         records = []
@@ -73,7 +79,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
 
         # Single pass: render, tokenize, and record metadata
         for chunk in chunks:
-            text = render_chunk_text(chunk, ordered_verses, address_index)
+            text = renderer.render(chunk)
             t_len = len(tokenizer.encode(text).ids)
             if t_len > limit:
                 truncated += 1

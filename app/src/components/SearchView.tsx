@@ -2,11 +2,13 @@ import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import type { SearchEngine } from '../core/ports';
 import type { ScoredPassage } from '../core/types';
+import { findBookByPrefix } from '../core/bible-books';
 
 interface SearchViewProps {
   engine: SearchEngine;
   isInspectorMode: boolean;
   onOpenReader: (book: string, chapter: number, verse: number) => void;
+  onOpenSelector: () => void;
   onToast: (message: string) => void;
 }
 
@@ -14,12 +16,15 @@ export function SearchView({
   engine,
   isInspectorMode,
   onOpenReader,
+  onOpenSelector,
   onToast,
 }: SearchViewProps): JSX.Element {
   const [query, setQuery] = useState('peace that surpasses understanding');
   const [passages, setPassages] = useState<ScoredPassage[]>([]);
   const [latencyMs, setLatencyMs] = useState(38);
   const [expandedCardId, setExpandedCardId] = useState<number | null>(null);
+
+  const matchedBook = findBookByPrefix(query);
 
   useEffect(() => {
     let isCancelled = false;
@@ -79,25 +84,83 @@ export function SearchView({
             style={{ color: 'var(--text-main)' }}
             onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
           />
-          {query.length > 0 && (
+          <div class="flex items-center gap-1.5 shrink-0">
+            {query.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                class="text-xs p-1 rounded-full hover:opacity-75"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => setQuery('')}
-              class="text-xs p-1 rounded-full hover:opacity-75"
-              style={{ color: 'var(--text-muted)' }}
+              onClick={onOpenSelector}
+              title="Open Bible book & chapter picker"
+              class="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg border transition-opacity hover:opacity-80"
+              style={{
+                backgroundColor: 'var(--bg-surface)',
+                borderColor: 'var(--border-subtle)',
+                color: 'var(--text-main)',
+              }}
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
+              <span>📖</span>
+              <span class="hidden sm:inline">Books</span>
             </button>
-          )}
+          </div>
         </div>
       </div>
+
+      {/* Scripture Navigator Strip (Appears when query matches a book prefix) */}
+      {matchedBook && (
+        <div
+          class="mb-3 p-3 rounded-2xl border flex flex-col gap-2 animate-fadeIn shrink-0"
+          style={{
+            backgroundColor: 'var(--bg-surface-elevated)',
+            borderColor: 'var(--border-subtle)',
+          }}
+        >
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
+              <span>📖</span>
+              <span>{matchedBook.name}</span>
+              <span class="text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>
+                ({matchedBook.chapters} chapters)
+              </span>
+            </span>
+            <span class="text-[10px]" style={{ color: 'var(--text-subtle)' }}>
+              Tap chapter to jump
+            </span>
+          </div>
+
+          <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            {Array.from({ length: matchedBook.chapters }, (_, i) => i + 1).map((ch) => (
+              <button
+                key={ch}
+                type="button"
+                onClick={() => onOpenReader(matchedBook.id, ch, 1)}
+                class="shrink-0 px-2.5 py-1 rounded-lg border font-medium transition-all hover:ring-2 hover:ring-amber-500/40"
+                style={{
+                  backgroundColor: 'var(--bg-surface)',
+                  borderColor: 'var(--border-subtle)',
+                  color: 'var(--text-main)',
+                }}
+              >
+                {ch}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Suggested Quick Queries */}
       <div class="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2 text-xs shrink-0">

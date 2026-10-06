@@ -16,6 +16,9 @@ CHUNK_EMBEDDINGS_NPY_PATH = REPO / "ingest/scripts/chunk_embeddings.npy"
 # OS-temp-dir default.
 FASTEMBED_CACHE_DIR = REPO / "ingest/data/models/fastembed"
 
+# joblib.Memory cache location for expensive data prep steps.
+CRUCIBLE_CACHE_DIR = REPO / "ingest/.crucible_cache"
+
 
 class EmbeddingModel(StrEnum):
     """Every embedding model this project uses. Behaves as a plain string
