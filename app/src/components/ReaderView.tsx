@@ -1,6 +1,8 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 
+import { BIBLE_BOOKS } from '../core/bible-books';
+
 interface ReaderViewProps {
   book: string;
   chapter: number;
@@ -16,16 +18,13 @@ interface ChapterVerse {
   text: string;
 }
 
-const PHILIPPIANS_4_VERSES: ChapterVerse[] = [
-  { num: 1, text: 'Therefore, my brothers, beloved and longed for, my joy and crown, so stand firm in the Lord, my beloved.' },
-  { num: 2, text: 'I exhort Euodia, and I exhort Syntyche, to be of the same mind in the Lord.' },
-  { num: 3, text: 'Yes, I beg you also, true partner, help these women, for they labored with me in the Good News, with Clement also, and the rest of my fellow workers, whose names are in the book of life.' },
-  { num: 4, text: 'Rejoice in the Lord always! Again I will say, “Rejoice!”' },
-  { num: 5, text: 'Let your gentleness be known to all men. The Lord is at hand.' },
-  { num: 6, text: 'In nothing be anxious, but in everything, by prayer and petition with thanksgiving, let your requests be made known to God.' },
-  { num: 7, text: 'And the peace of God, which surpasses all understanding, will guard your hearts and your thoughts in Christ Jesus.' },
-  { num: 8, text: 'Finally, brothers, whatever things are true, whatever things are honorable, whatever things are just, whatever things are pure, whatever things are lovely, whatever things are of good report; if there is any virtue, and if there is any praise, think about these things.' },
-];
+interface BookData {
+  id: string;
+  name: string;
+  chapters: Record<string, ChapterVerse[]>;
+}
+
+const bookCache = new Map<string, BookData>();
 
 export function ReaderView({
   book,
@@ -36,14 +35,65 @@ export function ReaderView({
   onSaveVerse,
   onToast,
 }: ReaderViewProps): JSX.Element {
+  const [verses, setVerses] = useState<ChapterVerse[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedVerse, setSelectedVerse] = useState<ChapterVerse | null>(null);
   const targetVerseRef = useRef<HTMLParagraphElement | null>(null);
 
+  const bookMeta = BIBLE_BOOKS.find((b) => b.id === book);
+  const bookTitle = bookMeta ? bookMeta.name : book;
+
   useEffect(() => {
-    if (targetVerseRef.current) {
+    let isCancelled = false;
+    const chKey = String(chapter);
+
+    const applyData = (data: BookData) => {
+      if (!isCancelled) {
+        setVerses(data.chapters[chKey] || []);
+        setIsLoading(false);
+        setLoadError(null);
+      }
+    };
+
+    if (bookCache.has(book)) {
+      applyData(bookCache.get(book)!);
+      return;
+    }
+
+    setIsLoading(true);
+    setLoadError(null);
+
+    const url = `${import.meta.env.BASE_URL}data/books/${book}.json`;
+    fetch(url)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`Failed to load ${book} (${res.status})`);
+        }
+        return res.json();
+      })
+      .then((data: BookData) => {
+        bookCache.set(book, data);
+        applyData(data);
+      })
+      .catch((err) => {
+        if (!isCancelled) {
+          console.error(`Error loading book ${book}:`, err);
+          setLoadError(`Unable to load ${bookTitle} Chapter ${chapter}.`);
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [book, chapter]);
+
+  useEffect(() => {
+    if (targetVerse && targetVerseRef.current) {
       targetVerseRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, [targetVerse]);
+  }, [targetVerse, verses]);
 
   const handleCopy = () => {
     if (selectedVerse) {
@@ -81,7 +131,7 @@ export function ReaderView({
             color: 'var(--text-main)',
           }}
         >
-          <span>{book === 'PHP' ? 'Philippians' : book} {chapter}</span>
+          <span>{bookTitle} {chapter}</span>
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
           </svg>
@@ -99,14 +149,29 @@ export function ReaderView({
 
       {/* Chapter Text */}
       <div class="p-5 sm:p-8 font-serif text-[18px] sm:text-[19px] leading-[1.85] space-y-4 max-w-2xl mx-auto w-full" style={{ color: 'var(--text-main)' }}>
-        <h1 class="text-xl font-bold tracking-tight mb-1 text-center">
-          {book === 'PHP' ? 'Philippians' : book} Chapter {chapter}
+        <h1 class="text-xl font-bold tracking-tight mb-6 text-center">
+          {bookTitle} Chapter {chapter}
         </h1>
-        <p class="text-xs font-sans uppercase tracking-wider font-semibold text-center mb-6" style={{ color: 'var(--text-subtle)' }}>
-          Exhortation to Rejoice & Stand Firm
-        </p>
 
-        {PHILIPPIANS_4_VERSES.map((v) => {
+        {isLoading && (
+          <div class="py-12 text-center text-sm font-sans" style={{ color: 'var(--text-muted)' }}>
+            Loading chapter text...
+          </div>
+        )}
+
+        {loadError && (
+          <div class="p-4 rounded-xl text-center text-sm font-sans bg-amber-500/10 text-amber-600 border border-amber-500/20">
+            {loadError}
+          </div>
+        )}
+
+        {!isLoading && !loadError && verses.length === 0 && (
+          <div class="py-12 text-center text-sm font-sans" style={{ color: 'var(--text-muted)' }}>
+            No verses found for this chapter.
+          </div>
+        )}
+
+        {!isLoading && !loadError && verses.map((v) => {
           const isTarget = targetVerse === v.num;
           const isSelected = selectedVerse?.num === v.num;
 
