@@ -65,8 +65,10 @@ Enhance search with online LLM generation when connected.
 
 ## Phase 4: Reader Expansion & Production Polish
 
-- [ ] **4.1 Book & Chapter Selector Drawer**
-  - Implement navigation modal to browse all 66 Protestant canon books (39 OT / 27 NT) and select any chapter.
+- [x] **4.1 Book & Chapter Selector Drawer & Quick Navigator**
+  - Canonical 66-book definitions (`app/src/core/bible-books.ts`) with OT/NT grouping.
+  - 2-tap selection modal (`BookSelectorModal.tsx`) accessible from search bar and reader header.
+  - Live as-you-type chapter navigator strip in search view.
 - [ ] **4.2 Continuous Chapter Reading & Scrolling**
   - Allow infinite scrolling or previous/next chapter navigation in Reader View.
 - [ ] **4.3 Production PWA Assets**
