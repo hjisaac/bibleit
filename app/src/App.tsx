@@ -7,6 +7,7 @@ import { SearchView } from './components/SearchView';
 import { ReaderView } from './components/ReaderView';
 import { SavedView, type SavedVerse } from './components/SavedView';
 import { SettingsView } from './components/SettingsView';
+import { BookSelectorModal } from './components/BookSelectorModal';
 
 export function App(): JSX.Element {
   const engine = useMemo(() => createDefaultEngine(), []);
@@ -15,6 +16,7 @@ export function App(): JSX.Element {
   const [activeTab, setActiveTab] = useState<ViewTab>('search');
   const [isInspectorMode, setIsInspectorMode] = useState<boolean>(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isSelectorOpen, setIsSelectorOpen] = useState(false);
 
   const [readerLocation, setReaderLocation] = useState<{
     book: string;
@@ -78,6 +80,7 @@ export function App(): JSX.Element {
             engine={engine}
             isInspectorMode={isInspectorMode}
             onOpenReader={handleOpenReader}
+            onOpenSelector={() => setIsSelectorOpen(true)}
             onToast={showToast}
           />
         )}
@@ -88,6 +91,7 @@ export function App(): JSX.Element {
             chapter={readerLocation.chapter}
             targetVerse={readerLocation.targetVerse}
             onBackToSearch={() => setActiveTab('search')}
+            onOpenSelector={() => setIsSelectorOpen(true)}
             onSaveVerse={handleSaveVerse}
             onToast={showToast}
           />
@@ -116,6 +120,13 @@ export function App(): JSX.Element {
       </main>
 
       <Navbar activeTab={activeTab} onTabChange={setActiveTab} />
+
+      {/* Book & Chapter Selection Modal */}
+      <BookSelectorModal
+        isOpen={isSelectorOpen}
+        onClose={() => setIsSelectorOpen(false)}
+        onSelectChapter={(bookId, chapter) => handleOpenReader(bookId, chapter, 1)}
+      />
 
       {/* Floating Toast Notification */}
       {toastMessage && (
