@@ -10,7 +10,7 @@ from bibleit_ingest.chunking import AdaptiveWindowChunker
 from bibleit_ingest.constants import BSB_DIR, FASTEMBED_CACHE_DIR, EmbeddingModel
 from bibleit_ingest.embedding import embed_query
 from bibleit_ingest.pericopes import get_or_prepare_corpus
-from eval.helpers import generate_retrieval_report, trigger_eval
+from eval.helpers import format_passage, generate_retrieval_report, trigger_eval
 from eval.job import EvalJobBase
 
 logger = logging.getLogger(__name__)
@@ -78,8 +78,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
             report_path = self.run_dir / "retrieval_inspect.md"
             generate_retrieval_report(
                 diagnostics=diagnostics,
-                chunks=prepared["chunks"],
-                ordered_verses=prepared["corpus"].ordered_verses,
+                renderer=lambda idx: format_passage(prepared["chunks"][idx], prepared["corpus"].ordered_verses),
                 metrics=result.get("metrics", {}),
                 out_path=report_path,
             )

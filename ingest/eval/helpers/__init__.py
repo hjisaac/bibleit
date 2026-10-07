@@ -7,9 +7,20 @@ from ranx import Qrels, Run, evaluate
 from usearch.index import Index
 
 from bibleit_ingest.chunking import Chunk, VerseAddress, resolve_verse_to_chunk_index
-from .report import generate_retrieval_report
+from .report import (
+    BaseRetrievalReport,
+    RetrievalOutcome,
+    format_passage,
+    generate_retrieval_report,
+)
 
-__all__ = ["trigger_eval", "generate_retrieval_report"]
+__all__ = [
+    "trigger_eval",
+    "BaseRetrievalReport",
+    "RetrievalOutcome",
+    "format_passage",
+    "generate_retrieval_report",
+]
 
 
 def trigger_eval(
