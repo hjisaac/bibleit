@@ -6,6 +6,8 @@ import { findBookByPrefix } from '../core/bible-books';
 
 interface SearchViewProps {
   engine: SearchEngine;
+  isOnline: boolean;
+  isAiEnabled: boolean;
   isInspectorMode: boolean;
   onOpenReader: (book: string, chapter: number, verse: number) => void;
   onToast: (message: string) => void;
@@ -24,6 +26,8 @@ function isQuestionQuery(text: string): boolean {
 
 export function SearchView({
   engine,
+  isOnline,
+  isAiEnabled,
   isInspectorMode,
   onOpenReader,
   onToast,
@@ -68,6 +72,11 @@ export function SearchView({
     };
   }, [engine, query]);
 
+  useEffect(() => {
+    setAnswerText('');
+    setIsSynthesizing(false);
+  }, [query]);
+
   const toggleContext = (id: number) => {
     setExpandedCardId((prev) => (prev === id ? null : id));
   };
@@ -78,12 +87,19 @@ export function SearchView({
   };
 
   const handleSynthesize = async () => {
-    if (!query.trim() || isSynthesizing) return;
+    const trimmed = query.trim();
+    if (!trimmed || isSynthesizing) return;
     setIsSynthesizing(true);
     setAnswerText('');
 
     try {
-      const stream = engine.answers.answer(query, { passages, parsedRefs: [] });
+      let currentPassages = passages;
+      if (currentPassages.length === 0) {
+        const res = await engine.retrieve(trimmed);
+        currentPassages = res.passages;
+        setPassages(currentPassages);
+      }
+      const stream = engine.answers.answer(trimmed, { passages: currentPassages, parsedRefs: [] });
       for await (const chunk of stream) {
         setAnswerText((prev) => prev + chunk);
       }
@@ -139,6 +155,9 @@ export function SearchView({
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   (e.target as HTMLTextAreaElement).blur();
+                  if (isQuestion && isAiEnabled && engine.answers.available && isOnline && !isSynthesizing) {
+                    void handleSynthesize();
+                  }
                 }
               }}
             />
@@ -335,50 +354,6 @@ export function SearchView({
         </div>
       )}
 
-      {/* On-Demand Synthesis Banner for Questions */}
-      {query.trim().length > 0 && isQuestion && !answerText && !isSynthesizing && engine.answers.available && (
-        <div
-          class="mb-3 p-3.5 rounded-2xl border flex items-center justify-between gap-3 animate-fadeIn shrink-0"
-          style={{
-            backgroundColor: 'var(--bg-surface-elevated)',
-            borderColor: 'var(--border-subtle)',
-          }}
-        >
-          <div class="flex items-center gap-2.5 text-xs">
-            <svg
-              class="w-5 h-5 shrink-0"
-              style={{ color: 'var(--accent)' }}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M13 10V3L4 14h7v7l9-11h-7z"
-              />
-            </svg>
-            <div>
-              <p class="font-medium" style={{ color: 'var(--text-main)' }}>
-                Synthesize biblical answer?
-              </p>
-              <p class="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                Generate an AI overview grounded in retrieved passages
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleSynthesize}
-            class="shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium text-white transition-opacity hover:opacity-90 shadow-sm"
-            style={{ backgroundColor: 'var(--accent)' }}
-          >
-            Synthesize
-          </button>
-        </div>
-      )}
-
       {/* Synthesized Answer Card */}
       {(answerText.length > 0 || isSynthesizing) && (
         <div
@@ -434,7 +409,7 @@ export function SearchView({
           </div>
 
           <div
-            class="text-sm leading-relaxed whitespace-pre-wrap font-serif"
+            class="text-sm leading-relaxed whitespace-pre-wrap font-serif max-h-72 overflow-y-auto pr-1"
             style={{ color: 'var(--text-main)' }}
           >
             {answerText}

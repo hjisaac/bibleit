@@ -64,11 +64,13 @@ class BaseRetrievalReport:
         diagnostics: list[dict[str, Any]],
         metrics: dict[str, float],
         renderer: ChunkRenderer | None = None,
+        params: dict[str, Any] | None = None,
         hit_cutoff: int = 1,
     ) -> None:
         self.diagnostics = diagnostics
         self.metrics = metrics
         self.renderer = renderer
+        self.params = params or {}
         self.hit_cutoff = hit_cutoff
 
     def render_item(self, idx: int) -> tuple[str, str]:
@@ -106,20 +108,32 @@ class BaseRetrievalReport:
     # Protected renderer methods for document structure
 
     def _render_summary(self, doc: snakemd.Document, buckets: dict[RetrievalOutcome, list[dict[str, Any]]]) -> None:
-        # Formats the top-level benchmark scorecard and outcome breakdown table.
+        # Formats the top-level benchmark scorecard, parameters, and outcome breakdown table.
         total = len(self.diagnostics)
         hits = buckets[RetrievalOutcome.HIT]
         near = buckets[RetrievalOutcome.NEAR_MISS]
         misses = buckets[RetrievalOutcome.MISS]
 
         doc.add_heading("Retrieval Inspection Report", level=1)
-        doc.add_heading("Summary Metrics", level=2)
+
+        # Run Configuration (collapsed by default)
+        if self.params:
+            param_rows = [[f"**`{k}`**", f"`{v}`"] for k, v in self.params.items()]
+            param_table = snakemd.Table(["Parameter", "Value"], param_rows)
+            doc.add_raw(
+                f"<details>\n<summary><b>⚙️ Run Configuration ({len(self.params)} parameters)</b></summary>\n\n{param_table}\n\n</details>"
+            )
+
+        # Summary Metrics (open by default, but collapsible)
         rows = [[f"**{k.upper()}**", f"`{v:.4f}`"] for k, v in self.metrics.items()]
         rows.append(["**Total Evaluated**", f"`{total}`"])
         rows.append(["**Direct Hits**", f"`{len(hits)} ({len(hits) / max(total, 1) * 100:.1f}%)`"])
         rows.append(["**Near Misses**", f"`{len(near)} ({len(near) / max(total, 1) * 100:.1f}%)`"])
         rows.append(["**Misses**", f"`{len(misses)} ({len(misses) / max(total, 1) * 100:.1f}%)`"])
-        doc.add_table(["Metric", "Value"], rows)
+        summary_table = snakemd.Table(["Metric", "Value"], rows)
+        doc.add_raw(
+            f"<details open>\n<summary><b>📊 Summary Metrics</b></summary>\n\n{summary_table}\n\n</details>"
+        )
 
     def _render_misses(self, doc: snakemd.Document, items: list[dict[str, Any]]) -> None:
         # Renders queries where the target failed to appear anywhere in top-k.
@@ -187,6 +201,7 @@ def generate_retrieval_report(
     renderer: ChunkRenderer,
     metrics: dict[str, float],
     out_path: Path,
+    params: dict[str, Any] | None = None,
     hit_cutoff: int = 1,
 ) -> Path:
     """Convenience function to generate a retrieval inspection report."""
@@ -194,5 +209,6 @@ def generate_retrieval_report(
         diagnostics=diagnostics,
         metrics=metrics,
         renderer=renderer,
+        params=params,
         hit_cutoff=hit_cutoff,
     ).generate(out_path)

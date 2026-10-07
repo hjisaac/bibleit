@@ -9,18 +9,45 @@ export interface UserProfile {
 }
 
 interface HeaderProps {
-  isOfflineReady: boolean;
+  isOnline: boolean;
+  isOfflineReady?: boolean;
+  isAiEnabled: boolean;
   user?: UserProfile | null;
   onOpenHelp: () => void;
   onOpenAccount?: () => void;
 }
 
 export function Header({
-  isOfflineReady,
+  isOnline,
+  isOfflineReady = true,
+  isAiEnabled,
   user,
   onOpenHelp,
   onOpenAccount,
 }: HeaderProps): JSX.Element {
+  const aiBadge = !isAiEnabled
+    ? {
+        label: 'AI Off',
+        colorClass: 'bg-stone-400',
+        textColor: 'var(--text-muted)',
+        tooltip: 'AI synthesis deactivated in Settings.',
+      }
+    : isOnline
+      ? {
+          label: !isOfflineReady ? 'Syncing...' : 'AI Ready',
+          colorClass: !isOfflineReady ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500',
+          textColor: 'var(--text-muted)',
+          tooltip: !isOfflineReady
+            ? 'Syncing offline cache...'
+            : 'Connected. Press Enter on question searches to synthesize answers.',
+        }
+      : {
+          label: 'AI Offline',
+          colorClass: 'bg-amber-500 animate-pulse',
+          textColor: 'var(--accent)',
+          tooltip: 'Offline mode: Searching & reading locally on-device. Connect to internet for AI answers.',
+        };
+
   return (
     <header
       class="px-4 sm:px-8 py-3.5 flex items-center justify-between border-b shrink-0 transition-colors"
@@ -34,18 +61,15 @@ export function Header({
           bible<span class="text-amber-600 font-sans text-sm font-bold ml-0.5">it</span>
         </span>
         <span
-          class="text-[11px] px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1.5"
+          class="text-[11px] px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1.5 transition-colors"
           style={{
             backgroundColor: 'var(--bg-surface-elevated)',
-            color: 'var(--text-muted)',
+            color: aiBadge.textColor,
           }}
+          title={aiBadge.tooltip}
         >
-          <span
-            class={`w-1.5 h-1.5 rounded-full ${
-              isOfflineReady ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
-            }`}
-          />
-          <span>{isOfflineReady ? 'Offline Ready' : 'Syncing...'}</span>
+          <span class={`w-1.5 h-1.5 rounded-full transition-colors ${aiBadge.colorClass}`} />
+          <span>{aiBadge.label}</span>
         </span>
       </div>
 

@@ -1,7 +1,12 @@
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any
+
+# Throttle BLAS and OpenMP thread pools so background evaluations do not starve the host OS
+for _var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+    os.environ.setdefault(_var, "2")
 
 from crucible.core.jobs import AbstractJob
 from crucible.core.trackers.wandb import WBTracker

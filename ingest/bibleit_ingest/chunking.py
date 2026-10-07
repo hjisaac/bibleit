@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
-from .constants import USFM_ORDER
+from .constants import BOOK_NAMES, USFM_ORDER
 
 VerseAddress = tuple[str, int, int]  # (book, chapter, verse)
 
@@ -216,22 +216,60 @@ class ChunkRenderer:
         self,
         ordered_verses: Sequence[tuple[VerseAddress, str]],
         address_index: dict[VerseAddress, int] | None = None,
+        strategy: str = "heading_and_text",
         include_headings: bool = True,
         include_incomplete_headings: bool = True,
     ):
         self.ordered_verses = ordered_verses
         self.address_index = address_index
+        self.strategy = strategy
         self.include_headings = include_headings
         self.include_incomplete_headings = include_incomplete_headings
+
+    def _format_address(self, start_idx: int, end_idx: int) -> str:
+        start_v = self.ordered_verses[start_idx][0]
+        end_v = self.ordered_verses[end_idx - 1][0]
+        book_name = BOOK_NAMES.get(start_v[0], start_v[0])
+        if start_v[1] == end_v[1]:
+            if start_v[2] == end_v[2]:
+                return f"[{book_name} {start_v[1]}:{start_v[2]}]"
+            return f"[{book_name} {start_v[1]}:{start_v[2]}–{end_v[2]}]"
+        return f"[{book_name} {start_v[1]}:{start_v[2]}–{end_v[1]}:{end_v[2]}]"
+
+    def _format_header(
+        self,
+        heading: str | None,
+        start_idx: int,
+        end_idx: int,
+        book: str,
+        is_first: bool = False,
+    ) -> str | None:
+        if self.strategy == "text_only":
+            return None
+        if self.strategy == "heading_and_text":
+            return heading if self.include_headings else None
+        book_name = BOOK_NAMES.get(book, book)
+        if self.strategy == "book_and_heading":
+            if heading and self.include_headings:
+                return f"{book_name} — {heading}"
+            return book_name if is_first else None
+        if self.strategy == "address_and_heading":
+            addr = self._format_address(start_idx, end_idx)
+            if heading and self.include_headings:
+                return f"{addr} {heading}"
+            return addr
+        raise ValueError(f"Unknown render strategy: {self.strategy}")
 
     def render(self, passage: Passage) -> str:
         if not passage.sections:
             text = " ".join(
                 self.ordered_verses[k][1] for k in range(passage.start_idx, passage.end_idx)
             )
-            if self.include_headings and passage.headings:
-                return f"{passage.headings[0]}\n{text}"
-            return text
+            heading = passage.headings[0] if passage.headings else None
+            header = self._format_header(
+                heading, passage.start_idx, passage.end_idx, passage.book, is_first=True
+            )
+            return f"{header}\n{text}" if header else text
 
         blocks: list[str] = []
         for i, (sec_start, heading) in enumerate(passage.sections):
@@ -239,8 +277,11 @@ class ChunkRenderer:
             sec_text = " ".join(
                 self.ordered_verses[k][1] for k in range(sec_start, sec_end)
             )
-            if self.include_headings and heading:
-                blocks.append(f"{heading}\n{sec_text}")
+            header = self._format_header(
+                heading, sec_start, sec_end, passage.book, is_first=(i == 0)
+            )
+            if header:
+                blocks.append(f"{header}\n{sec_text}")
             else:
                 blocks.append(sec_text)
         return "\n\n".join(blocks)

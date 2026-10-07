@@ -157,6 +157,31 @@ def test_chunk_renderer_sections() -> None:
     assert renderer.render(p_lead) == "Verse 1\n\nHeading 2\nVerse 2 Verse 3"
 
 
+def test_chunk_renderer_strategies() -> None:
+    ordered_verses = [
+        (("GEN", 1, 1), "Verse 1"),
+        (("GEN", 1, 2), "Verse 2"),
+        (("GEN", 1, 3), "Verse 3"),
+    ]
+    addr_index = index_verses_by_address(ordered_verses)
+    p = Passage(
+        book="GEN",
+        start_idx=0,
+        end_idx=3,
+        headings=("The Creation",),
+        sections=((0, "The Creation"), (1, "Light")),
+    )
+
+    r_text = ChunkRenderer(ordered_verses, addr_index, strategy="text_only")
+    assert r_text.render(p) == "Verse 1\n\nVerse 2 Verse 3"
+
+    r_book = ChunkRenderer(ordered_verses, addr_index, strategy="book_and_heading")
+    assert r_book.render(p) == "Genesis — The Creation\nVerse 1\n\nGenesis — Light\nVerse 2 Verse 3"
+
+    r_addr = ChunkRenderer(ordered_verses, addr_index, strategy="address_and_heading")
+    assert r_addr.render(p) == "[Genesis 1:1] The Creation\nVerse 1\n\n[Genesis 1:2–3] Light\nVerse 2 Verse 3"
+
+
 def test_chunk_multi_book_boundaries() -> None:
     chunker = AdaptiveWindowChunker(floor=5, ceiling=15, overlap=2)
     pericopes = [

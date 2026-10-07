@@ -90,6 +90,7 @@ def test_base_retrieval_report_full_generation(tmp_path: Path) -> None:
         diagnostics=diagnostics,
         renderer=lambda idx: chunks[idx],
         metrics={"mrr": 0.5555, "recall@10": 0.6666},
+        params={"k": 3, "embedding_model": "nomic-v1.5"},
         out_path=out_file,
     )
 
@@ -98,6 +99,9 @@ def test_base_retrieval_report_full_generation(tmp_path: Path) -> None:
 
     # Summary section checks
     assert "# Retrieval Inspection Report" in content
+    assert "<details>\n<summary><b>⚙️ Run Configuration (2 parameters)</b></summary>" in content
+    assert "nomic-v1.5" in content
+    assert "<details open>\n<summary><b>📊 Summary Metrics</b></summary>" in content
     assert "0.5555" in content
     assert "Total Evaluated" in content
     assert "Direct Hits" in content

@@ -40,10 +40,64 @@ export function App(): JSX.Element {
     },
   ]);
 
+  const [isOnline, setIsOnline] = useState<boolean>(
+    typeof navigator !== 'undefined' ? navigator.onLine : true,
+  );
+
+  const [isAiEnabled, setIsAiEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bibleit_ai_enabled');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+
+  const handleToggleAi = (enabled: boolean) => {
+    setIsAiEnabled(enabled);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('bibleit_ai_enabled', String(enabled));
+    }
+    showToast(enabled ? 'AI Scripture Overview enabled' : 'AI Scripture Overview deactivated');
+  };
+
   // Sync theme class to document body.
   useEffect(() => {
     document.body.className = `antialiased font-sans min-h-screen theme-${theme}`;
   }, [theme]);
+
+  // Monitor network status in real time with event listeners and polling heartbeat
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      showToast('Connected: Back online');
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      showToast('Offline: Local search & reader active');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    const interval = setInterval(() => {
+      if (typeof navigator !== 'undefined') {
+        const current = navigator.onLine;
+        setIsOnline((prev) => {
+          if (prev !== current) {
+            showToast(current ? 'Connected: Back online' : 'Offline: Local search & reader active');
+            return current;
+          }
+          return prev;
+        });
+      }
+    }, 800);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      clearInterval(interval);
+    };
+  }, []);
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -73,7 +127,9 @@ export function App(): JSX.Element {
       }}
     >
       <Header
+        isOnline={isOnline}
         isOfflineReady={true}
+        isAiEnabled={isAiEnabled}
         onOpenHelp={() => setIsHelpOpen(true)}
         onOpenAccount={() => showToast('Offline profile (Guest mode)')}
       />
@@ -82,6 +138,8 @@ export function App(): JSX.Element {
         {activeTab === 'search' && (
           <SearchView
             engine={engine}
+            isOnline={isOnline}
+            isAiEnabled={isAiEnabled}
             isInspectorMode={isInspectorMode}
             onOpenReader={handleOpenReader}
             onToast={showToast}
@@ -116,6 +174,8 @@ export function App(): JSX.Element {
           <SettingsView
             currentTheme={theme}
             onThemeChange={setTheme}
+            isAiEnabled={isAiEnabled}
+            onToggleAi={handleToggleAi}
             isInspectorMode={isInspectorMode}
             onToggleInspector={setIsInspectorMode}
             onClearStorage={() => showToast('Offline artifacts cleared.')}
