@@ -16,6 +16,7 @@ dependencies = [
     "matplotlib>=3.8.0",
     "ranx>=0.3.21",
     "snakemd>=2.0.0",
+    "tqdm>=4.66.0",
     "usearch>=2.26.2",
 ]
 

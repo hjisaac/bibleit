@@ -3,7 +3,9 @@ import logging
 from functools import partial
 from pathlib import Path
 
+from codetiming import Timer
 from fastembed import TextEmbedding
+from tqdm import tqdm
 
 from bibleit_ingest.chunking import AdaptiveWindowChunker
 from bibleit_ingest.constants import (
@@ -82,7 +84,15 @@ class EvalJobQuestionToPassage(EvalJobBase):
         # Batch embed eval queries for instant lookup instead of 150 single-item inferences
         eval_data = json.loads(self.eval_data_path.read_text())
         q_texts = [f"search_query: {q['query']}" for q in eval_data["queries"]]
-        q_vecs = list(model.embed(q_texts, batch_size=32))
+        with Timer(text=f"Embedded {len(q_texts)} queries in {{:.1f}}s", logger=logger.info):
+            q_vecs = list(
+                tqdm(
+                    model.embed(q_texts, batch_size=32),
+                    total=len(q_texts),
+                    desc="embedding queries",
+                    unit="query",
+                )
+            )
         query_map = {q["query"]: vec for q, vec in zip(eval_data["queries"], q_vecs)}
 
         return {
