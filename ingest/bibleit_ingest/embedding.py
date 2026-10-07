@@ -6,6 +6,7 @@ import numpy as np
 from fastembed import TextEmbedding
 
 from .chunking import ChunkRenderer, Passage, VerseAddress
+from .constants import CHUNK_EMBEDDINGS_NPY_PATH
 
 if TYPE_CHECKING:
     from .chunking import Chunk
@@ -66,6 +67,7 @@ def get_or_create_chunk_embeddings(
     render_strategy: str = "heading_and_text",
     cache_dir: Path | None = None,
     cache_key: str | None = None,
+    batch_size: int = 16,
 ) -> np.ndarray:
     """Returns cached chunk embedding matrix or computes, caches, and returns it."""
     if cache_dir and cache_key:
@@ -75,16 +77,27 @@ def get_or_create_chunk_embeddings(
             logger.info("Found cached corpus embeddings at %s", cached_file.name)
             return np.load(cached_file)
 
+        # Baseline fast-path: reuse canonical precomputed embeddings on disk
+        if (
+            cache_key.endswith("f5_c30_o0_heading_and_text.npy")
+            and CHUNK_EMBEDDINGS_NPY_PATH.exists()
+        ):
+            precomputed = np.load(CHUNK_EMBEDDINGS_NPY_PATH)
+            if precomputed.shape[0] == len(chunks):
+                logger.info("Reusing precomputed baseline embeddings from %s", CHUNK_EMBEDDINGS_NPY_PATH.name)
+                np.save(cached_file, precomputed)
+                return precomputed
+
     renderer = ChunkRenderer(ordered_verses=ordered_verses, strategy=render_strategy)
     texts = [renderer.render(c) for c in chunks]
     total = len(texts)
-    logger.info("Embedding %d chunks with strategy '%s'...", total, render_strategy)
+    logger.info("Embedding %d chunks with strategy '%s' (batch_size=%d)...", total, render_strategy, batch_size)
 
     vectors: list[np.ndarray] = []
-    for i, vec in enumerate(embed_documents(model, texts, batch_size=32)):
+    for i, vec in enumerate(embed_documents(model, texts, batch_size=batch_size)):
         vectors.append(vec)
-        if (i + 1) % 250 == 0 or (i + 1) == total:
-            logger.info("  Embedded %d/%d chunks (%.0f%%)", i + 1, total, (i + 1) / total * 100)
+        if (i + 1) % 50 == 0 or (i + 1) == total:
+            logger.info("  Embedded %d/%d chunks (%.1f%%)", i + 1, total, (i + 1) / total * 100)
 
     matrix = np.array(vectors)
     if cache_dir and cache_key:
