@@ -1,18 +1,33 @@
 import type { JSX } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { SearchEngine } from '../core/ports';
 import type { ScoredPassage } from '../core/types';
 import { findBookByPrefix } from '../core/bible-books';
 
 interface SearchViewProps {
   engine: SearchEngine;
+  isOnline: boolean;
+  isAiEnabled: boolean;
   isInspectorMode: boolean;
   onOpenReader: (book: string, chapter: number, verse: number) => void;
   onToast: (message: string) => void;
 }
 
+function isQuestionQuery(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.endsWith('?')) return true;
+  const lower = trimmed.toLowerCase();
+  const questionWords = [
+    'what', 'why', 'how', 'who', 'where', 'when', 'which',
+    'explain', 'describe', 'tell me', 'can you', 'does', 'is it',
+  ];
+  return questionWords.some((word) => lower.startsWith(`${word} `) || lower.startsWith(`${word}'`));
+}
+
 export function SearchView({
   engine,
+  isOnline,
+  isAiEnabled,
   isInspectorMode,
   onOpenReader,
   onToast,
@@ -22,7 +37,24 @@ export function SearchView({
   const [latencyMs, setLatencyMs] = useState(38);
   const [expandedCardId, setExpandedCardId] = useState<number | null>(null);
 
+  const [answerText, setAnswerText] = useState<string>('');
+  const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const isQuestion = isQuestionQuery(query);
   const matchedBook = findBookByPrefix(query);
+
+  const adjustHeight = () => {
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    }
+  };
+
+  useEffect(() => {
+    adjustHeight();
+  }, [query]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -40,6 +72,11 @@ export function SearchView({
     };
   }, [engine, query]);
 
+  useEffect(() => {
+    setAnswerText('');
+    setIsSynthesizing(false);
+  }, [query]);
+
   const toggleContext = (id: number) => {
     setExpandedCardId((prev) => (prev === id ? null : id));
   };
@@ -49,57 +86,103 @@ export function SearchView({
     onToast('Copied to clipboard');
   };
 
+  const handleSynthesize = async () => {
+    const trimmed = query.trim();
+    if (!trimmed || isSynthesizing) return;
+    setIsSynthesizing(true);
+    setAnswerText('');
+
+    try {
+      let currentPassages = passages;
+      if (currentPassages.length === 0) {
+        const res = await engine.retrieve(trimmed);
+        currentPassages = res.passages;
+        setPassages(currentPassages);
+      }
+      const stream = engine.answers.answer(trimmed, { passages: currentPassages, parsedRefs: [] });
+      for await (const chunk of stream) {
+        setAnswerText((prev) => prev + chunk);
+      }
+    } catch {
+      onToast('Failed to synthesize answer');
+    } finally {
+      setIsSynthesizing(false);
+    }
+  };
+
   return (
     <section class="flex-1 flex flex-col p-4 sm:p-8 overflow-y-auto max-w-2xl mx-auto w-full">
-      {/* Search Input Bar */}
+      {/* Search & Question Prompt Box */}
       <div class="relative mb-2 shrink-0">
         <div
-          class="flex items-center rounded-2xl border px-3.5 py-2.5 transition-all focus-within:ring-2 focus-within:ring-amber-500/30"
+          class="flex flex-col rounded-2xl border p-3 transition-all focus-within:ring-2 focus-within:ring-amber-500/30 shadow-sm"
           style={{
             backgroundColor: 'var(--bg-surface-elevated)',
             borderColor: 'var(--border-subtle)',
           }}
         >
-          <svg
-            class="w-4 h-4 mr-2.5 shrink-0"
-            style={{ color: 'var(--text-muted)' }}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-          <input
-            type="text"
-            value={query}
-            placeholder="Search reference, phrase, or topic..."
-            class="w-full bg-transparent text-sm font-medium outline-none"
-            style={{ color: 'var(--text-main)' }}
-            onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
-          />
-          {query.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setQuery('')}
-              class="text-xs p-1 rounded-full hover:opacity-75 shrink-0 ml-1.5"
+          <div class="flex items-start gap-2.5">
+            <svg
+              class="w-4 h-4 mt-1 shrink-0"
               style={{ color: 'var(--text-muted)' }}
-              title="Clear search"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          )}
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={query}
+              placeholder="Search verses (e.g. John 3:16) or ask a question..."
+              class="w-full bg-transparent text-sm font-medium outline-none resize-none leading-relaxed"
+              style={{
+                color: 'var(--text-main)',
+                minHeight: '26px',
+                maxHeight: '120px',
+              }}
+              onInput={(e) => {
+                setQuery((e.target as HTMLTextAreaElement).value);
+                adjustHeight();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  (e.target as HTMLTextAreaElement).blur();
+                  if (isQuestion && isAiEnabled && engine.answers.available && isOnline && !isSynthesizing) {
+                    void handleSynthesize();
+                  }
+                }
+              }}
+            />
+            {query.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('');
+                  setAnswerText('');
+                }}
+                class="text-xs p-1 rounded-full hover:opacity-75 shrink-0"
+                style={{ color: 'var(--text-muted)' }}
+                title="Clear query"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -114,7 +197,20 @@ export function SearchView({
         >
           <div class="flex items-center justify-between text-xs">
             <span class="font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-              <span>📖</span>
+              <svg
+                class="w-3.5 h-3.5"
+                style={{ color: 'var(--text-muted)' }}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                />
+              </svg>
               <span>{matchedBook.name}</span>
               <span class="text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>
                 ({matchedBook.chapters} chapters)
@@ -145,14 +241,17 @@ export function SearchView({
         </div>
       )}
 
-      {/* Suggested Quick Queries */}
-      <div class="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2 text-xs shrink-0">
+      {/* Mixed Suggestion Chips */}
+      <div class="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2 text-xs shrink-0 no-scrollbar">
         <span class="text-[11px] shrink-0 font-medium" style={{ color: 'var(--text-subtle)' }}>
           Try:
         </span>
         <button
           type="button"
-          onClick={() => setQuery('Philippians 4:7')}
+          onClick={() => {
+            setQuery('Philippians 4:7');
+            setAnswerText('');
+          }}
           class="shrink-0 px-2.5 py-1 rounded-lg border text-xs transition-opacity hover:opacity-80"
           style={{
             borderColor: 'var(--border-subtle)',
@@ -164,7 +263,10 @@ export function SearchView({
         </button>
         <button
           type="button"
-          onClick={() => setQuery('peace that surpasses')}
+          onClick={() => {
+            setQuery('peace that surpasses');
+            setAnswerText('');
+          }}
           class="shrink-0 px-2.5 py-1 rounded-lg border text-xs transition-opacity hover:opacity-80"
           style={{
             borderColor: 'var(--border-subtle)',
@@ -176,7 +278,10 @@ export function SearchView({
         </button>
         <button
           type="button"
-          onClick={() => setQuery('anxiety and trust')}
+          onClick={() => {
+            setQuery('What did Jesus teach about worry and peace?');
+            setAnswerText('');
+          }}
           class="shrink-0 px-2.5 py-1 rounded-lg border text-xs transition-opacity hover:opacity-80"
           style={{
             borderColor: 'var(--border-subtle)',
@@ -184,7 +289,7 @@ export function SearchView({
             color: 'var(--text-muted)',
           }}
         >
-          anxiety & trust
+          What did Jesus teach about worry?
         </button>
       </div>
 
@@ -207,13 +312,26 @@ export function SearchView({
       {query.trim().length === 0 && (
         <div class="py-16 flex flex-col items-center justify-center text-center animate-fadeIn">
           <div
-            class="w-12 h-12 rounded-2xl flex items-center justify-center text-xl mb-3 border shadow-sm"
+            class="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 border shadow-sm"
             style={{
               backgroundColor: 'var(--bg-surface-elevated)',
               borderColor: 'var(--border-subtle)',
             }}
           >
-            <span>📖</span>
+            <svg
+              class="w-6 h-6"
+              style={{ color: 'var(--text-muted)' }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.75"
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+              />
+            </svg>
           </div>
           <p class="font-serif text-lg font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
             Search Scripture
@@ -233,6 +351,88 @@ export function SearchView({
           <p class="text-xs max-w-sm" style={{ color: 'var(--text-muted)' }}>
             Try checking spelling, searching for a book name, or using broader keywords.
           </p>
+        </div>
+      )}
+
+      {/* Synthesized Answer Card */}
+      {(answerText.length > 0 || isSynthesizing) && (
+        <div
+          class="mb-4 p-4 rounded-2xl border transition-all animate-fadeIn"
+          style={{
+            backgroundColor: 'var(--bg-surface-elevated)',
+            borderColor: 'var(--accent)',
+          }}
+        >
+          <div class="flex items-center justify-between mb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold flex items-center gap-1.5" style={{ color: 'var(--accent)' }}>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M13 10V3L4 14h7v7l9-11h-7z"
+                  />
+                </svg>
+                <span>Scripture Synthesis</span>
+              </span>
+              <span
+                class="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                style={{
+                  backgroundColor: 'var(--badge-sem-bg)',
+                  color: 'var(--badge-sem-text)',
+                }}
+              >
+                Grounded Context
+              </span>
+            </div>
+
+            {answerText.length > 0 && !isSynthesizing && (
+              <button
+                type="button"
+                onClick={() => copyToClipboard(answerText)}
+                class="text-xs flex items-center gap-1 hover:opacity-75 transition-opacity"
+                style={{ color: 'var(--text-muted)' }}
+                title="Copy answer"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                  />
+                </svg>
+                <span>Copy</span>
+              </button>
+            )}
+          </div>
+
+          <div
+            class="text-sm leading-relaxed whitespace-pre-wrap font-serif max-h-72 overflow-y-auto pr-1"
+            style={{ color: 'var(--text-main)' }}
+          >
+            {answerText}
+            {isSynthesizing && (
+              <span class="inline-block w-1.5 h-4 ml-1 bg-amber-500 animate-pulse align-middle" />
+            )}
+          </div>
+
+          <div
+            class="mt-3 pt-2.5 border-t flex items-center justify-between text-[11px]"
+            style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-subtle)' }}
+          >
+            <span>Verified with cited passages below</span>
+            <button
+              type="button"
+              onClick={() => {
+                setAnswerText('');
+              }}
+              class="hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
 

@@ -1,7 +1,12 @@
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any
+
+# Throttle BLAS and OpenMP thread pools so background evaluations do not starve the host OS
+for _var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+    os.environ.setdefault(_var, "2")
 
 from crucible.core.jobs import AbstractJob
 from crucible.core.trackers.wandb import WBTracker
@@ -12,8 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 def dict_to_slug(params: dict[str, Any]) -> str:
-    """Format dict key-values into {key}{value} pairs joined by underscores."""
-    return "_".join(f"{k}{v}" for k, v in params.items() if v is not None)
+    """Format dict key-values into {key}-{value} pairs joined by underscores."""
+    return "_".join(f"{k}-{v}" for k, v in params.items() if v is not None)
 
 
 class EvalJobBase(AbstractJob):
@@ -64,7 +69,7 @@ class EvalJobBase(AbstractJob):
                 if k in result:
                     summary[k] = result[k]
             self.tracker.track_summary(**summary)
-            self.tracker.track_artifact(out_path, name="eval-result", type="eval_result")
+            self.tracker.track_artifact(out_path, name="run-summary", type="artifact-outputs")
 
     def on_teardown(self) -> None:
         super().on_teardown()

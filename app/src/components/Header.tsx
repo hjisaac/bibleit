@@ -2,29 +2,52 @@ import type { JSX } from 'preact';
 
 export type Theme = 'paper' | 'sepia' | 'obsidian';
 
-interface HeaderProps {
-  currentTheme: Theme;
-  onThemeChange: (theme: Theme) => void;
-  isOfflineReady: boolean;
+export interface UserProfile {
+  name: string;
+  email?: string;
+  avatarUrl?: string;
 }
 
-const NEXT_THEME: Record<Theme, Theme> = {
-  paper: 'sepia',
-  sepia: 'obsidian',
-  obsidian: 'paper',
-};
-
-const THEME_LABELS: Record<Theme, string> = {
-  paper: 'Day',
-  sepia: 'Warm',
-  obsidian: 'Dark',
-};
+interface HeaderProps {
+  isOnline: boolean;
+  isOfflineReady?: boolean;
+  isAiEnabled: boolean;
+  user?: UserProfile | null;
+  onOpenHelp: () => void;
+  onOpenAccount?: () => void;
+}
 
 export function Header({
-  currentTheme,
-  onThemeChange,
-  isOfflineReady,
+  isOnline,
+  isOfflineReady = true,
+  isAiEnabled,
+  user,
+  onOpenHelp,
+  onOpenAccount,
 }: HeaderProps): JSX.Element {
+  const aiBadge = !isAiEnabled
+    ? {
+        label: 'AI Off',
+        colorClass: 'bg-stone-400',
+        textColor: 'var(--text-muted)',
+        tooltip: 'AI synthesis deactivated in Settings.',
+      }
+    : isOnline
+      ? {
+          label: !isOfflineReady ? 'Syncing...' : 'AI Ready',
+          colorClass: !isOfflineReady ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500',
+          textColor: 'var(--text-muted)',
+          tooltip: !isOfflineReady
+            ? 'Syncing offline cache...'
+            : 'Connected. Press Enter on question searches to synthesize answers.',
+        }
+      : {
+          label: 'AI Offline',
+          colorClass: 'bg-amber-500 animate-pulse',
+          textColor: 'var(--accent)',
+          tooltip: 'Offline mode: Searching & reading locally on-device. Connect to internet for AI answers.',
+        };
+
   return (
     <header
       class="px-4 sm:px-8 py-3.5 flex items-center justify-between border-b shrink-0 transition-colors"
@@ -38,50 +61,72 @@ export function Header({
           bible<span class="text-amber-600 font-sans text-sm font-bold ml-0.5">it</span>
         </span>
         <span
-          class="text-[11px] px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1.5"
+          class="text-[11px] px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1.5 transition-colors"
           style={{
             backgroundColor: 'var(--bg-surface-elevated)',
-            color: 'var(--text-muted)',
+            color: aiBadge.textColor,
           }}
+          title={aiBadge.tooltip}
         >
-          <span
-            class={`w-1.5 h-1.5 rounded-full ${
-              isOfflineReady ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
-            }`}
-          />
-          <span>{isOfflineReady ? 'Offline Ready' : 'Syncing...'}</span>
+          <span class={`w-1.5 h-1.5 rounded-full transition-colors ${aiBadge.colorClass}`} />
+          <span>{aiBadge.label}</span>
         </span>
       </div>
 
-      {/* Single minimal theme cycle button */}
-      <button
-        type="button"
-        onClick={() => onThemeChange(NEXT_THEME[currentTheme])}
-        title={`Theme: ${THEME_LABELS[currentTheme]} (click to cycle)`}
-        class="flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-medium transition-all hover:opacity-80"
-        style={{
-          backgroundColor: 'var(--bg-surface-elevated)',
-          borderColor: 'var(--border-subtle)',
-          color: 'var(--text-main)',
-        }}
-      >
-        {currentTheme === 'paper' && (
-          <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+      {/* Right utility buttons: Help and User Account */}
+      <div class="flex items-center space-x-1">
+        <button
+          type="button"
+          onClick={onOpenHelp}
+          title="Help & Shortcuts"
+          class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all hover:opacity-70"
+          style={{
+            backgroundColor: 'transparent',
+            color: 'var(--text-muted)',
+          }}
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
-        )}
-        {currentTheme === 'sepia' && (
-          <svg class="w-3.5 h-3.5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-          </svg>
-        )}
-        {currentTheme === 'obsidian' && (
-          <svg class="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-          </svg>
-        )}
-        <span>{THEME_LABELS[currentTheme]}</span>
-      </button>
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenAccount}
+          title={user ? `Signed in as ${user.name}` : 'Account (Guest mode)'}
+          class="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all hover:opacity-70"
+          style={{
+            backgroundColor: 'transparent',
+            color: 'var(--text-muted)',
+          }}
+        >
+          <div
+            class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
+            style={{ backgroundColor: user ? 'var(--accent)' : 'var(--text-subtle)' }}
+          >
+            {user ? (
+              user.name.charAt(0).toUpperCase()
+            ) : (
+              <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
+              </svg>
+            )}
+          </div>
+          <span class="text-[11px] hidden sm:inline" style={{ color: 'var(--text-muted)' }}>
+            {user ? user.name : 'Guest'}
+          </span>
+        </button>
+      </div>
     </header>
   );
 }

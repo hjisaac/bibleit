@@ -8,6 +8,7 @@ import { ReaderView } from './components/ReaderView';
 import { SavedView, type SavedVerse } from './components/SavedView';
 import { SettingsView } from './components/SettingsView';
 import { BookSelectorModal } from './components/BookSelectorModal';
+import { HelpModal } from './components/HelpModal';
 
 export function App(): JSX.Element {
   const engine = useMemo(() => createDefaultEngine(), []);
@@ -17,15 +18,18 @@ export function App(): JSX.Element {
   const [isInspectorMode, setIsInspectorMode] = useState<boolean>(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   const [readerLocation, setReaderLocation] = useState<{
     book: string;
     chapter: number;
     targetVerse?: number;
+    scrollKey: number;
   }>({
     book: 'PHP',
     chapter: 4,
     targetVerse: 7,
+    scrollKey: 0,
   });
 
   const [savedVerses, setSavedVerses] = useState<SavedVerse[]>([
@@ -36,10 +40,64 @@ export function App(): JSX.Element {
     },
   ]);
 
+  const [isOnline, setIsOnline] = useState<boolean>(
+    typeof navigator !== 'undefined' ? navigator.onLine : true,
+  );
+
+  const [isAiEnabled, setIsAiEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bibleit_ai_enabled');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+
+  const handleToggleAi = (enabled: boolean) => {
+    setIsAiEnabled(enabled);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('bibleit_ai_enabled', String(enabled));
+    }
+    showToast(enabled ? 'AI Scripture Overview enabled' : 'AI Scripture Overview deactivated');
+  };
+
   // Sync theme class to document body.
   useEffect(() => {
     document.body.className = `antialiased font-sans min-h-screen theme-${theme}`;
   }, [theme]);
+
+  // Monitor network status in real time with event listeners and polling heartbeat
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      showToast('Connected: Back online');
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      showToast('Offline: Local search & reader active');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    const interval = setInterval(() => {
+      if (typeof navigator !== 'undefined') {
+        const current = navigator.onLine;
+        setIsOnline((prev) => {
+          if (prev !== current) {
+            showToast(current ? 'Connected: Back online' : 'Offline: Local search & reader active');
+            return current;
+          }
+          return prev;
+        });
+      }
+    }, 800);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      clearInterval(interval);
+    };
+  }, []);
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -49,7 +107,7 @@ export function App(): JSX.Element {
   };
 
   const handleOpenReader = (book: string, chapter: number, verse: number) => {
-    setReaderLocation({ book, chapter, targetVerse: verse });
+    setReaderLocation({ book, chapter, targetVerse: verse, scrollKey: Date.now() });
     setActiveTab('reader');
   };
 
@@ -69,15 +127,19 @@ export function App(): JSX.Element {
       }}
     >
       <Header
-        currentTheme={theme}
-        onThemeChange={setTheme}
+        isOnline={isOnline}
         isOfflineReady={true}
+        isAiEnabled={isAiEnabled}
+        onOpenHelp={() => setIsHelpOpen(true)}
+        onOpenAccount={() => showToast('Offline profile (Guest mode)')}
       />
 
       <main class="flex-1 flex flex-col overflow-hidden">
         {activeTab === 'search' && (
           <SearchView
             engine={engine}
+            isOnline={isOnline}
+            isAiEnabled={isAiEnabled}
             isInspectorMode={isInspectorMode}
             onOpenReader={handleOpenReader}
             onToast={showToast}
@@ -89,6 +151,7 @@ export function App(): JSX.Element {
             book={readerLocation.book}
             chapter={readerLocation.chapter}
             targetVerse={readerLocation.targetVerse}
+            scrollKey={readerLocation.scrollKey}
             onBackToSearch={() => setActiveTab('search')}
             onOpenSelector={() => setIsSelectorOpen(true)}
             onSaveVerse={handleSaveVerse}
@@ -111,6 +174,8 @@ export function App(): JSX.Element {
           <SettingsView
             currentTheme={theme}
             onThemeChange={setTheme}
+            isAiEnabled={isAiEnabled}
+            onToggleAi={handleToggleAi}
             isInspectorMode={isInspectorMode}
             onToggleInspector={setIsInspectorMode}
             onClearStorage={() => showToast('Offline artifacts cleared.')}
@@ -120,12 +185,17 @@ export function App(): JSX.Element {
 
       <Navbar activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* Book & Chapter Selection Modal */}
+      {/* Book, Chapter & Verse Selection Modal */}
       <BookSelectorModal
         isOpen={isSelectorOpen}
+        initialBookId={readerLocation.book}
+        initialChapter={readerLocation.chapter}
         onClose={() => setIsSelectorOpen(false)}
-        onSelectChapter={(bookId, chapter) => handleOpenReader(bookId, chapter, 1)}
+        onSelectPassage={(bookId, chapter, verse) => handleOpenReader(bookId, chapter, verse)}
       />
+
+      {/* Quick Help & Shortcuts Modal */}
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
 
       {/* Floating Toast Notification */}
       {toastMessage && (

@@ -13,7 +13,6 @@ from bibleit_ingest.chunking import (
 from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, OLD_TESTAMENT_BOOKS, REPO
 from bibleit_ingest.embedding import save_chunk_embeddings
 from bibleit_ingest.pericopes import get_or_prepare_corpus
-from analysis.chunking_strategy.plots import generate_chunk_plots
 from analysis.job import AnalysisJobBase
 
 logger = logging.getLogger(__name__)
@@ -101,9 +100,10 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
                 "verse_count": "numeric",
                 "book": "categorical",
             },
-            quantiles=[0.50, 0.90, 0.95, 0.99],
+            quantiles=[0.01, 0.05, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99],
         )
-        corpus_stats = run_analysis(lens_cfg, source=records).to_dict()
+        analysis_result = run_analysis(lens_cfg, source=records)
+        corpus_stats = analysis_result.to_dict()
         group = corpus_stats.get("groups", {}).get("_all", {})
         tok = group.get("token_count", {})
         words = group.get("word_count", {})
@@ -128,13 +128,17 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
             "texts": texts,
             "records": records,
             "metrics": metrics,
+            "analysis_result": analysis_result,
             "corpus_stats": corpus_stats,
         }
 
     def on_finalize(self, prepared: dict, result: dict[str, Any]) -> None:
         super().on_finalize(prepared, result)
-        token_limit = int(self.config.get("token_limit", 512))
-        plot_paths = generate_chunk_plots(result["records"], self.run_dir, token_limit=token_limit)
+        token_limit = float(self.config.get("token_limit", 512))
+        plot_paths = result["analysis_result"].plot(
+            out_dir=self.run_dir,
+            sla={"token_count": token_limit},
+        )
         if self.tracker is not None:
             for name, path in plot_paths.items():
                 self.tracker.track_artifact(path, name=name, type="plot")

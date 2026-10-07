@@ -1,27 +1,48 @@
 import type { JSX } from 'preact';
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { BIBLE_BOOKS, type BibleBook } from '../core/bible-books';
+import { getVerseCount } from '../core/verse-counts';
 
 interface BookSelectorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectChapter: (bookId: string, chapter: number) => void;
+  onSelectPassage: (bookId: string, chapter: number, verse: number) => void;
+  initialBookId?: string;
+  initialChapter?: number;
 }
 
+type SelectorStep = 'book' | 'chapter' | 'verse';
 type TestamentFilter = 'ALL' | 'OT' | 'NT';
 
 export function BookSelectorModal({
   isOpen,
   onClose,
-  onSelectChapter,
+  onSelectPassage,
+  initialBookId,
+  initialChapter,
 }: BookSelectorModalProps): JSX.Element | null {
   if (!isOpen) {
     return null;
   }
 
+  const [currentStep, setCurrentStep] = useState<SelectorStep>('book');
   const [selectedBook, setSelectedBook] = useState<BibleBook | null>(null);
+  const [selectedChapter, setSelectedChapter] = useState<number>(1);
   const [filterTestament, setFilterTestament] = useState<TestamentFilter>('ALL');
   const [searchFilter, setSearchFilter] = useState('');
+
+  // Sync initial location when modal opens.
+  useEffect(() => {
+    if (isOpen) {
+      const initial = initialBookId
+        ? BIBLE_BOOKS.find((b) => b.id === initialBookId)
+        : null;
+      setSelectedBook(initial ?? BIBLE_BOOKS.find((b) => b.id === 'PHP') ?? BIBLE_BOOKS[0]!);
+      setSelectedChapter(initialChapter ?? 1);
+      setCurrentStep('book');
+      setSearchFilter('');
+    }
+  }, [isOpen, initialBookId, initialChapter]);
 
   const filteredBooks = BIBLE_BOOKS.filter((b) => {
     const matchesTestament =
@@ -33,20 +54,41 @@ export function BookSelectorModal({
     return matchesTestament && matchesSearch;
   });
 
+  const totalVerses = selectedBook
+    ? getVerseCount(selectedBook.id, selectedChapter)
+    : 30;
+
   const handleSelectBook = (book: BibleBook) => {
+    setSelectedBook(book);
+    setSelectedChapter(1);
     if (book.chapters === 1) {
-      onSelectChapter(book.id, 1);
-      onClose();
+      setCurrentStep('verse');
     } else {
-      setSelectedBook(book);
+      setCurrentStep('chapter');
     }
   };
 
   const handleSelectChapter = (ch: number) => {
+    setSelectedChapter(ch);
+    setCurrentStep('verse');
+  };
+
+  const handleSelectVerse = (verseNum: number) => {
     if (selectedBook) {
-      onSelectChapter(selectedBook.id, ch);
-      setSelectedBook(null);
+      onSelectPassage(selectedBook.id, selectedChapter, verseNum);
       onClose();
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep === 'verse') {
+      if (selectedBook && selectedBook.chapters === 1) {
+        setCurrentStep('book');
+      } else {
+        setCurrentStep('chapter');
+      }
+    } else if (currentStep === 'chapter') {
+      setCurrentStep('book');
     }
   };
 
@@ -71,17 +113,22 @@ export function BookSelectorModal({
       >
         {/* Modal Header */}
         <div
-          class="px-5 py-3.5 border-b flex items-center justify-between shrink-0"
+          class="px-5 py-3 border-b flex items-center justify-between shrink-0"
           style={{ borderColor: 'var(--border-subtle)' }}
         >
-          {selectedBook ? (
+          {currentStep !== 'book' ? (
             <button
               type="button"
-              onClick={() => setSelectedBook(null)}
+              onClick={handleBack}
               class="flex items-center gap-1.5 text-xs font-semibold hover:underline"
               style={{ color: 'var(--text-muted)' }}
             >
-              <span>← Back to books</span>
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" />
+              </svg>
+              <span>
+                Back to {currentStep === 'verse' && selectedBook?.chapters !== 1 ? 'chapters' : 'books'}
+              </span>
             </button>
           ) : (
             <span class="text-sm font-semibold tracking-tight">Select Passage</span>
@@ -97,39 +144,74 @@ export function BookSelectorModal({
           </button>
         </div>
 
+        {/* Step Tabs */}
+        <div
+          class="px-4 py-2 border-b flex items-center gap-1.5 shrink-0 text-xs overflow-x-auto"
+          style={{
+            backgroundColor: 'var(--bg-surface-elevated)',
+            borderColor: 'var(--border-subtle)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setCurrentStep('book')}
+            class={`px-3 py-1 rounded-lg font-semibold transition-all ${
+              currentStep === 'book'
+                ? 'shadow-sm'
+                : 'hover:opacity-75'
+            }`}
+            style={{
+              backgroundColor: currentStep === 'book' ? 'var(--bg-surface)' : 'transparent',
+              color: currentStep === 'book' ? 'var(--text-main)' : 'var(--text-muted)',
+            }}
+          >
+            1. {selectedBook ? selectedBook.name : 'Book'}
+          </button>
+
+          <span class="text-xs opacity-40">›</span>
+
+          <button
+            type="button"
+            disabled={!selectedBook || selectedBook.chapters === 1}
+            onClick={() => selectedBook && setCurrentStep('chapter')}
+            class={`px-3 py-1 rounded-lg font-semibold transition-all ${
+              currentStep === 'chapter'
+                ? 'shadow-sm'
+                : 'hover:opacity-75'
+            } ${!selectedBook || selectedBook.chapters === 1 ? 'opacity-35 cursor-not-allowed' : ''}`}
+            style={{
+              backgroundColor: currentStep === 'chapter' ? 'var(--bg-surface)' : 'transparent',
+              color: currentStep === 'chapter' ? 'var(--text-main)' : 'var(--text-muted)',
+            }}
+          >
+            2. Chapter {selectedBook?.chapters === 1 ? '1' : selectedChapter}
+          </button>
+
+          <span class="text-xs opacity-40">›</span>
+
+          <button
+            type="button"
+            disabled={!selectedBook}
+            onClick={() => selectedBook && setCurrentStep('verse')}
+            class={`px-3 py-1 rounded-lg font-semibold transition-all ${
+              currentStep === 'verse'
+                ? 'shadow-sm'
+                : 'hover:opacity-75'
+            } ${!selectedBook ? 'opacity-35 cursor-not-allowed' : ''}`}
+            style={{
+              backgroundColor: currentStep === 'verse' ? 'var(--bg-surface)' : 'transparent',
+              color: currentStep === 'verse' ? 'var(--text-main)' : 'var(--text-muted)',
+            }}
+          >
+            3. Verse
+          </button>
+        </div>
+
         {/* Content Body */}
         <div class="p-4 overflow-y-auto flex-1 custom-scroll">
-          {selectedBook ? (
-            /* Stage 2: Chapter Grid */
-            <div>
-              <div class="mb-3 text-center">
-                <h3 class="font-serif text-lg font-bold">{selectedBook.name}</h3>
-                <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Select a chapter (1–{selectedBook.chapters})
-                </p>
-              </div>
-
-              <div class="grid grid-cols-6 sm:grid-cols-8 gap-2">
-                {Array.from({ length: selectedBook.chapters }, (_, i) => i + 1).map((ch) => (
-                  <button
-                    key={ch}
-                    type="button"
-                    onClick={() => handleSelectChapter(ch)}
-                    class="py-2.5 rounded-xl border text-xs font-semibold transition-all hover:ring-2 hover:ring-amber-500/40"
-                    style={{
-                      backgroundColor: 'var(--bg-surface-elevated)',
-                      borderColor: 'var(--border-subtle)',
-                    }}
-                  >
-                    {ch}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            /* Stage 1: Book Selection */
+          {/* Step 1: Books */}
+          {currentStep === 'book' && (
             <div class="space-y-3">
-              {/* Quick Filter Input */}
               <input
                 type="text"
                 placeholder="Filter books (e.g. John, Rom, Ps)..."
@@ -143,7 +225,6 @@ export function BookSelectorModal({
                 }}
               />
 
-              {/* Testament Tabs */}
               <div
                 class="flex items-center p-1 rounded-xl text-xs"
                 style={{ backgroundColor: 'var(--bg-surface-elevated)' }}
@@ -176,7 +257,7 @@ export function BookSelectorModal({
                       filterTestament === 'OT' ? 'var(--text-main)' : 'var(--text-muted)',
                   }}
                 >
-                  Old Testament (39)
+                  OT (39)
                 </button>
                 <button
                   type="button"
@@ -191,18 +272,19 @@ export function BookSelectorModal({
                       filterTestament === 'NT' ? 'var(--text-main)' : 'var(--text-muted)',
                   }}
                 >
-                  New Testament (27)
+                  NT (27)
                 </button>
               </div>
 
-              {/* Book Grid */}
               <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
                 {filteredBooks.map((b) => (
                   <button
                     key={b.id}
                     type="button"
                     onClick={() => handleSelectBook(b)}
-                    class="p-2.5 rounded-xl border text-left transition-all hover:ring-2 hover:ring-amber-500/30 flex items-center justify-between"
+                    class={`p-2.5 rounded-xl border text-left transition-all hover:ring-2 hover:ring-amber-500/30 flex items-center justify-between ${
+                      selectedBook?.id === b.id ? 'ring-2 ring-amber-500/50' : ''
+                    }`}
                     style={{
                       backgroundColor: 'var(--bg-surface-elevated)',
                       borderColor: 'var(--border-subtle)',
@@ -210,8 +292,70 @@ export function BookSelectorModal({
                   >
                     <span class="text-xs font-semibold">{b.name}</span>
                     <span class="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                      {b.chapters} ch
+                      {b.chapters} {b.chapters === 1 ? 'ch' : 'chs'}
                     </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Chapters */}
+          {currentStep === 'chapter' && selectedBook && (
+            <div class="space-y-3">
+              <div class="text-center">
+                <h3 class="font-serif text-lg font-bold">{selectedBook.name}</h3>
+                <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Select chapter (1–{selectedBook.chapters})
+                </p>
+              </div>
+
+              <div class="grid grid-cols-6 sm:grid-cols-8 gap-2">
+                {Array.from({ length: selectedBook.chapters }, (_, i) => i + 1).map((ch) => (
+                  <button
+                    key={ch}
+                    type="button"
+                    onClick={() => handleSelectChapter(ch)}
+                    class={`py-2.5 rounded-xl border text-xs font-semibold transition-all hover:ring-2 hover:ring-amber-500/40 ${
+                      selectedChapter === ch ? 'ring-2 ring-amber-500/50' : ''
+                    }`}
+                    style={{
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                      borderColor: 'var(--border-subtle)',
+                    }}
+                  >
+                    {ch}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Verses */}
+          {currentStep === 'verse' && selectedBook && (
+            <div class="space-y-3">
+              <div class="text-center">
+                <h3 class="font-serif text-lg font-bold">
+                  {selectedBook.name} Chapter {selectedChapter}
+                </h3>
+                <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Select verse (1–{totalVerses})
+                </p>
+              </div>
+
+              <div class="grid grid-cols-6 sm:grid-cols-8 gap-2 pt-1">
+                {Array.from({ length: totalVerses }, (_, i) => i + 1).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => handleSelectVerse(v)}
+                    class="py-2.5 rounded-xl border text-xs font-semibold transition-all hover:ring-2 hover:ring-amber-500/40"
+                    style={{
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                      borderColor: 'var(--border-subtle)',
+                    }}
+                  >
+                    {v}
                   </button>
                 ))}
               </div>

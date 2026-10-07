@@ -4,6 +4,8 @@ import type { Theme } from './Header';
 interface SettingsViewProps {
   currentTheme: Theme;
   onThemeChange: (theme: Theme) => void;
+  isAiEnabled: boolean;
+  onToggleAi: (enabled: boolean) => void;
   isInspectorMode: boolean;
   onToggleInspector: (enabled: boolean) => void;
   onClearStorage: () => void;
@@ -12,6 +14,8 @@ interface SettingsViewProps {
 export function SettingsView({
   currentTheme,
   onThemeChange,
+  isAiEnabled,
+  onToggleAi,
   isInspectorMode,
   onToggleInspector,
   onClearStorage,
@@ -86,6 +90,39 @@ export function SettingsView({
             <div class="text-xs font-semibold">Dark</div>
             <div class="text-[10px] text-stone-400 mt-0.5">OLED black</div>
           </button>
+        </div>
+      </div>
+
+      {/* AI Scripture Overview Toggle */}
+      <div
+        class="p-4 rounded-2xl border space-y-3"
+        style={{
+          backgroundColor: 'var(--bg-surface-elevated)',
+          borderColor: 'var(--border-subtle)',
+        }}
+      >
+        <div class="flex items-center justify-between">
+          <div class="pr-3">
+            <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
+              <span>AI Scripture Overview</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-mono font-medium">
+                LLM
+              </span>
+            </div>
+            <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              Generate grounded AI overviews when pressing Enter on question queries (requires internet).
+            </p>
+          </div>
+
+          <label class="relative inline-flex items-center cursor-pointer shrink-0">
+            <input
+              type="checkbox"
+              checked={isAiEnabled}
+              onChange={(e) => onToggleAi((e.target as HTMLInputElement).checked)}
+              class="sr-only peer"
+            />
+            <div class="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
+          </label>
         </div>
       </div>
 

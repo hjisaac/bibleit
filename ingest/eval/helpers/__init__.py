@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 from typing import Sequence
 
@@ -7,9 +8,22 @@ from ranx import Qrels, Run, evaluate
 from usearch.index import Index
 
 from bibleit_ingest.chunking import Chunk, VerseAddress, resolve_verse_to_chunk_index
-from .report import generate_retrieval_report
+from .report import (
+    BaseRetrievalReport,
+    RetrievalOutcome,
+    format_passage,
+    generate_retrieval_report,
+)
 
-__all__ = ["trigger_eval", "generate_retrieval_report"]
+logger = logging.getLogger(__name__)
+
+__all__ = [
+    "trigger_eval",
+    "BaseRetrievalReport",
+    "RetrievalOutcome",
+    "format_passage",
+    "generate_retrieval_report",
+]
 
 
 def trigger_eval(
@@ -22,6 +36,8 @@ def trigger_eval(
 ) -> dict:
     """Runs every query in eval set through real retrieval and returns metrics and diagnostics."""
     eval_data = json.loads(eval_path.read_text())
+    total_q = len(eval_data["queries"])
+    logger.info("Evaluating %d queries against %d chunks (k=%d)...", total_q, len(chunks), k)
 
     index = Index(ndim=chunk_embeddings.shape[1], metric="cos")
     index.add(np.arange(len(chunks)), chunk_embeddings.astype(np.float32))
@@ -31,7 +47,7 @@ def trigger_eval(
     unresolvable = []
     diagnostics = []
 
-    for q in eval_data["queries"]:
+    for i, q in enumerate(eval_data["queries"]):
         rel = q["relevant"][0]
         address = (rel["book"], rel["chapter"], rel["verse"])
         relevant_idx = resolve_verse_to_chunk_index(address, chunks, address_index)
@@ -49,6 +65,9 @@ def trigger_eval(
             match_records.append({"rank": rank, "chunk_idx": int(m.key), "score": score})
             if int(m.key) == relevant_idx and target_rank is None:
                 target_rank = rank
+
+        if (i + 1) % 50 == 0 or (i + 1) == total_q:
+            logger.info("  Evaluated %d/%d queries (%.0f%%)", i + 1, total_q, (i + 1) / total_q * 100)
 
         qrels_dict[q["id"]] = {str(relevant_idx): rel["relevance"]}
         run_dict[q["id"]] = {str(m.key): float(1 - m.distance) for m in matches}
