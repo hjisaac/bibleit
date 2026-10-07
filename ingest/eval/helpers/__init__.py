@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import Sequence
 
 import numpy as np
+from codetiming import Timer
 from ranx import Qrels, Run, evaluate
+from tqdm import tqdm
 from usearch.index import Index
 
 from bibleit_ingest.chunking import Chunk, VerseAddress, resolve_verse_to_chunk_index
@@ -47,30 +49,28 @@ def trigger_eval(
     unresolvable = []
     diagnostics = []
 
-    for i, q in enumerate(eval_data["queries"]):
-        rel = q["relevant"][0]
-        address = (rel["book"], rel["chapter"], rel["verse"])
-        relevant_idx = resolve_verse_to_chunk_index(address, chunks, address_index)
-        if relevant_idx is None:
-            unresolvable.append(q["id"])
-            continue
+    with Timer(text=f"Evaluated {total_q} queries in {{:.1f}}s", logger=logger.info):
+        for q in tqdm(eval_data["queries"], total=total_q, desc="evaluating queries", unit="query"):
+            rel = q["relevant"][0]
+            address = (rel["book"], rel["chapter"], rel["verse"])
+            relevant_idx = resolve_verse_to_chunk_index(address, chunks, address_index)
+            if relevant_idx is None:
+                unresolvable.append(q["id"])
+                continue
 
-        query_vec = embed_query_fn(q["query"]).astype(np.float32)
-        matches = index.search(query_vec, k)
+            query_vec = embed_query_fn(q["query"]).astype(np.float32)
+            matches = index.search(query_vec, k)
 
-        target_rank = None
-        match_records = []
-        for rank, m in enumerate(matches, 1):
-            score = round(float(1 - m.distance), 4)
-            match_records.append({"rank": rank, "chunk_idx": int(m.key), "score": score})
-            if int(m.key) == relevant_idx and target_rank is None:
-                target_rank = rank
+            target_rank = None
+            match_records = []
+            for rank, m in enumerate(matches, 1):
+                score = round(float(1 - m.distance), 4)
+                match_records.append({"rank": rank, "chunk_idx": int(m.key), "score": score})
+                if int(m.key) == relevant_idx and target_rank is None:
+                    target_rank = rank
 
-        if (i + 1) % 50 == 0 or (i + 1) == total_q:
-            logger.info("  Evaluated %d/%d queries (%.0f%%)", i + 1, total_q, (i + 1) / total_q * 100)
-
-        qrels_dict[q["id"]] = {str(relevant_idx): rel["relevance"]}
-        run_dict[q["id"]] = {str(m.key): float(1 - m.distance) for m in matches}
+            qrels_dict[q["id"]] = {str(relevant_idx): rel["relevance"]}
+            run_dict[q["id"]] = {str(m.key): float(1 - m.distance) for m in matches}
 
         diagnostics.append({
             "id": q["id"],

@@ -1,15 +1,20 @@
 import json
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, Iterator, Sequence
 
 import numpy as np
+from codetiming import Timer
 from fastembed import TextEmbedding
+from tqdm import tqdm
 
 from .chunking import ChunkRenderer, Passage, VerseAddress
 from .constants import CHUNK_EMBEDDINGS_NPY_PATH
 
 if TYPE_CHECKING:
     from .chunking import Chunk
+
+logger = logging.getLogger(__name__)
 
 
 def embed_query(model: TextEmbedding, text: str) -> np.ndarray:
@@ -55,11 +60,6 @@ def save_chunk_embeddings(
     return npy_path, json_path
 
 
-import logging
-
-logger = logging.getLogger(__name__)
-
-
 def get_or_create_chunk_embeddings(
     chunks: Sequence[Passage],
     ordered_verses: Sequence[tuple[VerseAddress, str]],
@@ -93,11 +93,17 @@ def get_or_create_chunk_embeddings(
     total = len(texts)
     logger.info("Embedding %d chunks with strategy '%s' (batch_size=%d)...", total, render_strategy, batch_size)
 
-    vectors: list[np.ndarray] = []
-    for i, vec in enumerate(embed_documents(model, texts, batch_size=batch_size)):
-        vectors.append(vec)
-        if (i + 1) % 50 == 0 or (i + 1) == total:
-            logger.info("  Embedded %d/%d chunks (%.1f%%)", i + 1, total, (i + 1) / total * 100)
+    with Timer(
+        text=f"Embedded {total} chunks in {{:.1f}}s", logger=logger.info
+    ):
+        vectors = list(
+            tqdm(
+                embed_documents(model, texts, batch_size=batch_size),
+                total=total,
+                desc=f"embedding chunks [{render_strategy}]",
+                unit="chunk",
+            )
+        )
 
     matrix = np.array(vectors)
     if cache_dir and cache_key:
