@@ -21,15 +21,6 @@ logger = logging.getLogger(__name__)
 class AnalysisJobChunkingStrategy(AnalysisJobBase):
     path_config_keys = ("web_path", "bsb_dir")
 
-    def on_start(self) -> None:
-        super().on_start()
-        self.slug = self.make_slug({
-            "f": self.config["floor"],
-            "c": self.config["ceiling"],
-            "o": self.config.get("overlap", 1),
-        })
-        self.run_dir = Path(self.config["log_dir"]).resolve() / self.slug
-
     def on_prepare(self) -> dict:
         corpus = get_or_prepare_corpus(self.web_path, self.bsb_dir)
 

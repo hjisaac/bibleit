@@ -4,10 +4,15 @@ import pytest
 
 from bibleit_ingest.chunking import (
     AdaptiveWindowChunker,
+    AddressAndHeadingRenderer,
+    BookAndHeadingRenderer,
     Chunk,
     ChunkRenderer,
+    HeadingAndTextRenderer,
     Passage,
     Pericope,
+    TextOnlyRenderer,
+    get_renderer,
     index_verses_by_address,
     load_pericopes,
 )
@@ -221,4 +226,42 @@ def test_load_pericopes(tmp_path: Path) -> None:
     if BSB_PERICOPES_PATH.exists():
         real_pericopes = load_pericopes(BSB_PERICOPES_PATH)
         assert len(real_pericopes) > 3000
+
+
+def test_dedicated_renderer_subclasses() -> None:
+    ordered_verses = [
+        (("GEN", 1, 1), "Verse 1"),
+        (("GEN", 1, 2), "Verse 2"),
+    ]
+    addr_index = index_verses_by_address(ordered_verses)
+    p = Passage(
+        book="GEN",
+        start_idx=0,
+        end_idx=2,
+        sections=((0, "Heading"),),
+    )
+
+    t_renderer = TextOnlyRenderer(ordered_verses, addr_index)
+    assert isinstance(t_renderer, TextOnlyRenderer)
+    assert t_renderer.render(p) == "Verse 1 Verse 2"
+
+    h_renderer = HeadingAndTextRenderer(ordered_verses, addr_index)
+    assert isinstance(h_renderer, HeadingAndTextRenderer)
+    assert h_renderer.render(p) == "Heading\nVerse 1 Verse 2"
+
+    b_renderer = BookAndHeadingRenderer(ordered_verses, addr_index)
+    assert isinstance(b_renderer, BookAndHeadingRenderer)
+    assert b_renderer.render(p) == "Genesis — Heading\nVerse 1 Verse 2"
+
+    a_renderer = AddressAndHeadingRenderer(ordered_verses, addr_index)
+    assert isinstance(a_renderer, AddressAndHeadingRenderer)
+    assert a_renderer.render(p) == "[Genesis 1:1–2] Heading\nVerse 1 Verse 2"
+
+    # Test factory
+    factory_r = get_renderer("book_and_heading", ordered_verses, addr_index)
+    assert isinstance(factory_r, BookAndHeadingRenderer)
+
+    with pytest.raises(ValueError, match="Unknown render strategy"):
+        get_renderer("nonexistent", ordered_verses, addr_index)
+
 

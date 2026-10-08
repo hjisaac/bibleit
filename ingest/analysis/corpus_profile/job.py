@@ -16,12 +16,6 @@ logger = logging.getLogger(__name__)
 class AnalysisJobCorpusProfile(AnalysisJobBase):
     path_config_keys = ("web_path", "bsb_dir")
 
-    def on_start(self) -> None:
-        super().on_start()
-        tok_slug = self.config.get("tokenizer_model", "nomic").replace("/", "-")
-        self.slug = self.make_slug({"model": tok_slug})
-        self.run_dir = Path(self.config["log_dir"]).resolve() / self.slug
-
     def on_prepare(self) -> dict:
         corpus = get_or_prepare_corpus(self.web_path, self.bsb_dir)
         tok_model_name = self.config.get("tokenizer_model", "nomic-ai/nomic-embed-text-v1.5")

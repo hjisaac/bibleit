@@ -16,7 +16,7 @@ from bibleit_ingest.constants import (
 )
 from bibleit_ingest.embedding import embed_query, get_or_create_chunk_embeddings
 from bibleit_ingest.pericopes import get_or_prepare_corpus
-from eval.helpers import format_passage, generate_retrieval_report, trigger_eval
+from bibleit_ingest.evaluation import format_passage, generate_retrieval_report, trigger_eval
 from eval.job import EvalJobBase
 
 logger = logging.getLogger(__name__)
@@ -30,16 +30,8 @@ class EvalJobQuestionToPassage(EvalJobBase):
 
     def on_start(self) -> None:
         super().on_start()
-        slug_parts = {
-            "f": self.config.get("floor", 5),
-            "c": self.config.get("ceiling", 30),
-            "o": self.config.get("overlap", 0),
-            "rnd": self.config.get("render_strategy", "heading_and_text"),
-            "k": self.config.get("k", 1),
-        }
-        self.slug = self.make_slug(slug_parts)
-        self.run_dir = Path(self.config["log_dir"]).resolve() / self.slug
-        logger.info("=== Starting run [%s] ===", self.slug)
+        self.run_dir = Path(self.config["log_dir"]).resolve() / self.run_id
+        logger.info("=== Starting run [%s] ===", self.run_id)
 
     def on_prepare(self) -> dict:
         k = int(self.config.get("k", 1))

@@ -29,7 +29,7 @@ def _run_one(
 	sweep_id: str,
 	on_error: OnError,
 ) -> dict[str, Any]:
-	run_id = f"{sweep_id}__{_slug(overrides)}" if overrides else sweep_id
+	run_id = new_timestamped_id()
 	config = apply_overrides(base_config, {**overrides, "run_id": run_id})
 	run = {"sweep_id": sweep_id, "overrides": overrides, "run_id": run_id}
 	try:

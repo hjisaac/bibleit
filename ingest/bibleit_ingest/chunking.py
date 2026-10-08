@@ -7,47 +7,16 @@ from pathlib import Path
 from typing import Sequence
 
 from .constants import BOOK_NAMES, USFM_ORDER
-
-VerseAddress = tuple[str, int, int]  # (book, chapter, verse)
-
-
-@dataclass(frozen=True)
-class Pericope:
-    """Canonical section heading and verse span defined by BSB translators."""
-
-    book: str
-    chapter: int
-    verse: int
-    heading: str
-    verse_count: int
-
-
-@dataclass(frozen=True)
-class Passage:
-    """A contiguous span of verses in reading order within a single book."""
-
-    book: str
-    start_idx: int
-    end_idx: int
-    headings: tuple[str, ...] = ()
-    start_address: VerseAddress | None = None
-    end_address: VerseAddress | None = None
-    sections: tuple[tuple[int, str | None], ...] = ()
-
-    @property
-    def verse_count(self) -> int:
-        return self.end_idx - self.start_idx
-
-    @property
-    def chapter(self) -> int:
-        return self.start_address[1] if self.start_address else 0
-
-    @property
-    def verse(self) -> int:
-        return self.start_address[2] if self.start_address else 0
-
-
-Chunk = Passage
+from .renderers import (
+    AddressAndHeadingRenderer,
+    BasePassageRenderer,
+    BookAndHeadingRenderer,
+    HeadingAndTextRenderer,
+    TextOnlyRenderer,
+    get_renderer,
+)
+from .types import Chunk, Passage, Pericope, VerseAddress
+from .walkers import WebCorpusWalker
 
 
 class Chunker(ABC):
@@ -190,16 +159,7 @@ class AdaptiveWindowChunker(Chunker):
 
 def load_web_verses(web_path: Path) -> list[tuple[VerseAddress, str]]:
     """Loads every verse from a WEB JSON file in reading order."""
-    web = json.loads(web_path.read_text())
-    ordered = []
-    for b in web["books"]:
-        code = USFM_ORDER[int(b["nr"]) - 1]
-        for ch in b["chapters"]:
-            for v in ch["verses"]:
-                ordered.append(
-                    ((code, int(ch["chapter"]), int(v["verse"])), v["text"])
-                )
-    return ordered
+    return list(WebCorpusWalker(web_path).walk())
 
 
 def index_verses_by_address(
@@ -209,8 +169,8 @@ def index_verses_by_address(
     return {addr: i for i, (addr, _) in enumerate(ordered_verses)}
 
 
-class ChunkRenderer:
-    """Renders passages into formatted text strings for retrieval embedding."""
+class ChunkRenderer(BasePassageRenderer):
+    """Backwards-compatible wrapper delegating to dedicated renderer subclasses."""
 
     def __init__(
         self,
@@ -220,21 +180,20 @@ class ChunkRenderer:
         include_headings: bool = True,
         include_incomplete_headings: bool = True,
     ):
-        self.ordered_verses = ordered_verses
-        self.address_index = address_index
+        super().__init__(
+            ordered_verses=ordered_verses,
+            address_index=address_index,
+            include_headings=include_headings,
+            include_incomplete_headings=include_incomplete_headings,
+        )
         self.strategy = strategy
-        self.include_headings = include_headings
-        self.include_incomplete_headings = include_incomplete_headings
-
-    def _format_address(self, start_idx: int, end_idx: int) -> str:
-        start_v = self.ordered_verses[start_idx][0]
-        end_v = self.ordered_verses[end_idx - 1][0]
-        book_name = BOOK_NAMES.get(start_v[0], start_v[0])
-        if start_v[1] == end_v[1]:
-            if start_v[2] == end_v[2]:
-                return f"[{book_name} {start_v[1]}:{start_v[2]}]"
-            return f"[{book_name} {start_v[1]}:{start_v[2]}–{end_v[2]}]"
-        return f"[{book_name} {start_v[1]}:{start_v[2]}–{end_v[1]}:{end_v[2]}]"
+        self._delegate = get_renderer(
+            strategy=strategy,
+            ordered_verses=ordered_verses,
+            address_index=address_index,
+            include_headings=include_headings,
+            include_incomplete_headings=include_incomplete_headings,
+        )
 
     def _format_header(
         self,
@@ -244,47 +203,12 @@ class ChunkRenderer:
         book: str,
         is_first: bool = False,
     ) -> str | None:
-        if self.strategy == "text_only":
-            return None
-        if self.strategy == "heading_and_text":
-            return heading if self.include_headings else None
-        book_name = BOOK_NAMES.get(book, book)
-        if self.strategy == "book_and_heading":
-            if heading and self.include_headings:
-                return f"{book_name} — {heading}"
-            return book_name if is_first else None
-        if self.strategy == "address_and_heading":
-            addr = self._format_address(start_idx, end_idx)
-            if heading and self.include_headings:
-                return f"{addr} {heading}"
-            return addr
-        raise ValueError(f"Unknown render strategy: {self.strategy}")
+        return self._delegate._format_header(
+            heading, start_idx, end_idx, book, is_first=is_first
+        )
 
     def render(self, passage: Passage) -> str:
-        if not passage.sections:
-            text = " ".join(
-                self.ordered_verses[k][1] for k in range(passage.start_idx, passage.end_idx)
-            )
-            heading = passage.headings[0] if passage.headings else None
-            header = self._format_header(
-                heading, passage.start_idx, passage.end_idx, passage.book, is_first=True
-            )
-            return f"{header}\n{text}" if header else text
-
-        blocks: list[str] = []
-        for i, (sec_start, heading) in enumerate(passage.sections):
-            sec_end = passage.sections[i + 1][0] if i + 1 < len(passage.sections) else passage.end_idx
-            sec_text = " ".join(
-                self.ordered_verses[k][1] for k in range(sec_start, sec_end)
-            )
-            header = self._format_header(
-                heading, sec_start, sec_end, passage.book, is_first=(i == 0)
-            )
-            if header:
-                blocks.append(f"{header}\n{sec_text}")
-            else:
-                blocks.append(sec_text)
-        return "\n\n".join(blocks)
+        return self._delegate.render(passage)
 
 
 def resolve_verse_to_chunk_index(
