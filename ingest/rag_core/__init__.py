@@ -1,4 +1,4 @@
-from .metrics import compute_recall_at_k, compute_reciprocal_rank
+from .metrics import evaluate_retrieval
 from .quantization import dequantize_int8, quantize_int8
 from .renderers import BaseChunkRenderer
 from .rerankers import BaseReranker, RrfReranker
@@ -14,8 +14,7 @@ __all__ = [
     "RrfReranker",
     "ScoredChunk",
     "batch_stream",
-    "compute_recall_at_k",
-    "compute_reciprocal_rank",
     "dequantize_int8",
+    "evaluate_retrieval",
     "quantize_int8",
 ]

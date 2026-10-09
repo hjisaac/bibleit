@@ -1,14 +1,13 @@
 from typing import Sequence
+from ranx import Qrels, Run, evaluate
 
 
-def compute_reciprocal_rank(retrieved_ids: Sequence[int | str], relevant_id: int | str) -> float:
-    """Computes Mean Reciprocal Rank (MRR) for a single query."""
-    for rank, item_id in enumerate(retrieved_ids, start=1):
-        if item_id == relevant_id:
-            return 1.0 / rank
-    return 0.0
-
-
-def compute_recall_at_k(retrieved_ids: Sequence[int | str], relevant_id: int | str, k: int) -> float:
-    """Computes Recall@k for a single relevant ground truth target."""
-    return 1.0 if relevant_id in retrieved_ids[:k] else 0.0
+def evaluate_retrieval(
+    qrels: dict[str, dict[str, int]] | Qrels,
+    run: dict[str, dict[str, float]] | Run,
+    metrics: Sequence[str] = ("mrr", "recall@1", "recall@5", "recall@10", "ndcg@10"),
+) -> dict[str, float] | float:
+    """Evaluates IR retrieval run against ground-truth qrels using ranx."""
+    q = qrels if isinstance(qrels, Qrels) else Qrels(qrels)
+    r = run if isinstance(run, Run) else Run(run)
+    return evaluate(q, r, list(metrics))

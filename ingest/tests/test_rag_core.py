@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from typing import Iterator
 
-from rag_core.metrics import compute_recall_at_k, compute_reciprocal_rank
+from rag_core.metrics import evaluate_retrieval
 from rag_core.quantization import dequantize_int8, quantize_int8
 from rag_core.rerankers import RrfReranker
 from rag_core.streaming import batch_stream
@@ -62,17 +62,13 @@ def test_batch_stream() -> None:
     assert list(batch_stream([], batch_size=3)) == []
 
 
-def test_metrics() -> None:
-    retrieved = ["a", "b", "c", "d"]
-    assert compute_reciprocal_rank(retrieved, "a") == 1.0
-    assert compute_reciprocal_rank(retrieved, "b") == 0.5
-    assert compute_reciprocal_rank(retrieved, "c") == pytest.approx(1 / 3)
-    assert compute_reciprocal_rank(retrieved, "x") == 0.0
+def test_evaluate_retrieval() -> None:
+    qrels = {"q1": {"doc1": 1}}
+    run = {"q1": {"doc1": 0.9, "doc2": 0.5}}
 
-    assert compute_recall_at_k(retrieved, "a", k=1) == 1.0
-    assert compute_recall_at_k(retrieved, "b", k=1) == 0.0
-    assert compute_recall_at_k(retrieved, "b", k=2) == 1.0
-    assert compute_recall_at_k(retrieved, "x", k=4) == 0.0
+    metrics = evaluate_retrieval(qrels, run, metrics=["mrr", "recall@1", "ndcg@5"])
+    assert metrics["mrr"] == 1.0
+    assert metrics["recall@1"] == 1.0
 
 
 def test_base_walker_streaming() -> None:

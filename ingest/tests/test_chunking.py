@@ -242,22 +242,18 @@ def test_dedicated_renderer_subclasses() -> None:
     )
 
     t_renderer = TextOnlyRenderer(ordered_verses, addr_index)
-    assert isinstance(t_renderer, TextOnlyRenderer)
     assert t_renderer.render(p) == "Verse 1 Verse 2"
 
     h_renderer = HeadingAndTextRenderer(ordered_verses, addr_index)
-    assert isinstance(h_renderer, HeadingAndTextRenderer)
     assert h_renderer.render(p) == "Heading\nVerse 1 Verse 2"
 
     b_renderer = BookAndHeadingRenderer(ordered_verses, addr_index)
-    assert isinstance(b_renderer, BookAndHeadingRenderer)
     assert b_renderer.render(p) == "Genesis — Heading\nVerse 1 Verse 2"
 
     a_renderer = AddressAndHeadingRenderer(ordered_verses, addr_index)
-    assert isinstance(a_renderer, AddressAndHeadingRenderer)
     assert a_renderer.render(p) == "[Genesis 1:1–2] Heading\nVerse 1 Verse 2"
 
-    # Test factory
+    # Test factory creates the configured strategy type
     factory_r = get_renderer("book_and_heading", ordered_verses, addr_index)
     assert isinstance(factory_r, BookAndHeadingRenderer)
 
