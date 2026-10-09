@@ -5,7 +5,7 @@ from typing import Any, Iterator
 
 from rag_core.walkers import BaseWalker
 from .constants import USFM_ORDER
-from .types import VerseAddress, VerseEvent
+from .types import Pericope, VerseAddress, VerseEvent
 
 
 class WebCorpusWalker(BaseWalker[tuple[VerseAddress, str]]):
@@ -83,6 +83,42 @@ class BsbCorpusWalker(BaseWalker[VerseEvent]):
             book_path = self.bsb_dir / f"{code}.usj"
             if book_path.exists():
                 yield from self._book_walker.walk(book_path)
+
+
+class BsbPericopeWalker(BaseWalker[Pericope]):
+    """Walks BSB USJ book files in canonical order, yielding derived Pericope spans."""
+
+    def __init__(self, bsb_dir: Path):
+        self.bsb_dir = bsb_dir
+        self._book_walker = BsbBookWalker()
+
+    def walk(self) -> Iterator[Pericope]:
+        for code in USFM_ORDER:
+            book_path = self.bsb_dir / f"{code}.usj"
+            if not book_path.exists():
+                continue
+            addresses: list[VerseAddress] = []
+            headings: list[tuple[VerseAddress, str]] = []
+            for event in self._book_walker.walk(book_path):
+                addresses.append(event.address)
+                if event.heading is not None:
+                    headings.append((event.address, event.heading))
+
+            addr_index = {a: i for i, a in enumerate(addresses)}
+            for i, (addr, heading) in enumerate(headings):
+                start = addr_index[addr]
+                end = (
+                    addr_index[headings[i + 1][0]]
+                    if i + 1 < len(headings)
+                    else len(addresses)
+                )
+                yield Pericope(
+                    book=addr[0],
+                    chapter=addr[1],
+                    verse=addr[2],
+                    heading=heading,
+                    verse_count=end - start,
+                )
 
 
 class BookWalker(ABC):

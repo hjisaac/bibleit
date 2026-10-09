@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Sequence
+from typing import Iterator, Sequence
 
 from rag_core.renderers import BaseChunkRenderer
 from .constants import BOOK_NAMES
@@ -7,21 +7,23 @@ from .types import Passage, VerseAddress
 
 
 class BasePassageRenderer(BaseChunkRenderer[Passage], ABC):
-    """Base class for scripture passage rendering strategies."""
+    """Base class providing scripture text extraction and address resolution."""
 
     def __init__(
         self,
         ordered_verses: Sequence[tuple[VerseAddress, str]],
         address_index: dict[VerseAddress, int] | None = None,
-        include_headings: bool = True,
-        include_incomplete_headings: bool = True,
+        **kwargs,
     ):
         self.ordered_verses = ordered_verses
         self.address_index = address_index
-        self.include_headings = include_headings
-        self.include_incomplete_headings = include_incomplete_headings
 
-    def _format_address(self, start_idx: int, end_idx: int) -> str:
+    def get_text(self, start_idx: int, end_idx: int) -> str:
+        """Extracts and joins verse texts across an index slice."""
+        return " ".join(self.ordered_verses[k][1] for k in range(start_idx, end_idx))
+
+    def format_address(self, start_idx: int, end_idx: int) -> str:
+        """Formats canonical scripture citation range (e.g. '[Genesis 1:1–3]')."""
         start_v = self.ordered_verses[start_idx][0]
         end_v = self.ordered_verses[end_idx - 1][0]
         book_name = BOOK_NAMES.get(start_v[0], start_v[0])
@@ -31,108 +33,77 @@ class BasePassageRenderer(BaseChunkRenderer[Passage], ABC):
             return f"[{book_name} {start_v[1]}:{start_v[2]}–{end_v[2]}]"
         return f"[{book_name} {start_v[1]}:{start_v[2]}–{end_v[1]}:{end_v[2]}]"
 
-    @abstractmethod
-    def _format_header(
-        self,
-        heading: str | None,
-        start_idx: int,
-        end_idx: int,
-        book: str,
-        is_first: bool = False,
-    ) -> str | None:
-        ...
-
-    def render(self, passage: Passage) -> str:
+    def iter_sections(self, passage: Passage) -> Iterator[tuple[int, int, str | None]]:
+        """Yields (start_idx, end_idx, heading) for each constituent section."""
         if not passage.sections:
-            text = " ".join(
-                self.ordered_verses[k][1] for k in range(passage.start_idx, passage.end_idx)
-            )
             heading = passage.headings[0] if passage.headings else None
-            header = self._format_header(
-                heading, passage.start_idx, passage.end_idx, passage.book, is_first=True
-            )
-            return f"{header}\n{text}" if header else text
+            yield (passage.start_idx, passage.end_idx, heading)
+            return
 
-        blocks: list[str] = []
         for i, (sec_start, heading) in enumerate(passage.sections):
             sec_end = (
                 passage.sections[i + 1][0]
                 if i + 1 < len(passage.sections)
                 else passage.end_idx
             )
-            sec_text = " ".join(
-                self.ordered_verses[k][1] for k in range(sec_start, sec_end)
-            )
-            header = self._format_header(
-                heading, sec_start, sec_end, passage.book, is_first=(i == 0)
-            )
-            if header:
-                blocks.append(f"{header}\n{sec_text}")
-            else:
-                blocks.append(sec_text)
-        return "\n\n".join(blocks)
+            yield (sec_start, sec_end, heading)
+
+    @abstractmethod
+    def render(self, passage: Passage) -> str:
+        ...
 
 
 class TextOnlyRenderer(BasePassageRenderer):
     """Renders raw verse text with no headings or citations."""
 
-    def _format_header(
-        self,
-        heading: str | None,
-        start_idx: int,
-        end_idx: int,
-        book: str,
-        is_first: bool = False,
-    ) -> str | None:
-        return None
+    def render(self, passage: Passage) -> str:
+        blocks = [
+            self.get_text(sec_start, sec_end)
+            for sec_start, sec_end, _ in self.iter_sections(passage)
+        ]
+        return "\n\n".join(blocks)
 
 
 class HeadingAndTextRenderer(BasePassageRenderer):
-    """Baseline renderer with section/pericope headings on top of verse texts."""
+    """Renders section headings above verse texts."""
 
-    def _format_header(
-        self,
-        heading: str | None,
-        start_idx: int,
-        end_idx: int,
-        book: str,
-        is_first: bool = False,
-    ) -> str | None:
-        return heading if self.include_headings else None
+    def render(self, passage: Passage) -> str:
+        blocks: list[str] = []
+        for sec_start, sec_end, heading in self.iter_sections(passage):
+            text = self.get_text(sec_start, sec_end)
+            blocks.append(f"{heading}\n{text}" if heading else text)
+        return "\n\n".join(blocks)
 
 
 class BookAndHeadingRenderer(BasePassageRenderer):
-    """Grounds canonical book name ('Genesis — Heading') with verse texts."""
+    """Grounds canonical book name ('Genesis — Heading') above verse texts."""
 
-    def _format_header(
-        self,
-        heading: str | None,
-        start_idx: int,
-        end_idx: int,
-        book: str,
-        is_first: bool = False,
-    ) -> str | None:
-        book_name = BOOK_NAMES.get(book, book)
-        if heading and self.include_headings:
-            return f"{book_name} — {heading}"
-        return book_name if is_first else None
+    def render(self, passage: Passage) -> str:
+        book_name = BOOK_NAMES.get(passage.book, passage.book)
+        blocks: list[str] = []
+        for i, (sec_start, sec_end, heading) in enumerate(self.iter_sections(passage)):
+            text = self.get_text(sec_start, sec_end)
+            if heading:
+                header = f"{book_name} — {heading}"
+            elif i == 0:
+                header = book_name
+            else:
+                header = None
+            blocks.append(f"{header}\n{text}" if header else text)
+        return "\n\n".join(blocks)
 
 
 class AddressAndHeadingRenderer(BasePassageRenderer):
-    """Renders full citation address ('[Genesis 1:1–3] Heading') with verse texts."""
+    """Renders full citation address ('[Genesis 1:1–3] Heading') above verse texts."""
 
-    def _format_header(
-        self,
-        heading: str | None,
-        start_idx: int,
-        end_idx: int,
-        book: str,
-        is_first: bool = False,
-    ) -> str | None:
-        addr = self._format_address(start_idx, end_idx)
-        if heading and self.include_headings:
-            return f"{addr} {heading}"
-        return addr
+    def render(self, passage: Passage) -> str:
+        blocks: list[str] = []
+        for sec_start, sec_end, heading in self.iter_sections(passage):
+            addr = self.format_address(sec_start, sec_end)
+            header = f"{addr} {heading}" if heading else addr
+            text = self.get_text(sec_start, sec_end)
+            blocks.append(f"{header}\n{text}")
+        return "\n\n".join(blocks)
 
 
 RENDERER_REGISTRY: dict[str, type[BasePassageRenderer]] = {
@@ -147,10 +118,9 @@ def get_renderer(
     strategy: str,
     ordered_verses: Sequence[tuple[VerseAddress, str]],
     address_index: dict[VerseAddress, int] | None = None,
-    include_headings: bool = True,
-    include_incomplete_headings: bool = True,
+    **kwargs,
 ) -> BasePassageRenderer:
-    """Factory function resolving a dedicated renderer subclass by strategy name."""
+    """Factory resolving a dedicated renderer subclass by strategy name."""
     cls = RENDERER_REGISTRY.get(strategy)
     if not cls:
         raise ValueError(
@@ -159,6 +129,4 @@ def get_renderer(
     return cls(
         ordered_verses=ordered_verses,
         address_index=address_index,
-        include_headings=include_headings,
-        include_incomplete_headings=include_incomplete_headings,
     )

@@ -64,3 +64,35 @@ def test_bsb_book_and_corpus_walker(tmp_path: Path) -> None:
     corpus_events = list(corpus_walker.walk())
     assert len(corpus_events) == 3
     assert corpus_events == events
+
+
+def test_bsb_pericope_walker(tmp_path: Path) -> None:
+    gen_file = tmp_path / "GEN.usj"
+    usj_data = {
+        "type": "USJ",
+        "content": [
+            {"type": "chapter", "number": "1"},
+            {"type": "para", "marker": "s1", "content": ["The Creation"]},
+            {"type": "verse", "number": "1"},
+            {"type": "verse", "number": "2"},
+            {"type": "para", "marker": "s1", "content": ["Light"]},
+            {"type": "verse", "number": "3"},
+        ],
+    }
+    gen_file.write_text(json.dumps(usj_data))
+
+    from bibleit_ingest.pericopes import derive_bsb_pericopes
+    from bibleit_ingest.walkers import BsbPericopeWalker
+
+    walker = BsbPericopeWalker(tmp_path)
+    pericopes = list(walker.walk())
+    assert len(pericopes) == 2
+    assert pericopes[0].book == "GEN"
+    assert pericopes[0].heading == "The Creation"
+    assert pericopes[0].verse_count == 2
+    assert pericopes[1].book == "GEN"
+    assert pericopes[1].heading == "Light"
+    assert pericopes[1].verse_count == 1
+
+    # derive_bsb_pericopes delegates to BsbPericopeWalker
+    assert derive_bsb_pericopes(tmp_path) == pericopes

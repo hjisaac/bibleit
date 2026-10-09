@@ -177,34 +177,14 @@ class ChunkRenderer(BasePassageRenderer):
         ordered_verses: Sequence[tuple[VerseAddress, str]],
         address_index: dict[VerseAddress, int] | None = None,
         strategy: str = "heading_and_text",
-        include_headings: bool = True,
-        include_incomplete_headings: bool = True,
+        **kwargs,
     ):
-        super().__init__(
-            ordered_verses=ordered_verses,
-            address_index=address_index,
-            include_headings=include_headings,
-            include_incomplete_headings=include_incomplete_headings,
-        )
+        super().__init__(ordered_verses=ordered_verses, address_index=address_index)
         self.strategy = strategy
         self._delegate = get_renderer(
             strategy=strategy,
             ordered_verses=ordered_verses,
             address_index=address_index,
-            include_headings=include_headings,
-            include_incomplete_headings=include_incomplete_headings,
-        )
-
-    def _format_header(
-        self,
-        heading: str | None,
-        start_idx: int,
-        end_idx: int,
-        book: str,
-        is_first: bool = False,
-    ) -> str | None:
-        return self._delegate._format_header(
-            heading, start_idx, end_idx, book, is_first=is_first
         )
 
     def render(self, passage: Passage) -> str:

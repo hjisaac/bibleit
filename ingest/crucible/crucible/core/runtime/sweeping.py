@@ -10,7 +10,7 @@ from crucible.core.config.overrides import apply_overrides
 from crucible.core.constants import UNSAFE_IN_FILENAME
 from crucible.core.jobs import AbstractJob
 from crucible.core.types import OnError, RunState
-from crucible.core.utils import new_timestamped_id
+from crucible.core.utils import get_timestamped_id
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ def _run_one(
 	sweep_id: str,
 	on_error: OnError,
 ) -> dict[str, Any]:
-	run_id = new_timestamped_id()
+	run_id = get_timestamped_id()
 	config = apply_overrides(base_config, {**overrides, "run_id": run_id})
 	run = {"sweep_id": sweep_id, "overrides": overrides, "run_id": run_id}
 	try:
@@ -63,7 +63,7 @@ def run_job(
 	if on_error is None:
 		on_error = "raise" if len(points) == 1 else "record"
 
-	sweep_id = new_timestamped_id()
+	sweep_id = get_timestamped_id()
 	return Parallel(n_jobs=min(n_jobs, len(points)))(
 		delayed(_run_one)(job_class, base, overrides, sweep_id, on_error) for overrides in points
 	)

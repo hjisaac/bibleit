@@ -11,41 +11,20 @@ from joblib import Memory
 
 from .constants import BSB_PERICOPES_PATH, CRUCIBLE_CACHE_DIR, USFM_ORDER
 from .types import Pericope, PreparedCorpus, VerseAddress, VerseEvent
-from .walkers import BookWalker, BsbBookWalker, BsbCorpusWalker, BSBBookWalker
+from .walkers import (
+    BookWalker,
+    BsbBookWalker,
+    BsbCorpusWalker,
+    BsbPericopeWalker,
+    BSBBookWalker,
+)
 
 _memory = Memory(location=str(CRUCIBLE_CACHE_DIR), verbose=0)
 
 
 def derive_bsb_pericopes(bsb_dir: Path) -> list[Pericope]:
     """Computes pericope spans within BSB's own versification in canonical order."""
-    walker = BSBBookWalker()
-    all_pericopes: list[Pericope] = []
-    for code in USFM_ORDER:
-        addresses: list[VerseAddress] = []
-        headings: list[tuple[VerseAddress, str]] = []
-        for event in walker.walk(bsb_dir / f"{code}.usj"):
-            addresses.append(event.address)
-            if event.heading is not None:
-                headings.append((event.address, event.heading))
-
-        addr_index = {a: i for i, a in enumerate(addresses)}
-        for i, (addr, heading) in enumerate(headings):
-            start = addr_index[addr]
-            end = (
-                addr_index[headings[i + 1][0]]
-                if i + 1 < len(headings)
-                else len(addresses)
-            )
-            all_pericopes.append(
-                Pericope(
-                    book=addr[0],
-                    chapter=addr[1],
-                    verse=addr[2],
-                    heading=heading,
-                    verse_count=end - start,
-                )
-            )
-    return all_pericopes
+    return list(BsbPericopeWalker(bsb_dir).walk())
 
 
 def save_pericopes(pericopes: Sequence[Pericope], path: Path) -> None:
