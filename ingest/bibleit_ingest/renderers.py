@@ -130,3 +130,22 @@ def get_renderer(
         ordered_verses=ordered_verses,
         address_index=address_index,
     )
+
+
+def create_chunk_renderer(
+    ordered_verses: Sequence[tuple[VerseAddress, str]],
+    address_index: dict[VerseAddress, int] | None = None,
+    strategy: str = "heading_and_text",
+    **kwargs,
+) -> BasePassageRenderer:
+    """Backwards-compatible factory returning a dedicated BasePassageRenderer subclass."""
+    return get_renderer(
+        strategy=strategy,
+        ordered_verses=ordered_verses,
+        address_index=address_index,
+        **kwargs,
+    )
+
+
+ChunkRenderer = create_chunk_renderer
+PassageRenderer = BasePassageRenderer

@@ -76,8 +76,72 @@ def test_base_walker_streaming() -> None:
         def __init__(self, limit: int):
             self.limit = limit
 
-        def walk(self) -> Iterator[int]:
+        def lazy_walk(self) -> Iterator[int]:
             yield from range(self.limit)
 
     walker = SequenceWalker(5)
-    assert list(walker.walk()) == [0, 1, 2, 3, 4]
+    assert list(walker.lazy_walk()) == [0, 1, 2, 3, 4]
+    assert walker.walk() == [0, 1, 2, 3, 4]
+
+
+def test_base_embedder() -> None:
+    from rag_core.embedders import BaseEmbedder
+
+    class DummyEmbedder(BaseEmbedder):
+        @property
+        def model_id(self) -> str:
+            return "dummy-model"
+
+        @property
+        def dim(self) -> int:
+            return 3
+
+        def embed_query(self, text: str) -> np.ndarray:
+            return np.array([1.0, 0.0, 0.0], dtype=np.float32)
+
+        def embed_documents(
+            self, texts: list[str], batch_size: int = 32
+        ) -> Iterator[np.ndarray]:
+            for _ in texts:
+                yield np.array([0.0, 1.0, 0.0], dtype=np.float32)
+
+    embedder = DummyEmbedder()
+    assert embedder.model_id == "dummy-model"
+    assert embedder.dim == 3
+
+    q_vec = embedder.embed_query("search")
+    assert np.allclose(q_vec, [1.0, 0.0, 0.0])
+
+    queries_vecs = list(embedder.embed_queries(["q1", "q2"]))
+    assert len(queries_vecs) == 2
+    assert np.allclose(queries_vecs[0], [1.0, 0.0, 0.0])
+
+    doc_matrix = embedder.embed(["d1", "d2"])
+    assert doc_matrix.shape == (2, 3)
+    assert np.allclose(doc_matrix[0], [0.0, 1.0, 0.0])
+
+
+def test_quantizer_classes() -> None:
+    from rag_core.quantization import Int8Quantizer, NoOpQuantizer
+
+    matrix = np.array([
+        [1.0, -1.0, 0.5],
+        [0.0, 0.25, -0.75],
+    ], dtype=np.float32)
+
+    # Int8Quantizer
+    i8_q = Int8Quantizer()
+    assert i8_q.name == "int8"
+    q_mat, meta = i8_q.quantize(matrix)
+    assert q_mat.dtype == np.int8
+    assert "scales" in meta
+    reconstructed = i8_q.dequantize(q_mat, **meta)
+    assert np.allclose(matrix, reconstructed, atol=1e-2)
+
+    # NoOpQuantizer
+    noop = NoOpQuantizer()
+    assert noop.name == "float32"
+    pass_mat, noop_meta = noop.quantize(matrix)
+    assert pass_mat.dtype == np.float32
+    assert np.allclose(matrix, pass_mat)
+    assert np.allclose(matrix, noop.dequantize(pass_mat, **noop_meta))

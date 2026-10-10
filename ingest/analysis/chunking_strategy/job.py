@@ -4,15 +4,12 @@ from pathlib import Path
 from typing import Any
 
 from datalens import AnalysisConfig, run_analysis
-from fastembed import TextEmbedding
 
-from bibleit_ingest.chunking import (
-    AdaptiveWindowChunker,
-    ChunkRenderer,
-)
+from bibleit_ingest.chunking import AdaptiveWindowChunker
 from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, OLD_TESTAMENT_BOOKS, REPO
-from bibleit_ingest.embedding import save_chunk_embeddings
+from bibleit_ingest.embedding import FastEmbedder, save_chunk_embeddings
 from bibleit_ingest.pericopes import get_or_prepare_corpus
+from bibleit_ingest.renderers import get_renderer
 from analysis.job import AnalysisJobBase
 
 logger = logging.getLogger(__name__)
@@ -27,7 +24,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         tok_model_name = self.config.get(
             "tokenizer_model", "nomic-ai/nomic-embed-text-v1.5"
         )
-        embed_model = TextEmbedding(
+        embedder = FastEmbedder(
             model_name=tok_model_name, cache_dir=str(FASTEMBED_CACHE_DIR)
         )
 
@@ -35,7 +32,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
             "pericopes": corpus.pericopes,
             "ordered_verses": corpus.ordered_verses,
             "address_index": corpus.address_index,
-            "embed_model": embed_model,
+            "embedder": embedder,
         }
 
     def on_execute(self, prepared: dict) -> dict[str, Any]:
@@ -54,13 +51,16 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         )
         chunks = chunker.chunk(prepared["pericopes"])
 
-        tokenizer = prepared["embed_model"].model.tokenizer
+        tokenizer = prepared["embedder"].raw_model.model.tokenizer
         limit = int(self.config.get("token_limit", 512))
-        renderer = ChunkRenderer(
+        strategy = self.config.get("render_strategy")
+        if not strategy:
+            include_headings = bool(self.config.get("include_headings", True))
+            strategy = "heading_and_text" if include_headings else "text_only"
+        renderer = get_renderer(
+            strategy=strategy,
             ordered_verses=ordered_verses,
             address_index=address_index,
-            include_headings=bool(self.config.get("include_headings", True)),
-            include_incomplete_headings=bool(self.config.get("include_incomplete_headings", True)),
         )
 
         texts = []
@@ -137,7 +137,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         if emb_model := self.config.get("embedding_model"):
             logger.info("Embedding %d chunks with %s", len(result["chunks"]), emb_model)
             save_chunk_embeddings(
-                result["chunks"], result["texts"], prepared["embed_model"], self.run_dir
+                result["chunks"], result["texts"], prepared["embedder"], self.run_dir
             )
 
 

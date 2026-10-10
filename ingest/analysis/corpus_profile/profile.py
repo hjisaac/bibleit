@@ -2,9 +2,10 @@ from typing import Any
 
 from datalens import AnalysisConfig, run_analysis
 
-from bibleit_ingest.chunking import ChunkRenderer, Passage
 from bibleit_ingest.constants import OLD_TESTAMENT_BOOKS
 from bibleit_ingest.pericopes import PreparedCorpus
+from bibleit_ingest.renderers import HeadingAndTextRenderer
+from bibleit_ingest.types import Passage
 
 
 def profile_corpus(
@@ -26,10 +27,9 @@ def profile_corpus(
         })
 
     # Pass 2: raw pericope-level verses, words, and tokens (with headings)
-    renderer = ChunkRenderer(
+    renderer = HeadingAndTextRenderer(
         ordered_verses=corpus.ordered_verses,
         address_index=corpus.address_index,
-        include_headings=True,
     )
     pericope_records = []
     for p in corpus.pericopes:

@@ -10,7 +10,6 @@ export interface UserProfile {
 
 interface HeaderProps {
   isOnline: boolean;
-  isOfflineReady?: boolean;
   isAiEnabled: boolean;
   user?: UserProfile | null;
   onOpenHelp: () => void;
@@ -19,7 +18,6 @@ interface HeaderProps {
 
 export function Header({
   isOnline,
-  isOfflineReady = true,
   isAiEnabled,
   user,
   onOpenHelp,
@@ -34,18 +32,16 @@ export function Header({
       }
     : isOnline
       ? {
-          label: !isOfflineReady ? 'Syncing...' : 'AI Ready',
-          colorClass: !isOfflineReady ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500',
+          label: 'AI Ready',
+          colorClass: 'bg-emerald-500',
           textColor: 'var(--text-muted)',
-          tooltip: !isOfflineReady
-            ? 'Syncing offline cache...'
-            : 'Connected. Press Enter on question searches to synthesize answers.',
+          tooltip: 'Connected. Press Enter on question queries to synthesize answers.',
         }
       : {
-          label: 'AI Offline',
-          colorClass: 'bg-amber-500 animate-pulse',
-          textColor: 'var(--accent)',
-          tooltip: 'Offline mode: Searching & reading locally on-device. Connect to internet for AI answers.',
+          label: 'Offline',
+          colorClass: 'bg-amber-500',
+          textColor: 'var(--text-muted)',
+          tooltip: 'Offline mode: Searching and reading locally on-device.',
         };
 
   return (

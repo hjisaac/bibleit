@@ -24,7 +24,7 @@ _memory = Memory(location=str(CRUCIBLE_CACHE_DIR), verbose=0)
 
 def derive_bsb_pericopes(bsb_dir: Path) -> list[Pericope]:
     """Computes pericope spans within BSB's own versification in canonical order."""
-    return list(BsbPericopeWalker(bsb_dir).walk())
+    return BsbPericopeWalker(bsb_dir).walk()
 
 
 def save_pericopes(pericopes: Sequence[Pericope], path: Path) -> None:

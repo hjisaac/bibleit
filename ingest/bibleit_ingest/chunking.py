@@ -12,7 +12,9 @@ from .renderers import (
     BasePassageRenderer,
     BookAndHeadingRenderer,
     HeadingAndTextRenderer,
+    PassageRenderer,
     TextOnlyRenderer,
+    create_chunk_renderer,
     get_renderer,
 )
 from .types import Chunk, Passage, Pericope, VerseAddress
@@ -159,7 +161,7 @@ class AdaptiveWindowChunker(Chunker):
 
 def load_web_verses(web_path: Path) -> list[tuple[VerseAddress, str]]:
     """Loads every verse from a WEB JSON file in reading order."""
-    return list(WebCorpusWalker(web_path).walk())
+    return WebCorpusWalker(web_path).walk()
 
 
 def index_verses_by_address(
@@ -169,26 +171,7 @@ def index_verses_by_address(
     return {addr: i for i, (addr, _) in enumerate(ordered_verses)}
 
 
-class ChunkRenderer(BasePassageRenderer):
-    """Backwards-compatible wrapper delegating to dedicated renderer subclasses."""
-
-    def __init__(
-        self,
-        ordered_verses: Sequence[tuple[VerseAddress, str]],
-        address_index: dict[VerseAddress, int] | None = None,
-        strategy: str = "heading_and_text",
-        **kwargs,
-    ):
-        super().__init__(ordered_verses=ordered_verses, address_index=address_index)
-        self.strategy = strategy
-        self._delegate = get_renderer(
-            strategy=strategy,
-            ordered_verses=ordered_verses,
-            address_index=address_index,
-        )
-
-    def render(self, passage: Passage) -> str:
-        return self._delegate.render(passage)
+ChunkRenderer = create_chunk_renderer
 
 
 def resolve_verse_to_chunk_index(
