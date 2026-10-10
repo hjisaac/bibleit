@@ -11,24 +11,11 @@ from bibleit_ingest.constants import REPO
 logger = logging.getLogger(__name__)
 
 
-def dict_to_slug(params: dict[str, Any]) -> str:
-    """Format dict key-values into {key}-{value} pairs joined by underscores."""
-    return "_".join(f"{k}-{v}" for k, v in params.items() if v is not None)
-
-
 class AnalysisJobBase(AbstractJob):
     """Base class for bibleit analysis and profiling jobs."""
 
     path_config_keys: tuple[str, ...] = ()
     category: str = "analysis"
-
-    def make_slug(self, params: dict[str, Any] | None = None) -> str:
-        parts = [self.run_id]
-        if tag := self.config.get("tag"):
-            parts.append(str(tag))
-        if params and (param_str := dict_to_slug(params)):
-            parts.append(param_str)
-        return "_".join(parts)
 
     @property
     def project_name(self) -> str:
@@ -40,11 +27,11 @@ class AnalysisJobBase(AbstractJob):
     def on_start(self) -> None:
         for key in self.path_config_keys:
             setattr(self, key, REPO / self.config[key])
+        self.run_dir = Path(self.config.get("log_dir", "outputs")).resolve() / self.run_id
 
     def on_track(self) -> None:
         logger.info("Using config:\n%s", json.dumps(self.config, indent=2, default=str))
-        run_name = getattr(self, "slug", self.run_id)
-        self.tracker = WBTracker(run_name=run_name, project=self.project_name, config=self.config)
+        self.tracker = WBTracker(run_name=self.run_id, project=self.project_name, config=self.config)
 
     def on_finalize(self, prepared: dict, result: dict[str, Any]) -> None:
         metrics = result.get("metrics", {})

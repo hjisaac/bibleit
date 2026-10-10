@@ -1,12 +1,8 @@
 import json
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, NamedTuple, Sequence
+from typing import Sequence
 
 from .chunking import (
-    Pericope,
-    VerseAddress,
     index_verses_by_address,
     load_pericopes,
     load_web_verses,
@@ -14,97 +10,21 @@ from .chunking import (
 from joblib import Memory
 
 from .constants import BSB_PERICOPES_PATH, CRUCIBLE_CACHE_DIR, USFM_ORDER
+from .types import Pericope, PreparedCorpus, VerseAddress, VerseEvent
+from .walkers import (
+    BookWalker,
+    BsbBookWalker,
+    BsbCorpusWalker,
+    BsbPericopeWalker,
+    BSBBookWalker,
+)
 
 _memory = Memory(location=str(CRUCIBLE_CACHE_DIR), verbose=0)
 
 
-class PreparedCorpus(NamedTuple):
-    pericopes: list[Pericope]
-    ordered_verses: list[tuple[VerseAddress, str]]
-    address_index: dict[VerseAddress, int]
-
-
-@dataclass(frozen=True)
-class VerseEvent:
-    """One verse encountered while walking a book. `heading` is set only
-    when a new section heading appeared immediately before it."""
-
-    address: VerseAddress
-    heading: str | None = None
-
-
-class BookWalker(ABC):
-    """Walks one translation's book file, yielding one VerseEvent per
-    verse. Subclass per source format."""
-
-    @abstractmethod
-    def walk(self, path: Path) -> Iterator[VerseEvent]: ...
-
-
-class BSBBookWalker(BookWalker):
-    """Walks one BSB .usj file. Resets state each call, so one instance
-    can be reused across books."""
-
-    def walk(self, path: Path) -> Iterator[VerseEvent]:
-        self._book = path.stem
-        self._ch: int | None = None
-        self._pending_heading: str | None = None
-
-        doc = json.loads(path.read_text())
-        yield from self.visit(doc["content"])
-
-    def visit(self, node) -> Iterator[VerseEvent]:
-        if isinstance(node, list):
-            for c in node:
-                yield from self.visit(c)
-            return
-        if not isinstance(node, dict):
-            return
-        if node.get("type") == "chapter":
-            self._ch = int(node["number"])
-        elif node.get("marker") == "s1":
-            self._pending_heading = "".join(
-                c for c in node.get("content", []) if isinstance(c, str)
-            ).strip()
-        elif node.get("type") == "verse":
-            n = str(node["number"]).split("-")[-1].split(",")[-1]
-            addr = (self._book, self._ch, int(n))
-            heading, self._pending_heading = self._pending_heading, None
-            yield VerseEvent(address=addr, heading=heading)
-        for c in node.get("content", []):
-            yield from self.visit(c)
-
-
 def derive_bsb_pericopes(bsb_dir: Path) -> list[Pericope]:
     """Computes pericope spans within BSB's own versification in canonical order."""
-    walker = BSBBookWalker()
-    all_pericopes: list[Pericope] = []
-    for code in USFM_ORDER:
-        addresses: list[VerseAddress] = []
-        headings: list[tuple[VerseAddress, str]] = []
-        for event in walker.walk(bsb_dir / f"{code}.usj"):
-            addresses.append(event.address)
-            if event.heading is not None:
-                headings.append((event.address, event.heading))
-
-        addr_index = {a: i for i, a in enumerate(addresses)}
-        for i, (addr, heading) in enumerate(headings):
-            start = addr_index[addr]
-            end = (
-                addr_index[headings[i + 1][0]]
-                if i + 1 < len(headings)
-                else len(addresses)
-            )
-            all_pericopes.append(
-                Pericope(
-                    book=addr[0],
-                    chapter=addr[1],
-                    verse=addr[2],
-                    heading=heading,
-                    verse_count=end - start,
-                )
-            )
-    return all_pericopes
+    return BsbPericopeWalker(bsb_dir).walk()
 
 
 def save_pericopes(pericopes: Sequence[Pericope], path: Path) -> None:

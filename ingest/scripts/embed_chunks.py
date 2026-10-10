@@ -4,13 +4,9 @@ import sys
 
 import numpy as np
 from codetiming import Timer
-from fastembed import TextEmbedding
 from tqdm import tqdm
 
-from bibleit_ingest.chunking import (
-    AdaptiveWindowChunker,
-    ChunkRenderer,
-)
+from bibleit_ingest.chunking import AdaptiveWindowChunker
 from bibleit_ingest.constants import (
     BSB_DIR,
     CHUNK_EMBEDDINGS_NPY_PATH,
@@ -19,8 +15,9 @@ from bibleit_ingest.constants import (
     WEB_PATH,
     EmbeddingModel,
 )
-from bibleit_ingest.embedding import embed_documents
+from bibleit_ingest.embedding import FastEmbedder
 from bibleit_ingest.pericopes import get_or_prepare_corpus
+from bibleit_ingest.renderers import HeadingAndTextRenderer
 
 # stdout, not logging's stderr default, to stay off tqdm's stream below.
 logging.basicConfig(
@@ -41,15 +38,15 @@ def main():
     with Timer(
         text=f"loaded {EmbeddingModel.NOMIC_EMBED_TEXT_V1_5} in {{:.1f}}s", logger=logger.info
     ):
-        model = TextEmbedding(
+        embedder = FastEmbedder(
             model_name=EmbeddingModel.NOMIC_EMBED_TEXT_V1_5,
             cache_dir=str(FASTEMBED_CACHE_DIR),
         )
 
     # Generator, not a list: text isn't rendered until the embedder asks.
-    renderer = ChunkRenderer(corpus.ordered_verses, corpus.address_index)
+    renderer = HeadingAndTextRenderer(corpus.ordered_verses, corpus.address_index)
     texts = (renderer.render(c) for c in chunks)
-    embeddings = embed_documents(model, texts)
+    embeddings = embedder.embed_documents(texts)
 
     metadata = []
     embeddings_npy = None

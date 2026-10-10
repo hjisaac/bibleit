@@ -7,7 +7,7 @@ from crucible.core.handlers.logger import (
 	detach_run_file_handler,
 	ensure_console_configured,
 )
-from crucible.core.utils import new_timestamped_id
+from crucible.core.utils import get_timestamped_id
 
 
 class AbstractJob(metaclass=ABCMeta):
@@ -17,7 +17,7 @@ class AbstractJob(metaclass=ABCMeta):
 		self.config = config
 		# A sweep injects its own run_id into config so a run's bookkeeping
 		# id and its actual log/result file name are the same value.
-		self._run_id = config.get("run_id") or new_timestamped_id()
+		self._run_id = config.get("run_id") or get_timestamped_id()
 		self.tracker = None
 		ensure_console_configured(config.get("log_console_level", "INFO"))
 		self._log_file_handler = attach_run_file_handler(config, self._run_id)

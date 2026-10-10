@@ -9,6 +9,10 @@ interface SearchViewProps {
   isOnline: boolean;
   isAiEnabled: boolean;
   isInspectorMode: boolean;
+  offlineTextStatus?: 'not_downloaded' | 'downloading' | 'ready';
+  hasSeenOnboarding?: boolean;
+  onOpenStorage?: () => void;
+  onDismissOnboarding?: () => void;
   onOpenReader: (book: string, chapter: number, verse: number) => void;
   onToast: (message: string) => void;
 }
@@ -29,6 +33,10 @@ export function SearchView({
   isOnline,
   isAiEnabled,
   isInspectorMode,
+  offlineTextStatus = 'ready',
+  hasSeenOnboarding = true,
+  onOpenStorage,
+  onDismissOnboarding,
   onOpenReader,
   onToast,
 }: SearchViewProps): JSX.Element {
@@ -185,6 +193,74 @@ export function SearchView({
           </div>
         </div>
       </div>
+
+      {/* Offline Storage Status Banner / Super Tiny Reminder */}
+      {offlineTextStatus !== 'ready' && (
+        !hasSeenOnboarding ? (
+          <div
+            class="mb-3 px-3 py-1.5 rounded-xl border flex items-center justify-between gap-2.5 animate-fadeIn shrink-0 transition-all bg-amber-500/[0.07] border-amber-500/25"
+          >
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+              <svg
+                class="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              <span class="text-[11px] font-medium truncate" style={{ color: 'var(--text-main)' }}>
+                Save Scripture text (~2 MB) to read and search offline.
+              </span>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={onOpenStorage}
+                class="px-2 py-0.5 rounded-lg text-[11px] font-medium text-white transition-opacity hover:opacity-90 shadow-sm"
+                style={{ backgroundColor: 'var(--accent)' }}
+              >
+                Set Up →
+              </button>
+              {onDismissOnboarding && (
+                <button
+                  type="button"
+                  onClick={onDismissOnboarding}
+                  class="p-0.5 rounded-md text-[11px] hover:opacity-75"
+                  style={{ color: 'var(--text-muted)' }}
+                  title="Dismiss banner"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div class="flex items-center justify-between mb-2 px-1 text-[10px] shrink-0">
+            <button
+              type="button"
+              onClick={onOpenStorage}
+              class="flex items-center gap-1.5 transition-opacity hover:opacity-80"
+              style={{ color: 'var(--text-subtle)' }}
+            >
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500/70" />
+              <span>Offline storage not downloaded · Tap to set up →</span>
+            </button>
+          </div>
+        )
+      )}
 
       {/* Scripture Navigator Strip (Appears when query matches a book prefix) */}
       {matchedBook && (

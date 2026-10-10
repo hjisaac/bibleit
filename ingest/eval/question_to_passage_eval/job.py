@@ -4,7 +4,6 @@ from functools import partial
 from pathlib import Path
 
 from codetiming import Timer
-from fastembed import TextEmbedding
 from tqdm import tqdm
 
 from bibleit_ingest.chunking import AdaptiveWindowChunker
@@ -14,9 +13,9 @@ from bibleit_ingest.constants import (
     FASTEMBED_CACHE_DIR,
     EmbeddingModel,
 )
-from bibleit_ingest.embedding import embed_query, get_or_create_chunk_embeddings
+from bibleit_ingest.embedding import FastEmbedder, get_or_create_chunk_embeddings
 from bibleit_ingest.pericopes import get_or_prepare_corpus
-from eval.helpers import format_passage, generate_retrieval_report, trigger_eval
+from bibleit_ingest.evaluation import format_passage, generate_retrieval_report, trigger_eval
 from eval.job import EvalJobBase
 
 logger = logging.getLogger(__name__)
@@ -30,16 +29,8 @@ class EvalJobQuestionToPassage(EvalJobBase):
 
     def on_start(self) -> None:
         super().on_start()
-        slug_parts = {
-            "f": self.config.get("floor", 5),
-            "c": self.config.get("ceiling", 30),
-            "o": self.config.get("overlap", 0),
-            "rnd": self.config.get("render_strategy", "heading_and_text"),
-            "k": self.config.get("k", 1),
-        }
-        self.slug = self.make_slug(slug_parts)
-        self.run_dir = Path(self.config["log_dir"]).resolve() / self.slug
-        logger.info("=== Starting run [%s] ===", self.slug)
+        self.run_dir = Path(self.config["log_dir"]).resolve() / self.run_id
+        logger.info("=== Starting run [%s] ===", self.run_id)
 
     def on_prepare(self) -> dict:
         k = int(self.config.get("k", 1))
@@ -60,7 +51,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
         ).chunk(corpus.pericopes)
 
         threads = int(self.config.get("threads", 4))
-        model = TextEmbedding(
+        embedder = FastEmbedder(
             model_name=embedding_model,
             cache_dir=str(FASTEMBED_CACHE_DIR),
             threads=threads,
@@ -71,7 +62,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
         chunk_embeddings = get_or_create_chunk_embeddings(
             chunks=chunks,
             ordered_verses=corpus.ordered_verses,
-            model=model,
+            model=embedder,
             render_strategy=render_strategy,
             cache_dir=CRUCIBLE_CACHE_DIR / "chunk_embeddings",
             cache_key=cache_key,
@@ -81,13 +72,13 @@ class EvalJobQuestionToPassage(EvalJobBase):
         )
         logger.info("Loaded %d embedded chunks (strategy=%s)", len(chunks), render_strategy)
 
-        # Batch embed eval queries for instant lookup instead of 150 single-item inferences
+        # Batch embed eval queries for instant lookup instead of single-item inferences
         eval_data = json.loads(self.eval_data_path.read_text())
-        q_texts = [f"search_query: {q['query']}" for q in eval_data["queries"]]
+        q_texts = [q["query"] for q in eval_data["queries"]]
         with Timer(text=f"Embedded {len(q_texts)} queries in {{:.1f}}s", logger=logger.info):
             q_vecs = list(
                 tqdm(
-                    model.embed(q_texts, batch_size=32),
+                    embedder.embed_queries(q_texts, batch_size=32),
                     total=len(q_texts),
                     desc="embedding queries",
                     unit="query",
@@ -101,7 +92,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
             "corpus": corpus,
             "address_index": corpus.address_index,
             "chunk_embeddings": chunk_embeddings,
-            "model": model,
+            "embedder": embedder,
             "query_map": query_map,
         }
 
@@ -111,7 +102,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
             prepared["chunks"],
             prepared["chunk_embeddings"],
             prepared["address_index"],
-            lambda q: prepared["query_map"].get(q, embed_query(prepared["model"], q)),
+            lambda q: prepared["query_map"].get(q, prepared["embedder"].embed_query(q)),
             k=prepared["k"],
         )
 
