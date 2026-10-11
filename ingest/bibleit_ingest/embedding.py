@@ -19,8 +19,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class Embedder(BaseEmbedder):
-    """Embedder adapter wrapping fastembed.TextEmbedding."""
+class FastEmbedder(TextEmbedding, BaseEmbedder):
+    """FastEmbed TextEmbedding subclass implementing BaseEmbedder."""
 
     def __init__(
         self,
@@ -30,35 +30,25 @@ class Embedder(BaseEmbedder):
         prefix_document: str = "search_document: ",
         **kwargs,
     ):
-        self._model_name = str(model_name)
-        self._cache_dir = cache_dir
-        self.prefix_query = prefix_query
-        self.prefix_document = prefix_document
-        self._model = TextEmbedding(
-            model_name=self._model_name,
+        super().__init__(
+            model_name=str(model_name),
             cache_dir=str(cache_dir) if cache_dir else None,
             **kwargs,
         )
-        self._dim: int | None = None
+        self.prefix_query = prefix_query
+        self.prefix_document = prefix_document
 
     @property
     def dim(self) -> int:
-        if self._dim is None:
-            test_vec = next(self._model.embed(["test"]))
-            self._dim = int(test_vec.shape[0])
-        return self._dim
-
-    @property
-    def raw_model(self) -> TextEmbedding:
-        return self._model
+        return self.embedding_size
 
     def embed_query(self, text: str) -> np.ndarray:
-        return next(self._model.embed([self.prefix_query + text]))
+        return next(self.embed([f"{self.prefix_query}{text}"]))
 
     def embed_documents(
         self, texts: Iterable[str], batch_size: int = 32
     ) -> Iterator[np.ndarray]:
-        return self._model.embed(
+        return self.embed(
             (f"{self.prefix_document}{t}" for t in texts),
             batch_size=batch_size,
         )
@@ -66,10 +56,13 @@ class Embedder(BaseEmbedder):
     def embed_queries(
         self, texts: Iterable[str], batch_size: int = 32
     ) -> Iterator[np.ndarray]:
-        return self._model.embed(
+        return self.embed(
             (f"{self.prefix_query}{t}" for t in texts),
             batch_size=batch_size,
         )
+
+
+Embedder = FastEmbedder
 
 
 def embed_query(model: BaseEmbedder | TextEmbedding, text: str) -> np.ndarray:
