@@ -1,3 +1,3 @@
-from .job import JOB_CLASS, Job
+from .job import JOB_CLASS, AnalysisJobEmbedCorpus
 
-__all__ = ["Job", "JOB_CLASS"]
+__all__ = ["AnalysisJobEmbedCorpus", "JOB_CLASS"]

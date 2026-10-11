@@ -41,5 +41,4 @@ class AnalysisJobCorpusProfile(AnalysisJobBase):
         super().on_finalize(prepared, filtered)
 
 
-Job = AnalysisJobCorpusProfile
 JOB_CLASS = AnalysisJobCorpusProfile

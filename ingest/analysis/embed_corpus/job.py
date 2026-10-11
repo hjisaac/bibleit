@@ -189,5 +189,4 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
         logger.info("Saved embedding artifact with lock to %s", self.run_dir)
 
 
-Job = AnalysisJobEmbedCorpus
 JOB_CLASS = AnalysisJobEmbedCorpus
