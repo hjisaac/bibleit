@@ -11,7 +11,7 @@ from rag_core.embedders import BaseEmbedder
 
 class MockEmbedder(BaseEmbedder):
     @property
-    def model_id(self) -> str:
+    def model_name(self) -> str:
         return "test-embedder-v1"
 
     @property

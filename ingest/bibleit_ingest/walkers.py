@@ -1,5 +1,4 @@
 import json
-from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -122,13 +121,3 @@ class BsbPericopeWalker(BaseWalker[Pericope]):
                     heading=heading,
                     verse_count=end - start,
                 )
-
-
-class BookWalker(ABC):
-    """Abstract base for single book walkers (backwards compatibility)."""
-
-    @abstractmethod
-    def walk(self, path: Path) -> Iterator[VerseEvent]: ...
-
-
-BSBBookWalker = BsbBookWalker

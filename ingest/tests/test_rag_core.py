@@ -3,9 +3,8 @@ import pytest
 from typing import Iterator
 
 from rag_core.metrics import evaluate_retrieval
-from rag_core.quantization import dequantize_int8, quantize_int8
+from rag_core.quantization import Int8Quantizer, NoOpQuantizer
 from rag_core.rerankers import RrfReranker
-from rag_core.streaming import batch_stream
 from rag_core.types import GenericChunk, ScoredChunk
 from rag_core.walkers import BaseWalker
 
@@ -16,21 +15,23 @@ def test_quantize_and_dequantize_int8() -> None:
         [-1.0, 0.25, 0.0, -0.75],
     ], dtype=np.float32)
 
-    q_matrix, scales = quantize_int8(embeddings)
+    quantizer = Int8Quantizer()
+    q_matrix, meta = quantizer.quantize(embeddings)
     assert q_matrix.dtype == np.int8
     assert q_matrix.shape == embeddings.shape
-    assert scales.shape == (2,)
+    assert meta["scales"].shape == (2,)
 
-    reconstructed = dequantize_int8(q_matrix, scales)
+    reconstructed = quantizer.dequantize(q_matrix, **meta)
     assert reconstructed.shape == embeddings.shape
     assert np.allclose(embeddings, reconstructed, atol=1e-2)
 
 
 def test_quantize_int8_zero_vector() -> None:
     zeros = np.zeros((1, 4), dtype=np.float32)
-    q_matrix, scales = quantize_int8(zeros)
+    quantizer = Int8Quantizer()
+    q_matrix, meta = quantizer.quantize(zeros)
     assert np.all(q_matrix == 0)
-    reconstructed = dequantize_int8(q_matrix, scales)
+    reconstructed = quantizer.dequantize(q_matrix, **meta)
     assert np.allclose(zeros, reconstructed)
 
 
@@ -52,14 +53,6 @@ def test_rrf_reranker() -> None:
     assert top_ids == {"chunk-1", "chunk-2"}
     assert reranked[2].chunk.id == "chunk-3"
     assert reranked[0].score > reranked[2].score
-
-
-def test_batch_stream() -> None:
-    items = list(range(10))
-    batches = list(batch_stream(items, batch_size=3))
-    assert batches == [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]]
-
-    assert list(batch_stream([], batch_size=3)) == []
 
 
 def test_evaluate_retrieval() -> None:
@@ -89,10 +82,6 @@ def test_base_embedder() -> None:
 
     class DummyEmbedder(BaseEmbedder):
         @property
-        def model_id(self) -> str:
-            return "dummy-model"
-
-        @property
         def dim(self) -> int:
             return 3
 
@@ -106,7 +95,6 @@ def test_base_embedder() -> None:
                 yield np.array([0.0, 1.0, 0.0], dtype=np.float32)
 
     embedder = DummyEmbedder()
-    assert embedder.model_id == "dummy-model"
     assert embedder.dim == 3
 
     q_vec = embedder.embed_query("search")

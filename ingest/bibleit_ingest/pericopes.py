@@ -12,11 +12,9 @@ from joblib import Memory
 from .constants import BSB_PERICOPES_PATH, CRUCIBLE_CACHE_DIR, USFM_ORDER
 from .types import Pericope, PreparedCorpus, VerseAddress, VerseEvent
 from .walkers import (
-    BookWalker,
     BsbBookWalker,
     BsbCorpusWalker,
     BsbPericopeWalker,
-    BSBBookWalker,
 )
 
 _memory = Memory(location=str(CRUCIBLE_CACHE_DIR), verbose=0)

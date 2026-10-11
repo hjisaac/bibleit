@@ -10,7 +10,7 @@ from rag_core.embedders import BaseEmbedder
 from rag_core.quantization import BaseQuantizer, Int8Quantizer
 from rag_core.sinks import BaseSink
 
-from .renderers import BasePassageRenderer, HeadingAndTextRenderer
+from .renderers import HeadingAndTextRenderer, PassageRenderer
 from .types import Passage, PreparedCorpus
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ class StaticArtifactSink(BaseSink):
         self,
         translation: dict[str, str] | None = None,
         quantizer: BaseQuantizer | None = None,
-        renderer: BasePassageRenderer | None = None,
+        renderer: PassageRenderer | None = None,
     ):
         self.translation = translation or {
             "id": "web",
@@ -97,7 +97,11 @@ class StaticArtifactSink(BaseSink):
             "chunks": {"file": chunks_file.name, **meta},
             "embeddings": {
                 "file": emb_file.name,
-                "model": embedder.model_id,
+                "model": (
+                    getattr(embedder.raw_model, "model_name", None)
+                    if hasattr(embedder, "raw_model")
+                    else getattr(embedder, "model_name", "unknown")
+                ),
                 "dim": embedder.dim,
                 "quantization": quant_dict,
                 "count": len(chunks),

@@ -9,12 +9,6 @@ class BaseEmbedder(ABC):
 
     @property
     @abstractmethod
-    def model_id(self) -> str:
-        """Identifier of the underlying model (e.g. 'nomic-ai/nomic-embed-text-v1.5')."""
-        ...
-
-    @property
-    @abstractmethod
     def dim(self) -> int:
         """Embedding dimension (e.g. 768, 384)."""
         ...

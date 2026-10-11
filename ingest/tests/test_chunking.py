@@ -7,7 +7,6 @@ from bibleit_ingest.chunking import (
     AddressAndHeadingRenderer,
     BookAndHeadingRenderer,
     Chunk,
-    ChunkRenderer,
     HeadingAndTextRenderer,
     Passage,
     Pericope,
@@ -132,7 +131,7 @@ def test_index_and_render_chunk() -> None:
     assert addr_index[("GEN", 1, 3)] == 2
 
     p = Passage(book="GEN", start_idx=0, end_idx=2, headings=("Creation",))
-    renderer = ChunkRenderer(ordered_verses, addr_index)
+    renderer = HeadingAndTextRenderer(ordered_verses, addr_index)
     assert renderer.render(p) == "Creation\nIn the beginning, the earth was formless."
 
 
@@ -150,7 +149,7 @@ def test_chunk_renderer_sections() -> None:
         sections=((0, "Heading 1"), (1, "Heading 2")),
     )
 
-    renderer = ChunkRenderer(ordered_verses, addr_index)
+    renderer = HeadingAndTextRenderer(ordered_verses, addr_index)
     assert renderer.render(p) == "Heading 1\nVerse 1\n\nHeading 2\nVerse 2 Verse 3"
 
     p_lead = Passage(
@@ -177,13 +176,13 @@ def test_chunk_renderer_strategies() -> None:
         sections=((0, "The Creation"), (1, "Light")),
     )
 
-    r_text = ChunkRenderer(ordered_verses, addr_index, strategy="text_only")
+    r_text = get_renderer("text_only", ordered_verses, addr_index)
     assert r_text.render(p) == "Verse 1\n\nVerse 2 Verse 3"
 
-    r_book = ChunkRenderer(ordered_verses, addr_index, strategy="book_and_heading")
+    r_book = get_renderer("book_and_heading", ordered_verses, addr_index)
     assert r_book.render(p) == "Genesis — The Creation\nVerse 1\n\nGenesis — Light\nVerse 2 Verse 3"
 
-    r_addr = ChunkRenderer(ordered_verses, addr_index, strategy="address_and_heading")
+    r_addr = get_renderer("address_and_heading", ordered_verses, addr_index)
     assert r_addr.render(p) == "[Genesis 1:1] The Creation\nVerse 1\n\n[Genesis 1:2–3] Light\nVerse 2 Verse 3"
 
 

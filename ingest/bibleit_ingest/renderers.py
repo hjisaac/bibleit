@@ -6,7 +6,7 @@ from .constants import BOOK_NAMES
 from .types import Passage, VerseAddress
 
 
-class BasePassageRenderer(BaseChunkRenderer[Passage], ABC):
+class PassageRenderer(BaseChunkRenderer[Passage], ABC):
     """Base class providing scripture text extraction and address resolution."""
 
     def __init__(
@@ -53,7 +53,7 @@ class BasePassageRenderer(BaseChunkRenderer[Passage], ABC):
         ...
 
 
-class TextOnlyRenderer(BasePassageRenderer):
+class TextOnlyRenderer(PassageRenderer):
     """Renders raw verse text with no headings or citations."""
 
     def render(self, passage: Passage) -> str:
@@ -64,7 +64,7 @@ class TextOnlyRenderer(BasePassageRenderer):
         return "\n\n".join(blocks)
 
 
-class HeadingAndTextRenderer(BasePassageRenderer):
+class HeadingAndTextRenderer(PassageRenderer):
     """Renders section headings above verse texts."""
 
     def render(self, passage: Passage) -> str:
@@ -75,7 +75,7 @@ class HeadingAndTextRenderer(BasePassageRenderer):
         return "\n\n".join(blocks)
 
 
-class BookAndHeadingRenderer(BasePassageRenderer):
+class BookAndHeadingRenderer(PassageRenderer):
     """Grounds canonical book name ('Genesis — Heading') above verse texts."""
 
     def render(self, passage: Passage) -> str:
@@ -93,7 +93,7 @@ class BookAndHeadingRenderer(BasePassageRenderer):
         return "\n\n".join(blocks)
 
 
-class AddressAndHeadingRenderer(BasePassageRenderer):
+class AddressAndHeadingRenderer(PassageRenderer):
     """Renders full citation address ('[Genesis 1:1–3] Heading') above verse texts."""
 
     def render(self, passage: Passage) -> str:
@@ -106,7 +106,7 @@ class AddressAndHeadingRenderer(BasePassageRenderer):
         return "\n\n".join(blocks)
 
 
-RENDERER_REGISTRY: dict[str, type[BasePassageRenderer]] = {
+RENDERER_REGISTRY: dict[str, type[PassageRenderer]] = {
     "text_only": TextOnlyRenderer,
     "heading_and_text": HeadingAndTextRenderer,
     "book_and_heading": BookAndHeadingRenderer,
@@ -119,7 +119,7 @@ def get_renderer(
     ordered_verses: Sequence[tuple[VerseAddress, str]],
     address_index: dict[VerseAddress, int] | None = None,
     **kwargs,
-) -> BasePassageRenderer:
+) -> PassageRenderer:
     """Factory resolving a dedicated renderer subclass by strategy name."""
     cls = RENDERER_REGISTRY.get(strategy)
     if not cls:
@@ -130,22 +130,3 @@ def get_renderer(
         ordered_verses=ordered_verses,
         address_index=address_index,
     )
-
-
-def create_chunk_renderer(
-    ordered_verses: Sequence[tuple[VerseAddress, str]],
-    address_index: dict[VerseAddress, int] | None = None,
-    strategy: str = "heading_and_text",
-    **kwargs,
-) -> BasePassageRenderer:
-    """Backwards-compatible factory returning a dedicated BasePassageRenderer subclass."""
-    return get_renderer(
-        strategy=strategy,
-        ordered_verses=ordered_verses,
-        address_index=address_index,
-        **kwargs,
-    )
-
-
-ChunkRenderer = create_chunk_renderer
-PassageRenderer = BasePassageRenderer

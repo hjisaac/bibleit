@@ -42,10 +42,6 @@ class FastEmbedder(BaseEmbedder):
         self._dim: int | None = None
 
     @property
-    def model_id(self) -> str:
-        return self._model_name
-
-    @property
     def dim(self) -> int:
         if self._dim is None:
             test_vec = next(self._model.embed(["test"]))

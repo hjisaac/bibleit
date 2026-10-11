@@ -9,12 +9,10 @@ from typing import Sequence
 from .constants import BOOK_NAMES, USFM_ORDER
 from .renderers import (
     AddressAndHeadingRenderer,
-    BasePassageRenderer,
     BookAndHeadingRenderer,
     HeadingAndTextRenderer,
     PassageRenderer,
     TextOnlyRenderer,
-    create_chunk_renderer,
     get_renderer,
 )
 from .types import Chunk, Passage, Pericope, VerseAddress
@@ -169,9 +167,6 @@ def index_verses_by_address(
 ) -> dict[VerseAddress, int]:
     """Maps each verse address to its position in ordered_verses."""
     return {addr: i for i, (addr, _) in enumerate(ordered_verses)}
-
-
-ChunkRenderer = create_chunk_renderer
 
 
 def resolve_verse_to_chunk_index(
