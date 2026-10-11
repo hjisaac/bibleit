@@ -9,6 +9,7 @@ import { SavedView, type SavedVerse } from './components/SavedView';
 import { SettingsView, type PackageStatus } from './components/SettingsView';
 import { BookSelectorModal } from './components/BookSelectorModal';
 import { HelpModal } from './components/HelpModal';
+import { clearBookCache, downloadAllBooks, getCachedBooksCount } from './adapters/book-store';
 
 export function App(): JSX.Element {
   const engine = useMemo(() => createDefaultEngine(), []);
@@ -72,16 +73,32 @@ export function App(): JSX.Element {
     showToast(enabled ? 'AI Scripture Overview enabled' : 'AI Scripture Overview deactivated');
   };
 
-  const handleDownloadText = () => {
+  // Sync offline text package state with real Cache API on boot
+  useEffect(() => {
+    getCachedBooksCount().then((count) => {
+      if (count >= 66) {
+        setTextPackageStatus('ready');
+        setTextProgress(100);
+      } else if (count > 0) {
+        setTextProgress(Math.round((count / 66) * 100));
+      }
+    });
+  }, []);
+
+  const handleDownloadText = async () => {
     setTextPackageStatus('downloading');
-    setTextProgress(15);
-    setTimeout(() => setTextProgress(55), 300);
-    setTimeout(() => setTextProgress(85), 650);
-    setTimeout(() => {
-      setTextProgress(100);
+    try {
+      await downloadAllBooks((progress) => {
+        setTextProgress(progress);
+      });
       setTextPackageStatus('ready');
-      showToast('Scripture text installed offline (2.0 MB)');
-    }, 950);
+      setTextProgress(100);
+      showToast('Scripture text verified & installed offline (2.0 MB)');
+    } catch (err) {
+      console.error('Download failed:', err);
+      showToast('Download interrupted. Check network and try again.');
+      setTextPackageStatus('not_downloaded');
+    }
   };
 
   const handleDownloadAi = () => {
@@ -97,12 +114,13 @@ export function App(): JSX.Element {
     }, 1600);
   };
 
-  const handleClearStorage = () => {
+  const handleClearStorage = async () => {
+    await clearBookCache();
     setTextPackageStatus('not_downloaded');
     setAiPackageStatus('not_downloaded');
     setTextProgress(0);
     setAiProgress(0);
-    showToast('Offline artifacts cleared.');
+    showToast('Offline cache cleared.');
   };
 
   const handleOpenStorage = () => {

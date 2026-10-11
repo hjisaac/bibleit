@@ -1,7 +1,8 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 
-import { BIBLE_BOOKS } from '../core/bible-books';
+import { BIBLE_BOOKS_BY_ID } from '../core/bible-books';
+import { loadBook, type ChapterVerse } from '../adapters/book-store';
 
 interface ReaderViewProps {
   book: string;
@@ -13,19 +14,6 @@ interface ReaderViewProps {
   onSaveVerse: (ref: string, text: string) => void;
   onToast: (msg: string) => void;
 }
-
-interface ChapterVerse {
-  num: number;
-  text: string;
-}
-
-interface BookData {
-  id: string;
-  name: string;
-  chapters: Record<string, ChapterVerse[]>;
-}
-
-const bookCache = new Map<string, BookData>();
 
 export function ReaderView({
   book,
@@ -43,45 +31,28 @@ export function ReaderView({
   const [selectedVerse, setSelectedVerse] = useState<ChapterVerse | null>(null);
   const targetVerseRef = useRef<HTMLParagraphElement | null>(null);
 
-  const bookMeta = BIBLE_BOOKS.find((b) => b.id === book);
+  const bookMeta = BIBLE_BOOKS_BY_ID[book];
   const bookTitle = bookMeta ? bookMeta.name : book;
 
   useEffect(() => {
     let isCancelled = false;
     const chKey = String(chapter);
 
-    const applyData = (data: BookData) => {
-      if (!isCancelled) {
-        setVerses(data.chapters[chKey] || []);
-        setIsLoading(false);
-        setLoadError(null);
-      }
-    };
-
-    if (bookCache.has(book)) {
-      applyData(bookCache.get(book)!);
-      return;
-    }
-
     setIsLoading(true);
     setLoadError(null);
 
-    const url = `${import.meta.env.BASE_URL}data/books/${book}.json`;
-    fetch(url)
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`Failed to load ${book} (${res.status})`);
+    loadBook(book)
+      .then((data) => {
+        if (!isCancelled) {
+          setVerses(data.chapters[chKey] || []);
+          setIsLoading(false);
+          setLoadError(null);
         }
-        return res.json();
-      })
-      .then((data: BookData) => {
-        bookCache.set(book, data);
-        applyData(data);
       })
       .catch((err) => {
         if (!isCancelled) {
           console.error(`Error loading book ${book}:`, err);
-          setLoadError(`Unable to load ${bookTitle} Chapter ${chapter}.`);
+          setLoadError(`Unable to load ${bookTitle} Chapter ${chapter}. Check internet or download offline text in Settings.`);
           setIsLoading(false);
         }
       });

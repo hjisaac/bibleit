@@ -1,6 +1,6 @@
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { BIBLE_BOOKS, type BibleBook } from '../core/bible-books';
+import { BIBLE_BOOKS, BIBLE_BOOKS_BY_ID, type BibleBook } from '../core/bible-books';
 import { getVerseCount } from '../core/verse-counts';
 
 interface BookSelectorModalProps {
@@ -34,10 +34,8 @@ export function BookSelectorModal({
   // Sync initial location when modal opens.
   useEffect(() => {
     if (isOpen) {
-      const initial = initialBookId
-        ? BIBLE_BOOKS.find((b) => b.id === initialBookId)
-        : null;
-      setSelectedBook(initial ?? BIBLE_BOOKS.find((b) => b.id === 'PHP') ?? BIBLE_BOOKS[0]!);
+      const initial = initialBookId ? BIBLE_BOOKS_BY_ID[initialBookId] : null;
+      setSelectedBook(initial ?? BIBLE_BOOKS_BY_ID['PHP'] ?? BIBLE_BOOKS[0]!);
       setSelectedChapter(initialChapter ?? 1);
       setCurrentStep('book');
       setSearchFilter('');
