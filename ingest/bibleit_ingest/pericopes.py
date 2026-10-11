@@ -5,16 +5,14 @@ from typing import Sequence
 from .chunking import (
     index_verses_by_address,
     load_pericopes,
-    load_web_verses,
 )
 from joblib import Memory
 
 from .constants import BSB_PERICOPES_PATH, CRUCIBLE_CACHE_DIR, USFM_ORDER
-from .types import Pericope, PreparedCorpus, VerseAddress, VerseEvent
+from .types import Pericope, PreparedCorpus, VerseAddress
 from .walkers import (
-    BsbBookWalker,
-    BsbCorpusWalker,
     BsbPericopeWalker,
+    WebCorpusWalker,
 )
 
 _memory = Memory(location=str(CRUCIBLE_CACHE_DIR), verbose=0)
@@ -97,7 +95,7 @@ def get_or_prepare_corpus(
     bsb_pericopes_path: Path | None = BSB_PERICOPES_PATH,
 ) -> PreparedCorpus:
     """Prepares and projects pericopes onto target verses, returning the full corpus context."""
-    ordered_verses = load_web_verses(web_path)
+    ordered_verses = WebCorpusWalker(web_path).walk()
     address_index = index_verses_by_address(ordered_verses)
 
     if bsb_pericopes_path and bsb_pericopes_path.exists():

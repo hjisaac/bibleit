@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 
-from bibleit_ingest.chunking import load_web_verses
 from bibleit_ingest.walkers import BsbBookWalker, BsbCorpusWalker, WebCorpusWalker
 
 
@@ -34,9 +33,6 @@ def test_web_corpus_walker(tmp_path: Path) -> None:
 
     # lazy_walk yields as an iterator
     assert list(walker.lazy_walk()) == results
-
-    # load_web_verses delegates to walker
-    assert load_web_verses(web_file) == results
 
 
 def test_bsb_book_and_corpus_walker(tmp_path: Path) -> None:

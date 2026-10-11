@@ -2,8 +2,8 @@ import json
 import statistics as st
 from pathlib import Path
 
-from bibleit_ingest.chunking import load_web_verses
 from bibleit_ingest.constants import BOOK_NAMES, OLD_TESTAMENT_BOOKS, USFM_ORDER, WEB_PATH
+from bibleit_ingest.walkers import WebCorpusWalker
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 ALIGNMENT_PATH = SCRIPT_DIR / "heading_alignment.json"
@@ -13,7 +13,7 @@ OUT_PATH = SCRIPT_DIR / "pericope_sizes.json"
 def main():
     alignment = json.load(open(ALIGNMENT_PATH))
 
-    web_addrs = [addr for addr, _ in load_web_verses(WEB_PATH)]
+    web_addrs = [addr for addr, _ in WebCorpusWalker(WEB_PATH).lazy_walk()]
     addr_index = {a: i for i, a in enumerate(web_addrs)}
 
     recs = sorted(

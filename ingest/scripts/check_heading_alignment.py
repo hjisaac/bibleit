@@ -4,9 +4,8 @@ import glob
 from multiprocessing import Pool
 from pathlib import Path
 
-from bibleit_ingest.chunking import load_web_verses
 from bibleit_ingest.constants import BSB_DIR, OLD_TESTAMENT_BOOKS, USFM_ORDER, WEB_PATH
-from bibleit_ingest.walkers import BsbBookWalker
+from bibleit_ingest.walkers import BsbBookWalker, WebCorpusWalker
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 OUT_PATH = SCRIPT_DIR / "heading_alignment.json"
@@ -34,7 +33,7 @@ def main():
     with Pool(processes=os.cpu_count()) as pool:
         results = pool.map(worker, paths)
 
-    web_addrs = {addr for addr, _ in load_web_verses(WEB_PATH)}
+    web_addrs = {addr for addr, _ in WebCorpusWalker(WEB_PATH).lazy_walk()}
 
     records = []
     for book, headings in results:

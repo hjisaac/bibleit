@@ -16,7 +16,6 @@ from .renderers import (
     get_renderer,
 )
 from .types import Chunk, Passage, Pericope, VerseAddress
-from .walkers import WebCorpusWalker
 
 
 class Chunker(ABC):
@@ -155,11 +154,6 @@ class AdaptiveWindowChunker(Chunker):
             i += step
 
         return passages
-
-
-def load_web_verses(web_path: Path) -> list[tuple[VerseAddress, str]]:
-    """Loads every verse from a WEB JSON file in reading order."""
-    return WebCorpusWalker(web_path).walk()
 
 
 def index_verses_by_address(
