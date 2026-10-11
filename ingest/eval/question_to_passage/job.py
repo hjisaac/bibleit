@@ -138,7 +138,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
         with Timer(text=f"Embedded {len(q_texts)} queries in {{:.1f}}s", logger=logger.info):
             q_vecs = list(
                 tqdm(
-                    embedder.embed_queries(q_texts, batch_size=32),
+                    embedder.embed_queries(q_texts, batch_size=4),
                     total=len(q_texts),
                     desc="embedding queries",
                     unit="query",

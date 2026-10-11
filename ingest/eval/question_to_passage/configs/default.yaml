@@ -6,7 +6,7 @@ log_file_level: INFO
 k: 1
 floor: 5
 ceiling: 30
-overlap: 0
+overlap: 1
 render_strategy: heading_and_text
 
 # REPO-relative, not CWD-relative (see job.py).
