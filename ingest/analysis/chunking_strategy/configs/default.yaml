@@ -2,6 +2,7 @@
 floor: 5
 ceiling: 30
 overlap: 1
+render_strategy: "heading_and_text"
 
 # Context limit for truncation checks
 token_limit: 512

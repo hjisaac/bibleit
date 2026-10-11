@@ -113,7 +113,7 @@ def save_chunk_embeddings(
 def get_or_create_chunk_embeddings(
     chunks: Sequence[Passage],
     ordered_verses: Sequence[tuple[VerseAddress, str]],
-    model: BaseEmbedder | TextEmbedding,
+    embedder: BaseEmbedder | TextEmbedding,
     render_strategy: str = "heading_and_text",
     cache_dir: Path | None = None,
     cache_key: str | None = None,
@@ -126,20 +126,6 @@ def get_or_create_chunk_embeddings(
         if cached_file.exists():
             logger.info("Found cached corpus embeddings at %s", cached_file.name)
             return np.load(cached_file)
-
-        # Baseline fast-path: reuse canonical precomputed embeddings on disk
-        if (
-            cache_key.endswith("f5_c30_o0_heading_and_text.npy")
-            and CHUNK_EMBEDDINGS_NPY_PATH.exists()
-        ):
-            precomputed = np.load(CHUNK_EMBEDDINGS_NPY_PATH)
-            if precomputed.shape[0] == len(chunks):
-                logger.info(
-                    "Reusing precomputed baseline embeddings from %s",
-                    CHUNK_EMBEDDINGS_NPY_PATH.name,
-                )
-                np.save(cached_file, precomputed)
-                return precomputed
 
     renderer = get_renderer(render_strategy, ordered_verses=ordered_verses)
     texts = (renderer.render(c) for c in chunks)
@@ -154,7 +140,7 @@ def get_or_create_chunk_embeddings(
     with Timer(text=f"Embedded {total} chunks in {{:.1f}}s", logger=logger.info):
         vectors = list(
             tqdm(
-                embed_documents(model, texts, batch_size=batch_size),
+                embed_documents(embedder, texts, batch_size=batch_size),
                 total=total,
                 desc=f"embedding chunks [{render_strategy}]",
                 unit="chunk",

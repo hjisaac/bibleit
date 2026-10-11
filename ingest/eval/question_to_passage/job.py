@@ -6,16 +6,18 @@ from pathlib import Path
 from codetiming import Timer
 from tqdm import tqdm
 
+from bibleit_ingest.artifacts import find_matching_artifact, read_lock_file
 from bibleit_ingest.chunking import AdaptiveWindowChunker
 from bibleit_ingest.constants import (
     BSB_DIR,
-    CRUCIBLE_CACHE_DIR,
     FASTEMBED_CACHE_DIR,
+    REPO,
     EmbeddingModel,
 )
-from bibleit_ingest.embedding import Embedder, get_or_create_chunk_embeddings
+from bibleit_ingest.embedding import FastEmbedder, get_or_create_chunk_embeddings
 from bibleit_ingest.pericopes import get_or_prepare_corpus
 from bibleit_ingest.evaluation import format_passage, generate_retrieval_report, trigger_eval
+from bibleit_ingest.types import Passage
 from eval.job import EvalJobBase
 
 logger = logging.getLogger(__name__)
@@ -42,35 +44,77 @@ class EvalJobQuestionToPassage(EvalJobBase):
         self.config["chunk_source_model"] = str(embedding_model)
 
         corpus = get_or_prepare_corpus(self.web_path, BSB_DIR)
-        chunks = AdaptiveWindowChunker(
-            ordered_verses=corpus.ordered_verses,
-            address_index=corpus.address_index,
-            floor=floor,
-            ceiling=ceiling,
-            overlap=overlap,
-        ).chunk(corpus.pericopes)
 
-        threads = int(self.config.get("threads", 4))
-        embedder = Embedder(
-            model_name=embedding_model,
-            cache_dir=str(FASTEMBED_CACHE_DIR),
-            threads=threads,
-        )
-        model_slug = embedding_model.replace("/", "_")
-        cache_key = f"{model_slug}_f{floor}_c{ceiling}_o{overlap}_{render_strategy}.npy"
+        # 1. Resolve embedding artifact (explicit override, or auto-match from embed_corpus)
+        emb_dir_override = self.config.get("embedding_artifact_dir")
+        emb_run_dir = Path(emb_dir_override) if emb_dir_override else None
 
-        chunk_embeddings = get_or_create_chunk_embeddings(
-            chunks=chunks,
-            ordered_verses=corpus.ordered_verses,
-            model=embedder,
-            render_strategy=render_strategy,
-            cache_dir=CRUCIBLE_CACHE_DIR / "chunk_embeddings",
-            cache_key=cache_key,
-        )
+        if not emb_run_dir:
+            emb_outputs = REPO / "ingest" / "analysis" / "embed_corpus" / "outputs"
+            emb_criteria = {
+                "floor": floor,
+                "ceiling": ceiling,
+                "overlap": overlap,
+                "render_strategy": render_strategy,
+                "embedding_model": str(embedding_model),
+            }
+            emb_run_dir = find_matching_artifact(emb_outputs, emb_criteria)
+
+        chunks: list[Passage]
+        chunk_embeddings: Any
+
+        if emb_run_dir and (emb_run_dir / "embeddings.npy").exists() and (emb_run_dir / "chunks.json").exists():
+            logger.info("Found matching embedding artifact at %s", emb_run_dir)
+            import numpy as np
+
+            chunk_embeddings = np.load(emb_run_dir / "embeddings.npy")
+            raw_meta = json.loads((emb_run_dir / "chunks.json").read_text(encoding="utf-8"))
+            chunks = []
+            for item in raw_meta:
+                start_idx = corpus.address_index[(item["book"], item["chapter"], item["verse"])]
+                chunks.append(
+                    Passage(
+                        book=item["book"],
+                        start_idx=start_idx,
+                        end_idx=start_idx + item["verse_count"],
+                        headings=tuple(item["headings"]),
+                    )
+                )
+        else:
+            logger.info("No matching embedding artifact found; computing in-line.")
+            chunks = AdaptiveWindowChunker(
+                ordered_verses=corpus.ordered_verses,
+                address_index=corpus.address_index,
+                floor=floor,
+                ceiling=ceiling,
+                overlap=overlap,
+            ).chunk(corpus.pericopes)
+
+            threads = int(self.config.get("threads", 4))
+            embedder = FastEmbedder(
+                model_name=embedding_model,
+                cache_dir=str(FASTEMBED_CACHE_DIR),
+                threads=threads,
+            )
+            chunk_embeddings = get_or_create_chunk_embeddings(
+                chunks=chunks,
+                ordered_verses=corpus.ordered_verses,
+                embedder=embedder,
+                render_strategy=render_strategy,
+            )
+
         assert len(chunks) == chunk_embeddings.shape[0], (
             f"chunks count ({len(chunks)}) != embedding rows ({chunk_embeddings.shape[0]})"
         )
         logger.info("Loaded %d embedded chunks (strategy=%s)", len(chunks), render_strategy)
+
+        # 2. Query embedder
+        threads = int(self.config.get("threads", 4))
+        embedder = FastEmbedder(
+            model_name=embedding_model,
+            cache_dir=str(FASTEMBED_CACHE_DIR),
+            threads=threads,
+        )
 
         # Batch embed eval queries for instant lookup instead of single-item inferences
         eval_data = json.loads(self.eval_data_path.read_text())

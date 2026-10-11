@@ -5,9 +5,10 @@ from typing import Any
 
 from datalens import AnalysisConfig, run_analysis
 
+from bibleit_ingest.artifacts import write_lock_file
 from bibleit_ingest.chunking import AdaptiveWindowChunker
 from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, OLD_TESTAMENT_BOOKS, REPO
-from bibleit_ingest.embedding import Embedder, save_chunk_embeddings
+from bibleit_ingest.embedding import FastEmbedder
 from bibleit_ingest.pericopes import get_or_prepare_corpus
 from bibleit_ingest.renderers import get_renderer
 from analysis.job import AnalysisJobBase
@@ -24,7 +25,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         tok_model_name = self.config.get(
             "tokenizer_model", "nomic-ai/nomic-embed-text-v1.5"
         )
-        embedder = Embedder(
+        embedder = FastEmbedder(
             model_name=tok_model_name, cache_dir=str(FASTEMBED_CACHE_DIR)
         )
 
@@ -51,12 +52,9 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         )
         chunks = chunker.chunk(prepared["pericopes"])
 
-        tokenizer = prepared["embedder"].raw_model.model.tokenizer
+        tokenizer = prepared["embedder"].model.tokenizer
         limit = int(self.config.get("token_limit", 512))
-        strategy = self.config.get("render_strategy")
-        if not strategy:
-            include_headings = bool(self.config.get("include_headings", True))
-            strategy = "heading_and_text" if include_headings else "text_only"
+        strategy = self.config.get("render_strategy", "heading_and_text")
         renderer = get_renderer(
             strategy=strategy,
             ordered_verses=ordered_verses,
@@ -134,11 +132,38 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
             for name, path in plot_paths.items():
                 self.tracker.track_artifact(path, name=name, type="plot")
 
-        if emb_model := self.config.get("embedding_model"):
-            logger.info("Embedding %d chunks with %s", len(result["chunks"]), emb_model)
-            save_chunk_embeddings(
-                result["chunks"], result["texts"], prepared["embedder"], self.run_dir
-            )
+        # Save chunk definitions artifact
+        chunks_meta = [
+            {
+                "book": c.book,
+                "chapter": c.chapter,
+                "verse": c.verse,
+                "headings": list(c.headings),
+                "verse_count": c.verse_count,
+            }
+            for c in result["chunks"]
+        ]
+        chunks_path = self.run_dir / "chunks.json"
+        chunks_path.write_text(json.dumps(chunks_meta, indent=2), encoding="utf-8")
+
+        # Write immutable lock file for chunk artifact
+        lock_data = {
+            "stage": "chunking",
+            "parameters": {
+                "floor": int(self.config["floor"]),
+                "ceiling": int(self.config["ceiling"]),
+                "overlap": int(self.config.get("overlap", 1)),
+                "render_strategy": self.config.get("render_strategy", "heading_and_text"),
+                "tokenizer_model": self.config.get("tokenizer_model", "nomic-ai/nomic-embed-text-v1.5"),
+            },
+            "output": {
+                "total_chunks": len(result["chunks"]),
+                "truncation_pct": result["metrics"]["truncation_pct"],
+                "p50_tokens": result["metrics"]["p50_tokens"],
+            },
+        }
+        write_lock_file(self.run_dir / "config.lock.yaml", lock_data)
+        logger.info("Saved chunk artifact with lock to %s", self.run_dir)
 
 
 JOB_CLASS = AnalysisJobChunkingStrategy

@@ -1,0 +1,22 @@
+# Analysis/embed_corpus default config
+log_dir: analysis/embed_corpus/outputs
+log_console_level: INFO
+log_file_level: INFO
+
+# Embedding configuration
+embedding_model: "nomic-ai/nomic-embed-text-v1.5"
+batch_size: 16
+threads: 4
+
+# Upstream chunk artifact parameters (to auto-match from analysis/chunking_strategy/outputs)
+floor: 5
+ceiling: 30
+overlap: 0
+render_strategy: "heading_and_text"
+
+# Optional explicit path to an upstream chunk run dir
+chunk_run_dir: null
+
+# Corpus path inputs
+web_path: "ingest/data/translations/web/en/web.json"
+bsb_dir: "ingest/data/translations/bsb/en"

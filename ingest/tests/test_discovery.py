@@ -1,7 +1,7 @@
 import pytest
 from crucible.core.runtime.discovery import resolve_job_class
 from analysis.chunking_strategy.job import AnalysisJobChunkingStrategy
-from eval.question_to_passage_eval.job import EvalJobQuestionToPassage
+from eval.question_to_passage.job import EvalJobQuestionToPassage
 
 
 def test_resolve_chunking_strategy_job() -> None:
@@ -10,7 +10,7 @@ def test_resolve_chunking_strategy_job() -> None:
 
 
 def test_resolve_question_to_passage_job() -> None:
-    job_cls = resolve_job_class("question_to_passage_eval")
+    job_cls = resolve_job_class("question_to_passage")
     assert job_cls is EvalJobQuestionToPassage
 
 
