@@ -30,10 +30,16 @@ class EvalJobBase(AbstractJob):
         name = raw.replace("_", "-").removesuffix("-eval").removesuffix("-analysis")
         return f"bibleit-{self.category}-{name}"
 
+    def make_slug(self) -> str:
+        """Override in subclasses to provide a concise parameter suffix for the run folder."""
+        return ""
+
     def on_start(self) -> None:
         for key in self.path_config_keys:
             setattr(self, key, REPO / self.config[key])
-        self.run_dir = Path(self.config.get("log_dir", "outputs")).resolve() / self.run_id
+        slug = self.make_slug()
+        folder_name = f"{self.run_id}_{slug}" if slug else self.run_id
+        self.run_dir = Path(self.config.get("log_dir", "outputs")).resolve() / folder_name
 
     def on_track(self) -> None:
         logger.info("Using config:\n%s", json.dumps(self.config, indent=2, default=str))

@@ -8,7 +8,11 @@ from codetiming import Timer
 from tqdm import tqdm
 from usearch.index import Index
 
-from bibleit_ingest.artifacts import read_lock_file, resolve_matching_artifacts
+from bibleit_ingest.artifacts import (
+    read_lock_file,
+    resolve_matching_artifacts,
+    write_lock_file,
+)
 from bibleit_ingest.chunking import AdaptiveWindowChunker, resolve_verse_to_chunk_index
 from bibleit_ingest.constants import (
     BSB_DIR,
@@ -32,9 +36,16 @@ class EvalJobQuestionToPassage(EvalJobBase):
         "web_path",
     )
 
+    def make_slug(self) -> str:
+        k = self.config.get("k", 1)
+        f = self.config.get("floor", 5)
+        c = self.config.get("ceiling", 30)
+        model = str(self.config.get("embedding_model", "nomic"))
+        model_short = "nomic" if "nomic" in model else model.split("/")[-1]
+        return f"k{k}_f{f}_c{c}_{model_short}"
+
     def on_start(self) -> None:
         super().on_start()
-        self.run_dir = Path(self.config["log_dir"]).resolve() / self.run_id
         logger.info("=== Starting run [%s] ===", self.run_id)
 
     def on_prepare(self) -> dict:
@@ -65,9 +76,11 @@ class EvalJobQuestionToPassage(EvalJobBase):
 
         chunks: list[Passage]
         chunk_embeddings: Any
+        upstream_lock_meta: dict[str, Any] = {}
 
         if emb_run_dir and (emb_run_dir / "embeddings.npy").exists() and (emb_run_dir / "chunks.json").exists():
-            logger.info("Found matching embedding artifact at %s", emb_run_dir)
+            if (emb_run_dir / "config.lock.yaml").exists():
+                upstream_lock_meta = read_lock_file(emb_run_dir / "config.lock.yaml")
             import numpy as np
 
             chunk_embeddings = np.load(emb_run_dir / "embeddings.npy")
@@ -141,6 +154,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
             "chunk_embeddings": chunk_embeddings,
             "embedder": embedder,
             "query_map": query_map,
+            "upstream_lock": upstream_lock_meta,
         }
 
     def on_execute(self, prepared: dict) -> dict:
@@ -176,6 +190,27 @@ class EvalJobQuestionToPassage(EvalJobBase):
             logger.info("Saved report to %s:\n%s\n...", report_path, preview)
             if self.tracker is not None:
                 self.tracker.track_artifact(report_path, name="retrieval-report", type="artifact-outputs")
+
+        # Write immutable lock file for evaluation artifact
+        lock_data = {
+            "stage": "evaluation",
+            "parameters": {
+                "k": int(self.config.get("k", 1)),
+                "floor": int(self.config.get("floor", 5)),
+                "ceiling": int(self.config.get("ceiling", 30)),
+                "overlap": int(self.config.get("overlap", 0)),
+                "render_strategy": str(self.config.get("render_strategy", "heading_and_text")),
+                "embedding_model": str(self.config.get("embedding_model")),
+            },
+            "output": {
+                "metrics": result.get("metrics", {}),
+                "total_queries": result.get("total_queries", 0),
+                "resolvable": result.get("resolvable", 0),
+            },
+            "upstream": prepared.get("upstream_lock", {}),
+        }
+        write_lock_file(self.run_dir / "config.lock.yaml", lock_data)
+        logger.info("Saved evaluation artifact with lock to %s", self.run_dir)
 
         super().on_finalize(prepared, result)
 

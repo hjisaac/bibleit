@@ -19,6 +19,12 @@ logger = logging.getLogger(__name__)
 class AnalysisJobChunkingStrategy(AnalysisJobBase):
     path_config_keys = ("web_path", "bsb_dir")
 
+    def make_slug(self) -> str:
+        f = self.config.get("floor", 5)
+        c = self.config.get("ceiling", 30)
+        strat = "heading" if "heading" in str(self.config.get("render_strategy", "")) else "text"
+        return f"f{f}_c{c}_{strat}"
+
     def on_prepare(self) -> dict:
         corpus = get_or_prepare_corpus(self.web_path, self.bsb_dir)
 

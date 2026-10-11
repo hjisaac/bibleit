@@ -442,7 +442,7 @@ wheels = [
 [[package]]
 name = "crucible"
 version = "0.1.0"
-source = { git = "https://github.com/hjisaac/cruciblelib.git#00fac2769563796639ad75c86b08a87dac973250" }
+source = { git = "https://github.com/hjisaac/cruciblelib.git#927d60cb25aa23150bcf2a055edfef954153d5ff" }
 dependencies = [
     { name = "dotenv" },
     { name = "hydra-core" },

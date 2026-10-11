@@ -62,4 +62,10 @@ def resolve_matching_artifacts(
         except Exception as exc:
             logger.debug("Failed reading lock file %s: %s", lock_path, exc)
 
-    return matches[0] if matches else None
+    if matches:
+        chosen = matches[0]
+        logger.info("Resolved matching artifact at %s matching %s", chosen, criteria)
+        return chosen
+
+    logger.warning("No artifact matching %s found in %s", criteria, stage_outputs_dir)
+    return None

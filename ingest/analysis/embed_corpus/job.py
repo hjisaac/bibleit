@@ -50,6 +50,13 @@ def _compute_vector_health(matrix: np.ndarray) -> dict[str, Any]:
 class AnalysisJobEmbedCorpus(AnalysisJobBase):
     path_config_keys = ("web_path", "bsb_dir")
 
+    def make_slug(self) -> str:
+        f = self.config.get("floor", 5)
+        c = self.config.get("ceiling", 30)
+        model = str(self.config.get("embedding_model", "nomic"))
+        model_short = "nomic" if "nomic" in model else model.split("/")[-1]
+        return f"f{f}_c{c}_{model_short}"
+
     def on_prepare(self) -> dict:
         corpus = get_or_prepare_corpus(self.web_path, self.bsb_dir)
 
