@@ -91,8 +91,8 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         lens_cfg = AnalysisConfig(
             columns={
                 "token_count": "quantile",
-                "word_count": "numeric",
-                "verse_count": "numeric",
+                "word_count": "quantile",
+                "verse_count": "quantile",
                 "book": "categorical",
             },
             quantiles=[0.01, 0.05, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99],
@@ -114,8 +114,8 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
             "p99_tokens": round(float(tok.get("p99", 0)), 2),
             "truncated_count": truncated,
             "truncation_pct": round((truncated / len(chunks) * 100), 2) if chunks else 0.0,
-            "mean_words": round(float(words.get("mean", 0)), 2),
-            "mean_verses": round(float(verses.get("mean", 0)), 2),
+            "p50_words": round(float(words.get("p50", 0)), 2),
+            "p50_verses": round(float(verses.get("p50", 0)), 2),
         }
 
         return {
