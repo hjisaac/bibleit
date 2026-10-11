@@ -7,7 +7,7 @@ from datalens import AnalysisConfig, run_analysis
 
 from bibleit_ingest.chunking import AdaptiveWindowChunker
 from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, OLD_TESTAMENT_BOOKS, REPO
-from bibleit_ingest.embedding import FastEmbedder, save_chunk_embeddings
+from bibleit_ingest.embedding import Embedder, save_chunk_embeddings
 from bibleit_ingest.pericopes import get_or_prepare_corpus
 from bibleit_ingest.renderers import get_renderer
 from analysis.job import AnalysisJobBase
@@ -24,7 +24,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         tok_model_name = self.config.get(
             "tokenizer_model", "nomic-ai/nomic-embed-text-v1.5"
         )
-        embedder = FastEmbedder(
+        embedder = Embedder(
             model_name=tok_model_name, cache_dir=str(FASTEMBED_CACHE_DIR)
         )
 

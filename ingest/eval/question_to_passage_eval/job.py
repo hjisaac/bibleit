@@ -13,7 +13,7 @@ from bibleit_ingest.constants import (
     FASTEMBED_CACHE_DIR,
     EmbeddingModel,
 )
-from bibleit_ingest.embedding import FastEmbedder, get_or_create_chunk_embeddings
+from bibleit_ingest.embedding import Embedder, get_or_create_chunk_embeddings
 from bibleit_ingest.pericopes import get_or_prepare_corpus
 from bibleit_ingest.evaluation import format_passage, generate_retrieval_report, trigger_eval
 from eval.job import EvalJobBase
@@ -51,7 +51,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
         ).chunk(corpus.pericopes)
 
         threads = int(self.config.get("threads", 4))
-        embedder = FastEmbedder(
+        embedder = Embedder(
             model_name=embedding_model,
             cache_dir=str(FASTEMBED_CACHE_DIR),
             threads=threads,

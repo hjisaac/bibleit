@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class FastEmbedder(BaseEmbedder):
+class Embedder(BaseEmbedder):
     """Embedder adapter wrapping fastembed.TextEmbedding."""
 
     def __init__(
@@ -173,6 +173,3 @@ def get_or_create_chunk_embeddings(
         np.save(cache_dir / cache_key, matrix)
         logger.info("Saved cached embeddings to %s", cached_file.name)
     return matrix
-
-
-FastEmbedEmbedder = FastEmbedder

@@ -15,7 +15,7 @@ from bibleit_ingest.constants import (
     WEB_PATH,
     EmbeddingModel,
 )
-from bibleit_ingest.embedding import FastEmbedder
+from bibleit_ingest.embedding import Embedder
 from bibleit_ingest.pericopes import get_or_prepare_corpus
 from bibleit_ingest.renderers import HeadingAndTextRenderer
 
@@ -38,7 +38,7 @@ def main():
     with Timer(
         text=f"loaded {EmbeddingModel.NOMIC_EMBED_TEXT_V1_5} in {{:.1f}}s", logger=logger.info
     ):
-        embedder = FastEmbedder(
+        embedder = Embedder(
             model_name=EmbeddingModel.NOMIC_EMBED_TEXT_V1_5,
             cache_dir=str(FASTEMBED_CACHE_DIR),
         )
