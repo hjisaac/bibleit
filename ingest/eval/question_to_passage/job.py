@@ -3,11 +3,13 @@ import logging
 from functools import partial
 from pathlib import Path
 
+import numpy as np
 from codetiming import Timer
 from tqdm import tqdm
+from usearch.index import Index
 
-from bibleit_ingest.artifacts import find_matching_artifact, read_lock_file
-from bibleit_ingest.chunking import AdaptiveWindowChunker
+from bibleit_ingest.artifacts import read_lock_file, resolve_matching_artifacts
+from bibleit_ingest.chunking import AdaptiveWindowChunker, resolve_verse_to_chunk_index
 from bibleit_ingest.constants import (
     BSB_DIR,
     FASTEMBED_CACHE_DIR,
@@ -15,8 +17,9 @@ from bibleit_ingest.constants import (
     EmbeddingModel,
 )
 from bibleit_ingest.embedding import FastEmbedder, get_or_create_chunk_embeddings
+from bibleit_ingest.helpers import trigger_eval
 from bibleit_ingest.pericopes import get_or_prepare_corpus
-from bibleit_ingest.evaluation import format_passage, generate_retrieval_report, trigger_eval
+from bibleit_ingest.report import format_passage, generate_retrieval_report
 from bibleit_ingest.types import Passage
 from eval.job import EvalJobBase
 
@@ -58,7 +61,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
                 "render_strategy": render_strategy,
                 "embedding_model": str(embedding_model),
             }
-            emb_run_dir = find_matching_artifact(emb_outputs, emb_criteria)
+            emb_run_dir = resolve_matching_artifacts(emb_outputs, emb_criteria)
 
         chunks: list[Passage]
         chunk_embeddings: Any
@@ -142,11 +145,11 @@ class EvalJobQuestionToPassage(EvalJobBase):
 
     def on_execute(self, prepared: dict) -> dict:
         return trigger_eval(
-            self.eval_data_path,
-            prepared["chunks"],
-            prepared["chunk_embeddings"],
-            prepared["address_index"],
-            lambda q: prepared["query_map"].get(q, prepared["embedder"].embed_query(q)),
+            eval_path=self.eval_data_path,
+            chunks=prepared["chunks"],
+            chunk_embeddings=prepared["chunk_embeddings"],
+            address_index=prepared["address_index"],
+            embed_query_fn=lambda q: prepared["query_map"].get(q, prepared["embedder"].embed_query(q)),
             k=prepared["k"],
         )
 

@@ -1,5 +1,5 @@
 from pathlib import Path
-from bibleit_ingest.artifacts import find_matching_artifact, read_lock_file, write_lock_file
+from bibleit_ingest.artifacts import read_lock_file, resolve_matching_artifacts, write_lock_file
 
 
 def test_write_and_read_lock_file(tmp_path: Path) -> None:
@@ -28,7 +28,7 @@ def test_write_and_read_lock_file(tmp_path: Path) -> None:
     assert loaded["parameters"]["floor"] == 5
 
 
-def test_find_matching_artifact(tmp_path: Path) -> None:
+def test_resolve_matching_artifacts(tmp_path: Path) -> None:
     run_dir1 = tmp_path / "run_1"
     write_lock_file(
         run_dir1 / "config.lock.yaml",
@@ -56,18 +56,18 @@ def test_find_matching_artifact(tmp_path: Path) -> None:
     )
 
     # Match criteria against run 2
-    matched = find_matching_artifact(
+    matched = resolve_matching_artifacts(
         tmp_path,
         {"floor": 5, "ceiling": 30, "overlap": 1, "render_strategy": "heading_and_text"},
     )
     assert matched == run_dir2
 
     # Match criteria against run 1
-    matched1 = find_matching_artifact(
+    matched1 = resolve_matching_artifacts(
         tmp_path,
         {"overlap": 0, "render_strategy": "text_only"},
     )
     assert matched1 == run_dir1
 
     # Non-existent criteria
-    assert find_matching_artifact(tmp_path, {"floor": 99}) is None
+    assert resolve_matching_artifacts(tmp_path, {"floor": 99}) is None

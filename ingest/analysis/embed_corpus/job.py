@@ -8,7 +8,7 @@ from codetiming import Timer
 from tqdm import tqdm
 
 from analysis.job import AnalysisJobBase
-from bibleit_ingest.artifacts import find_matching_artifact, read_lock_file, write_lock_file
+from bibleit_ingest.artifacts import read_lock_file, resolve_matching_artifacts, write_lock_file
 from bibleit_ingest.chunking import AdaptiveWindowChunker
 from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, REPO
 from bibleit_ingest.embedding import FastEmbedder, embed_documents
@@ -65,7 +65,7 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
         if not chunk_run_dir:
             chunk_outputs = REPO / "ingest" / "analysis" / "chunking_strategy" / "outputs"
             chunk_criteria = {"floor": floor, "ceiling": ceiling, "overlap": overlap}
-            chunk_run_dir = find_matching_artifact(chunk_outputs, chunk_criteria)
+            chunk_run_dir = resolve_matching_artifacts(chunk_outputs, chunk_criteria)
 
         chunks: list[Passage]
         upstream_lock_meta: dict[str, Any] = {}

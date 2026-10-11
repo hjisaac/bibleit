@@ -30,7 +30,7 @@ def read_lock_file(path: Path) -> dict[str, Any]:
     return container if isinstance(container, dict) else {}
 
 
-def find_matching_artifact(
+def resolve_matching_artifacts(
     stage_outputs_dir: Path,
     criteria: dict[str, Any],
 ) -> Path | None:

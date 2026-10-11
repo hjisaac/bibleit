@@ -1,44 +1,52 @@
 import json
 import logging
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Sequence
+from typing import Any
 
 import numpy as np
-from codetiming import Timer
-from ranx import Qrels, Run, evaluate
-from tqdm import tqdm
-from usearch.index import Index
 
-from bibleit_ingest.chunking import Chunk, VerseAddress, resolve_verse_to_chunk_index
-from .report import (
-    BaseRetrievalReport,
-    RetrievalOutcome,
-    format_passage,
-    generate_retrieval_report,
-)
 
-logger = logging.getLogger(__name__)
+def setup_logger(name: str, log_path: Path) -> logging.Logger:
+    """Returns a logger that writes to both console and the given file."""
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    logger.handlers.clear()
+    logger.propagate = False
 
-__all__ = [
-    "trigger_eval",
-    "BaseRetrievalReport",
-    "RetrievalOutcome",
-    "format_passage",
-    "generate_retrieval_report",
-]
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    file_handler = logging.FileHandler(log_path)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
+    return logger
 
 
 def trigger_eval(
     eval_path: Path,
-    chunks: Sequence[Chunk],
+    chunks: Sequence[Any],
     chunk_embeddings: np.ndarray,
-    address_index: dict[VerseAddress, int],
-    embed_query_fn,
+    address_index: dict[Any, int],
+    embed_query_fn: Callable[[str], np.ndarray],
     k: int = 10,
-) -> dict:
-    """Runs every query in eval set through real retrieval and returns metrics and diagnostics."""
+) -> dict[str, Any]:
+    """Runs queries in eval set through vector retrieval and returns metrics and diagnostics."""
+    from codetiming import Timer
+    from tqdm import tqdm
+    from usearch.index import Index
+
+    from bibleit_ingest.chunking import resolve_verse_to_chunk_index
+    from rag_core.metrics import evaluate_retrieval
+
     eval_data = json.loads(eval_path.read_text())
     total_q = len(eval_data["queries"])
+    logger = logging.getLogger(__name__)
     logger.info("Evaluating %d queries against %d chunks (k=%d)...", total_q, len(chunks), k)
 
     index = Index(ndim=chunk_embeddings.shape[1], metric="cos")
@@ -46,8 +54,8 @@ def trigger_eval(
 
     qrels_dict: dict[str, dict[str, int]] = {}
     run_dict: dict[str, dict[str, float]] = {}
-    unresolvable = []
-    diagnostics = []
+    unresolvable: list[str] = []
+    diagnostics: list[dict[str, Any]] = []
 
     with Timer(text=f"Evaluated {total_q} queries in {{:.1f}}s", logger=logger.info):
         for q in tqdm(eval_data["queries"], total=total_q, desc="evaluating queries", unit="query"):
@@ -72,19 +80,16 @@ def trigger_eval(
             qrels_dict[q["id"]] = {str(relevant_idx): rel["relevance"]}
             run_dict[q["id"]] = {str(m.key): float(1 - m.distance) for m in matches}
 
-        diagnostics.append({
-            "id": q["id"],
-            "query": q["query"],
-            "target_address": address,
-            "target_chunk_idx": relevant_idx,
-            "target_rank": target_rank,
-            "matches": match_records,
-        })
+            diagnostics.append({
+                "id": q["id"],
+                "query": q["query"],
+                "target_address": address,
+                "target_chunk_idx": relevant_idx,
+                "target_rank": target_rank,
+                "matches": match_records,
+            })
 
-    metrics = evaluate(
-        Qrels(qrels_dict), Run(run_dict), ["mrr", f"recall@{k}", f"ndcg@{k}"]
-    )
-
+    metrics = evaluate_retrieval(qrels_dict, run_dict, ["mrr", f"recall@{k}", f"ndcg@{k}"])
     return {
         "total_queries": len(eval_data["queries"]),
         "resolvable": len(qrels_dict),

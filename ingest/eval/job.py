@@ -46,7 +46,7 @@ class EvalJobBase(AbstractJob):
         payload = {"run_conditions": self.config, **result}
         target_dir = getattr(self, "run_dir", Path(self.config.get("log_dir", "outputs")))
         target_dir.mkdir(parents=True, exist_ok=True)
-        out_path = target_dir / f"{self.run_id}.json"
+        out_path = target_dir / "run.json"
         out_path.write_text(json.dumps(payload, indent=2, default=str))
         logger.info("Saved to %s", out_path)
 
@@ -63,8 +63,8 @@ class EvalJobBase(AbstractJob):
         if hasattr(self, "run_dir"):
             log_dir = Path(self.config.get("log_dir", "outputs"))
             src_log = log_dir / f"{self.run_id}.log"
-            dst_log = self.run_dir / f"{self.run_id}.log"
-            if src_log.exists() and self.run_dir != log_dir:
+            dst_log = self.run_dir / "run.log"
+            if src_log.exists():
                 import shutil
                 self.run_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src_log, dst_log)
+                shutil.move(str(src_log), str(dst_log))

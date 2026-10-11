@@ -6,16 +6,12 @@ from .chunking import (
     index_verses_by_address,
     load_pericopes,
 )
-from joblib import Memory
-
-from .constants import BSB_PERICOPES_PATH, CRUCIBLE_CACHE_DIR, USFM_ORDER
+from .constants import BSB_DIR, BSB_PERICOPES_PATH, USFM_ORDER
 from .types import Pericope, PreparedCorpus, VerseAddress
 from .walkers import (
     BsbPericopeWalker,
     WebCorpusWalker,
 )
-
-_memory = Memory(location=str(CRUCIBLE_CACHE_DIR), verbose=0)
 
 
 def derive_bsb_pericopes(bsb_dir: Path) -> list[Pericope]:
@@ -88,10 +84,9 @@ def project_pericopes(
     return resolved, unresolved
 
 
-@_memory.cache
 def get_or_prepare_corpus(
     web_path: Path,
-    bsb_dir: Path,
+    bsb_dir: Path | None = None,
     bsb_pericopes_path: Path | None = BSB_PERICOPES_PATH,
 ) -> PreparedCorpus:
     """Prepares and projects pericopes onto target verses, returning the full corpus context."""
@@ -101,7 +96,7 @@ def get_or_prepare_corpus(
     if bsb_pericopes_path and bsb_pericopes_path.exists():
         bsb_native = load_pericopes(bsb_pericopes_path)
     else:
-        bsb_native = derive_bsb_pericopes(bsb_dir)
+        bsb_native = derive_bsb_pericopes(bsb_dir or BSB_DIR)
 
     resolved, _ = project_pericopes(bsb_native, ordered_verses)
     return PreparedCorpus(
