@@ -110,5 +110,5 @@ class StaticArtifactSink(BaseSink):
         manifest_file = out_dir / "manifest.json"
         manifest_file.write_text(json.dumps(manifest, indent=2))
 
-        logger.info("Published static artifacts to %s", out_dir)
+        logger.info("Wrote static artifacts to %s", out_dir)
         return out_dir
