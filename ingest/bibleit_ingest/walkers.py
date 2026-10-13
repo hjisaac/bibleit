@@ -68,11 +68,6 @@ class BsbBookWalker(BaseWalker[VerseEvent]):
         for child in node.get("content", []):
             yield from self._visit(child)
 
-    def visit(self, node: Any) -> Iterator[VerseEvent]:
-        """Backwards compatibility alias for _visit."""
-        return self._visit(node)
-
-
 class BsbCorpusWalker(BaseWalker[VerseEvent]):
     """Walks an entire BSB translation directory in canonical USFM order."""
 

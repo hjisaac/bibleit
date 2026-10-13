@@ -1,22 +1,10 @@
-import json
-import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable, Iterator, Sequence
+from typing import Iterable, Iterator
 
 import numpy as np
-from codetiming import Timer
 from fastembed import TextEmbedding
-from tqdm import tqdm
 
 from rag_core.embedders import BaseEmbedder
-from .constants import CHUNK_EMBEDDINGS_NPY_PATH
-from .renderers import get_renderer
-from .types import Passage, VerseAddress
-
-if TYPE_CHECKING:
-    from .chunking import Chunk
-
-logger = logging.getLogger(__name__)
 
 
 class Embedder(TextEmbedding, BaseEmbedder):
@@ -60,74 +48,3 @@ class Embedder(TextEmbedding, BaseEmbedder):
             (f"{self.prefix_query}{t}" for t in texts),
             batch_size=batch_size,
         )
-
-
-def save_chunk_embeddings(
-    chunks: Sequence["Chunk"],
-    texts: Iterable[str],
-    embedder: Embedder,
-    out_dir: Path,
-) -> tuple[Path, Path]:
-    """Computes and writes chunk embeddings matrix and metadata to out_dir."""
-    out_dir.mkdir(parents=True, exist_ok=True)
-    matrix = np.array(list(embedder.embed_documents(texts)))
-    npy_path = out_dir / "embeddings.npy"
-    np.save(npy_path, matrix)
-
-    meta = [
-        {
-            "book": c.book,
-            "chapter": c.chapter,
-            "verse": c.verse,
-            "headings": list(c.headings),
-            "verse_count": c.verse_count,
-        }
-        for c in chunks
-    ]
-    json_path = out_dir / "chunks.json"
-    json_path.write_text(json.dumps(meta, indent=2))
-    return npy_path, json_path
-
-
-def get_or_create_chunk_embeddings(
-    chunks: Sequence[Passage],
-    ordered_verses: Sequence[tuple[VerseAddress, str]],
-    embedder: Embedder,
-    render_strategy: str = "heading_and_text",
-    cache_dir: Path | None = None,
-    cache_key: str | None = None,
-    batch_size: int = 16,
-) -> np.ndarray:
-    """Returns cached chunk embedding matrix or computes, caches, and returns it."""
-    if cache_dir and cache_key:
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        cached_file = cache_dir / cache_key
-        if cached_file.exists():
-            logger.info("Found cached corpus embeddings at %s", cached_file.name)
-            return np.load(cached_file)
-
-    renderer = get_renderer(render_strategy, ordered_verses=ordered_verses)
-    texts = (renderer.render(c) for c in chunks)
-    total = len(chunks)
-    logger.info(
-        "Embedding %d chunks with strategy '%s' (batch_size=%d)...",
-        total,
-        render_strategy,
-        batch_size,
-    )
-
-    with Timer(text=f"Embedded {total} chunks in {{:.1f}}s", logger=logger.info):
-        vectors = list(
-            tqdm(
-                embedder.embed_documents(texts, batch_size=batch_size),
-                total=total,
-                desc=f"embedding chunks [{render_strategy}]",
-                unit="chunk",
-            )
-        )
-
-    matrix = np.array(vectors)
-    if cache_dir and cache_key:
-        np.save(cache_dir / cache_key, matrix)
-        logger.info("Saved cached embeddings to %s", cached_file.name)
-    return matrix

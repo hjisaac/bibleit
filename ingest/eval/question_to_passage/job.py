@@ -1,12 +1,11 @@
 import json
 import logging
-from functools import partial
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from codetiming import Timer
 from tqdm import tqdm
-from usearch.index import Index
 
 from bibleit_ingest.artifacts import (
     read_lock_file,
@@ -20,9 +19,10 @@ from bibleit_ingest.constants import (
     REPO,
     EmbeddingModel,
 )
-from bibleit_ingest.embedding import Embedder, get_or_create_chunk_embeddings
+from bibleit_ingest.embedding import Embedder
 from bibleit_ingest.helpers import trigger_retrieval_eval
 from bibleit_ingest.pericopes import get_or_prepare_corpus
+from bibleit_ingest.renderers import get_renderer
 from bibleit_ingest.report import format_passage, generate_retrieval_report
 from bibleit_ingest.types import Passage
 from eval.job import EvalJobBase
@@ -118,12 +118,26 @@ class EvalJobQuestionToPassage(EvalJobBase):
                 cache_dir=str(FASTEMBED_CACHE_DIR),
                 threads=threads,
             )
-            chunk_embeddings = get_or_create_chunk_embeddings(
-                chunks=chunks,
+            renderer = get_renderer(
+                render_strategy,
                 ordered_verses=corpus.ordered_verses,
-                embedder=embedder,
-                render_strategy=render_strategy,
+                address_index=corpus.address_index,
             )
+            texts = (renderer.render(chunk) for chunk in chunks)
+            batch_size = int(self.config.get("batch_size", 16))
+            with Timer(
+                text=f"Embedded {len(chunks)} chunks in {{:.1f}}s", logger=logger.info
+            ):
+                chunk_embeddings = np.array(
+                    list(
+                        tqdm(
+                            embedder.embed_documents(texts, batch_size=batch_size),
+                            total=len(chunks),
+                            desc=f"embedding chunks [{render_strategy}]",
+                            unit="chunk",
+                        )
+                    )
+                )
 
         assert len(chunks) == chunk_embeddings.shape[0], (
             f"chunks count ({len(chunks)}) != embedding rows ({chunk_embeddings.shape[0]})"
