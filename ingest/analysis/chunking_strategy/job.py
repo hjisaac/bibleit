@@ -5,8 +5,8 @@ from typing import Any
 
 from datalens import AnalysisConfig, run_analysis
 
-from bibleit_ingest.artifacts import write_lock_file
-from bibleit_ingest.chunking import AdaptiveWindowChunker
+from bibleit_ingest.artifacts import write_inspection_samples, write_lock_file
+from bibleit_ingest.chunking import AdaptiveWindowChunker, PericopeChunker
 from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, OLD_TESTAMENT_BOOKS, REPO
 from bibleit_ingest.embedding import FastEmbedder
 from bibleit_ingest.pericopes import get_or_prepare_corpus
@@ -31,6 +31,8 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         }
         strat_key = str(self.config.get("render_strategy", "heading_and_text"))
         strat = strat_map.get(strat_key, strat_key[:8])
+        if self.config.get("strategy") == "pericope":
+            return f"peri_c{c}_o{o}_{strat}"
         return f"f{f}_c{c}_o{o}_{strat}"
 
     def on_prepare(self) -> dict:
@@ -51,19 +53,28 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         }
 
     def on_execute(self, prepared: dict) -> dict[str, Any]:
-        floor = int(self.config["floor"])
         ceiling = int(self.config["ceiling"])
         overlap = int(self.config.get("overlap", 1))
+        strategy_name = self.config.get("strategy", "adaptive")
         ordered_verses = prepared["ordered_verses"]
         address_index = prepared["address_index"]
 
-        chunker = AdaptiveWindowChunker(
-            floor=floor,
-            ceiling=ceiling,
-            overlap=overlap,
-            ordered_verses=ordered_verses,
-            address_index=address_index,
-        )
+        if strategy_name == "pericope":
+            chunker = PericopeChunker(
+                ceiling=ceiling,
+                overlap=overlap,
+                ordered_verses=ordered_verses,
+                address_index=address_index,
+            )
+        else:
+            floor = int(self.config.get("floor", 5))
+            chunker = AdaptiveWindowChunker(
+                floor=floor,
+                ceiling=ceiling,
+                overlap=overlap,
+                ordered_verses=ordered_verses,
+                address_index=address_index,
+            )
         chunks = chunker.chunk(prepared["pericopes"])
 
         tokenizer = prepared["embedder"].model.tokenizer
@@ -133,6 +144,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
             "metrics": metrics,
             "analysis_result": analysis_result,
             "corpus_stats": corpus_stats,
+            "renderer": renderer,
         }
 
     def on_finalize(self, prepared: dict, result: dict[str, Any]) -> None:
@@ -160,13 +172,13 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         chunks_path = self.run_dir / "chunks.json"
         chunks_path.write_text(json.dumps(chunks_meta, indent=2), encoding="utf-8")
 
-        # Write immutable lock file for chunk artifact
         lock_data = {
             "stage": "chunking",
             "parameters": {
-                "floor": int(self.config["floor"]),
+                "floor": int(self.config.get("floor", 1)),
                 "ceiling": int(self.config["ceiling"]),
                 "overlap": int(self.config.get("overlap", 1)),
+                "strategy": self.config.get("strategy", "adaptive"),
                 "render_strategy": self.config.get("render_strategy", "heading_and_text"),
                 "tokenizer_model": self.config.get("tokenizer_model", "nomic-ai/nomic-embed-text-v1.5"),
             },
@@ -177,6 +189,9 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
             },
         }
         write_lock_file(self.run_dir / "config.lock.yaml", lock_data)
+        renderer = result.get("renderer")
+        if renderer:
+            write_inspection_samples(self.run_dir, result["chunks"], renderer)
         logger.info("Saved chunk artifact with lock to %s", self.run_dir)
 
 

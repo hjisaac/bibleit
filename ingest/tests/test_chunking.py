@@ -260,3 +260,31 @@ def test_dedicated_renderer_subclasses() -> None:
         get_renderer("nonexistent", ordered_verses, addr_index)
 
 
+def test_pericope_chunker() -> None:
+    from bibleit_ingest.chunking import PericopeChunker
+
+    pericopes = [
+        Pericope(book="GEN", chapter=1, verse=1, heading="Day 1", verse_count=5),
+        Pericope(book="GEN", chapter=1, verse=6, heading="Day 2", verse_count=3),
+        Pericope(book="EXO", chapter=1, verse=1, heading="Egypt", verse_count=10),
+    ]
+    # No overlap: strictly 1 chunk per pericope
+    chunker = PericopeChunker(ceiling=30, overlap=0)
+    chunks = chunker.chunk(pericopes)
+    assert len(chunks) == 3
+    assert chunks[0].verse_count == 5
+    assert list(chunks[0].headings) == ["Day 1"]
+    assert chunks[1].verse_count == 3
+    assert list(chunks[1].headings) == ["Day 2"]
+    assert chunks[2].verse_count == 10
+    assert list(chunks[2].headings) == ["Egypt"]
+
+    # With overlap: chunk 2 pulls up to 2 verses from chunk 1 (same book)
+    chunker_overlap = PericopeChunker(ceiling=30, overlap=2)
+    chunks_ov = chunker_overlap.chunk(pericopes)
+    assert len(chunks_ov) == 3
+    assert chunks_ov[0].verse_count == 5
+    assert chunks_ov[1].verse_count == 5  # 3 fresh + 2 lead-in
+    assert chunks_ov[2].verse_count == 10  # new book EXO, no overlap from GEN
+
+

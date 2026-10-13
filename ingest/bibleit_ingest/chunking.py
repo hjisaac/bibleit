@@ -28,8 +28,17 @@ class Chunker(ABC):
 class AdaptiveWindowChunker(Chunker):
     """Slices Bible verses into passage chunks bounded by floor and ceiling.
 
-    Pericopes serve as initial semantic break points. Chunks never cross book
-    boundaries. Undersized tails at book ends merge backward into the preceding chunk.
+    Mechanics:
+    1. Takes pericopes (semantic heading sections) as initial candidate chunks.
+    2. Optional lead-in overlap: prepends up to `overlap` verses from the prior chunk
+       if within the same book and without exceeding `ceiling`.
+    3. Forward merge: while the accumulated verse count is strictly below `floor`,
+       it merges subsequent pericopes forward, provided they belong to the same book
+       and total size does not exceed `ceiling`.
+    4. Undersized tail handling: if the final chunk in a book remains below `floor`,
+       it merges backward into the preceding chunk (if it fits within `ceiling`).
+    5. Single oversize pericopes: pericopes that individually exceed `ceiling`
+       are emitted as single monolithic chunks without being sub-divided.
     """
 
     DEFAULT_FLOOR = 5
@@ -152,6 +161,78 @@ class AdaptiveWindowChunker(Chunker):
 
             passages.append(self._make_passage(current_book, start_idx, end_idx, headings, sections))
             i += step
+
+        return passages
+
+
+class PericopeChunker(Chunker):
+    """Chunks strictly per pericope with optional lead-in overlap bounded by ceiling."""
+
+    def __init__(
+        self,
+        ceiling: int = 30,
+        overlap: int = 0,
+        ordered_verses: Sequence[tuple[VerseAddress, str]] | None = None,
+        address_index: dict[VerseAddress, int] | None = None,
+    ):
+        if ceiling <= 0:
+            raise ValueError("ceiling must be positive")
+        if overlap < 0:
+            raise ValueError("overlap cannot be negative")
+        self.ceiling = ceiling
+        self.overlap = overlap
+        self.ordered_verses = ordered_verses
+        self.address_index = address_index
+
+    def _resolve_spans(self, pericopes: Sequence[Pericope]) -> list[tuple[int, int]]:
+        spans: list[tuple[int, int]] = []
+        curr = 0
+        for p in pericopes:
+            if self.address_index is not None:
+                s = self.address_index[(p.book, p.chapter, p.verse)]
+            else:
+                s = curr
+                curr += p.verse_count
+            spans.append((s, s + p.verse_count))
+        return spans
+
+    def chunk(self, pericopes: Sequence[Pericope]) -> list[Passage]:
+        passages: list[Passage] = []
+        spans = self._resolve_spans(pericopes)
+
+        for i, p in enumerate(pericopes):
+            current_book = p.book
+            fresh_start, fresh_end = spans[i]
+            fresh_len = p.verse_count
+
+            lead_in = 0
+            if self.overlap > 0 and passages and passages[-1].book == current_book:
+                prev_passage = passages[-1]
+                cand_overlap = min(self.overlap, prev_passage.verse_count)
+                if cand_overlap + fresh_len <= self.ceiling:
+                    lead_in = cand_overlap
+
+            start_idx = fresh_start - lead_in
+            end_idx = fresh_end
+            start_addr = self.ordered_verses[start_idx][0] if self.ordered_verses else None
+            end_addr = self.ordered_verses[end_idx - 1][0] if self.ordered_verses and end_idx > start_idx else None
+
+            sections: list[tuple[int, str | None]] = []
+            if lead_in > 0:
+                sections.append((start_idx, None))
+            sections.append((fresh_start, p.heading))
+
+            passages.append(
+                Passage(
+                    book=current_book,
+                    start_idx=start_idx,
+                    end_idx=end_idx,
+                    headings=(p.heading,) if p.heading else (),
+                    start_address=start_addr,
+                    end_address=end_addr,
+                    sections=tuple(sections),
+                )
+            )
 
         return passages
 

@@ -21,6 +21,44 @@ def write_lock_file(path: Path, data: dict[str, Any]) -> Path:
     return path
 
 
+def write_inspection_samples(
+    run_dir: Path,
+    chunks: list[Any],
+    renderer: Any,
+    seed: int | None = None,
+) -> list[Path]:
+    """Picks a random book with at least 3 chunks and writes the first 3 chunks as read-only inspection files."""
+    import random
+    from collections import defaultdict
+
+    book_chunks: dict[str, list[Any]] = defaultdict(list)
+    for c in chunks:
+        book_chunks[c.book].append(c)
+
+    eligible_books = [b for b, clist in book_chunks.items() if len(clist) >= 3]
+    if not eligible_books:
+        eligible_books = list(book_chunks.keys())
+    if not eligible_books:
+        return []
+
+    rng = random.Random(seed)
+    chosen_book = rng.choice(eligible_books)
+    samples = book_chunks[chosen_book][:3]
+
+    out_paths = []
+    for idx, chunk in enumerate(samples, start=1):
+        rendered = renderer.render(chunk)
+        path = run_dir / f"chunk_{idx}.lock.txt"
+        if path.exists():
+            path.chmod(0o644)
+        path.write_text(rendered, encoding="utf-8")
+        path.chmod(0o444)
+        out_paths.append(path)
+        logger.info("Inspection sample [%s chunk %d]:\n%s\n", chosen_book, idx, rendered)
+
+    return out_paths
+
+
 def read_lock_file(path: Path) -> dict[str, Any]:
     """Reads a YAML lock file returning a dictionary."""
     if not path.exists():
