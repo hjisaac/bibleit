@@ -6,7 +6,7 @@ from typing import Any
 from datalens import AnalysisConfig, run_analysis
 
 from bibleit_ingest.artifacts import write_inspection_samples, write_lock_file
-from bibleit_ingest.chunking import AdaptiveWindowChunker, PericopeChunker
+from bibleit_ingest.chunking import AdaptiveWindowChunker, PericopeChunker, TokenWindowChunker
 from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, OLD_TESTAMENT_BOOKS, REPO
 from bibleit_ingest.embedding import Embedder
 from bibleit_ingest.pericopes import get_or_prepare_corpus
@@ -36,6 +36,8 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         strat = strat_map.get(strat_key, strat_key[:8])
         if self.config.get("strategy") == "pericope":
             return f"peri_c{c}_o{o}{ovh_flag}_{strat}"
+        if self.config.get("strategy") == "token_window":
+            return f"tok_c{c}_o{o}{ovh_flag}_{strat}"
         return f"f{f}_c{c}_o{o}{ovh_flag}_{strat}"
 
     def on_prepare(self) -> dict:
@@ -69,6 +71,17 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
                 overlap=overlap,
                 ordered_verses=ordered_verses,
                 address_index=address_index,
+                include_overlap_heading=include_overlap_heading,
+            )
+        elif strategy_name == "token_window":
+            headroom_margin = int(self.config.get("headroom_margin", 25))
+            chunker = TokenWindowChunker(
+                ceiling=ceiling,
+                overlap=overlap,
+                ordered_verses=ordered_verses,
+                address_index=address_index,
+                tokenizer=prepared["embedder"].model.tokenizer,
+                headroom_margin=headroom_margin,
                 include_overlap_heading=include_overlap_heading,
             )
         else:

@@ -11,6 +11,7 @@ from bibleit_ingest.chunking import (
     Passage,
     Pericope,
     TextOnlyRenderer,
+    VerseAddress,
     get_renderer,
     index_verses_by_address,
     load_pericopes,
@@ -295,5 +296,58 @@ def test_pericope_chunker() -> None:
     assert chunks_no_ovh[1].verse_count == 5
     assert list(chunks_no_ovh[1].headings) == ["Day 2"]
     assert chunks_no_ovh[1].sections[0][1] is None  # lead-in section heading is None
+
+
+def test_token_window_chunker() -> None:
+    from bibleit_ingest.chunking import TokenWindowChunker
+
+    # 10 verses of 10 words each (~13 tokens each)
+    ordered_verses = [
+        (("GEN", 1, i), "word " * 10)
+        for i in range(1, 7)
+    ] + [
+        (("EXO", 1, i), "word " * 10)
+        for i in range(1, 5)
+    ]
+    addr_index = {addr: i for i, (addr, _) in enumerate(ordered_verses)}
+
+    pericopes = [
+        Pericope(book="GEN", chapter=1, verse=1, heading="Gen Part 1", verse_count=3),
+        Pericope(book="GEN", chapter=1, verse=4, heading="Gen Part 2", verse_count=3),
+        Pericope(book="EXO", chapter=1, verse=1, heading="Exo Story", verse_count=4),
+    ]
+
+    # Mock tokenizer returning 10 tokens per verse
+    class MockTokenizer:
+        def encode(self, text: str) -> list[int]:
+            return [1] * 10
+
+    # ceiling=50, headroom_margin=10 -> effective ceiling = 40 tokens (4 verses max per chunk)
+    chunker = TokenWindowChunker(
+        ceiling=50,
+        overlap=1,
+        ordered_verses=ordered_verses,
+        address_index=addr_index,
+        tokenizer=MockTokenizer(),
+        headroom_margin=10,
+    )
+    chunks = chunker.chunk(pericopes)
+
+    # Verifies chunks never cross book boundaries
+    for c in chunks:
+        start_book = ordered_verses[c.start_idx][0][0]
+        end_book = ordered_verses[c.end_idx - 1][0][0]
+        assert start_book == end_book == c.book
+
+    # Genesis has 6 verses, Exo has 4 verses.
+    # No single chunk can have more than 4 verses (effective ceiling 40 // 10 tokens = 4)
+    for c in chunks:
+        assert c.verse_count <= 4
+
+    # Check validation errors
+    with pytest.raises(ValueError, match="ceiling must be positive"):
+        TokenWindowChunker(ceiling=0)
+    with pytest.raises(ValueError, match="headroom_margin cannot meet or exceed ceiling"):
+        TokenWindowChunker(ceiling=50, headroom_margin=50)
 
 
