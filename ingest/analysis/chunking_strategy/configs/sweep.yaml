@@ -1,0 +1,16 @@
+# Grid sweep configuration for chunking strategy analysis
+floor: [3, 5, 8]
+ceiling: [20, 30]
+overlap: [0, 1, 2]
+render_strategy:
+  - "text_only"
+  - "heading_and_text"
+  - "book_and_heading"
+  - "address_and_heading"
+
+token_limit: 512
+tokenizer_model: "nomic-ai/nomic-embed-text-v1.5"
+embedding_model: null
+
+web_path: "ingest/data/translations/web/en/web.json"
+bsb_dir: "ingest/data/translations/bsb/en"

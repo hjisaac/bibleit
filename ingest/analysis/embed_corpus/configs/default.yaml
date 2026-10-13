@@ -1,5 +1,4 @@
 # Analysis/embed_corpus default config
-log_dir: analysis/embed_corpus/outputs
 log_console_level: INFO
 log_file_level: INFO
 

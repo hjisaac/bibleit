@@ -32,12 +32,12 @@ class AnalysisJobBase(AbstractJob):
         for key in self.path_config_keys:
             setattr(self, key, REPO / self.config[key])
         slug = self.make_slug()
-        folder_name = f"{self.run_id}_{slug}" if slug else self.run_id
-        self.run_dir = Path(self.config.get("log_dir", "outputs")).resolve() / folder_name
+        self.run_name = f"{self.run_id}_{slug}" if slug else self.run_id
+        self.run_dir = Path(self.config.get("log_dir", "outputs")).resolve() / self.run_name
 
     def on_track(self) -> None:
         logger.info("Using config:\n%s", json.dumps(self.config, indent=2, default=str))
-        self.tracker = WBTracker(run_name=self.run_id, project=self.project_name, config=self.config)
+        self.tracker = WBTracker(run_name=getattr(self, "run_name", self.run_id), project=self.project_name, config=self.config)
 
     def on_finalize(self, prepared: dict, result: dict[str, Any]) -> None:
         metrics = result.get("metrics", {})

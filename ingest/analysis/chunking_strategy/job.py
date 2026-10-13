@@ -22,8 +22,16 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
     def make_slug(self) -> str:
         f = self.config.get("floor", 5)
         c = self.config.get("ceiling", 30)
-        strat = "heading" if "heading" in str(self.config.get("render_strategy", "")) else "text"
-        return f"f{f}_c{c}_{strat}"
+        o = self.config.get("overlap", 1)
+        strat_map = {
+            "text_only": "text",
+            "heading_and_text": "heading",
+            "book_and_heading": "book_heading",
+            "address_and_heading": "addr_heading",
+        }
+        strat_key = str(self.config.get("render_strategy", "heading_and_text"))
+        strat = strat_map.get(strat_key, strat_key[:8])
+        return f"f{f}_c{c}_o{o}_{strat}"
 
     def on_prepare(self) -> dict:
         corpus = get_or_prepare_corpus(self.web_path, self.bsb_dir)

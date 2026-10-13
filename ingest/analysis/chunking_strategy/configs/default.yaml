@@ -20,5 +20,3 @@ tag: null
 # Paths relative to REPO
 web_path: "ingest/data/translations/web/en/web.json"
 bsb_dir: "ingest/data/translations/bsb/en"
-# CWD-relative: run crucible execute from ingest/.
-log_dir: analysis/chunking_strategy/outputs
