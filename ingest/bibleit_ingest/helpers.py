@@ -5,9 +5,15 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from codetiming import Timer
+from tqdm import tqdm
+from usearch.index import Index
+
+from bibleit_ingest.chunking import resolve_verse_to_chunk_index
+from rag_core.metrics import evaluate_retrieval
 
 
-def setup_logger(name: str, log_path: Path) -> logging.Logger:
+def _configure_logger(name: str, log_path: Path) -> logging.Logger:
     """Returns a logger that writes to both console and the given file."""
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
@@ -28,7 +34,7 @@ def setup_logger(name: str, log_path: Path) -> logging.Logger:
     return logger
 
 
-def trigger_eval(
+def trigger_retrieval_eval(
     eval_path: Path,
     chunks: Sequence[Any],
     chunk_embeddings: np.ndarray,
@@ -37,13 +43,6 @@ def trigger_eval(
     k: int = 10,
 ) -> dict[str, Any]:
     """Runs queries in eval set through vector retrieval and returns metrics and diagnostics."""
-    from codetiming import Timer
-    from tqdm import tqdm
-    from usearch.index import Index
-
-    from bibleit_ingest.chunking import resolve_verse_to_chunk_index
-    from rag_core.metrics import evaluate_retrieval
-
     eval_data = json.loads(eval_path.read_text())
     total_q = len(eval_data["queries"])
     logger = logging.getLogger(__name__)

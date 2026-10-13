@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class FastEmbedder(TextEmbedding, BaseEmbedder):
+class Embedder(TextEmbedding, BaseEmbedder):
     """FastEmbed TextEmbedding subclass implementing BaseEmbedder."""
 
     def __init__(
@@ -62,36 +62,15 @@ class FastEmbedder(TextEmbedding, BaseEmbedder):
         )
 
 
-Embedder = FastEmbedder
-
-
-def embed_query(model: BaseEmbedder | TextEmbedding, text: str) -> np.ndarray:
-    """Embeds one query with the search_query prefix."""
-    if isinstance(model, BaseEmbedder):
-        return model.embed_query(text)
-    return next(model.embed(["search_query: " + text]))
-
-
-def embed_documents(
-    model: BaseEmbedder | TextEmbedding, texts: Iterable[str], batch_size: int = 32
-) -> Iterator[np.ndarray]:
-    """Embeds document/chunk texts lazily."""
-    if isinstance(model, BaseEmbedder):
-        return model.embed_documents(texts, batch_size=batch_size)
-    return model.embed(
-        (f"search_document: {t}" for t in texts), batch_size=batch_size
-    )
-
-
 def save_chunk_embeddings(
     chunks: Sequence["Chunk"],
     texts: Iterable[str],
-    model: BaseEmbedder | TextEmbedding,
+    embedder: Embedder,
     out_dir: Path,
 ) -> tuple[Path, Path]:
     """Computes and writes chunk embeddings matrix and metadata to out_dir."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    matrix = np.array(list(embed_documents(model, texts)))
+    matrix = np.array(list(embedder.embed_documents(texts)))
     npy_path = out_dir / "embeddings.npy"
     np.save(npy_path, matrix)
 
@@ -113,7 +92,7 @@ def save_chunk_embeddings(
 def get_or_create_chunk_embeddings(
     chunks: Sequence[Passage],
     ordered_verses: Sequence[tuple[VerseAddress, str]],
-    embedder: BaseEmbedder | TextEmbedding,
+    embedder: Embedder,
     render_strategy: str = "heading_and_text",
     cache_dir: Path | None = None,
     cache_key: str | None = None,
@@ -140,7 +119,7 @@ def get_or_create_chunk_embeddings(
     with Timer(text=f"Embedded {total} chunks in {{:.1f}}s", logger=logger.info):
         vectors = list(
             tqdm(
-                embed_documents(embedder, texts, batch_size=batch_size),
+                embedder.embed_documents(texts, batch_size=batch_size),
                 total=total,
                 desc=f"embedding chunks [{render_strategy}]",
                 unit="chunk",

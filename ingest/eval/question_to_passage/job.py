@@ -20,8 +20,8 @@ from bibleit_ingest.constants import (
     REPO,
     EmbeddingModel,
 )
-from bibleit_ingest.embedding import FastEmbedder, get_or_create_chunk_embeddings
-from bibleit_ingest.helpers import trigger_eval
+from bibleit_ingest.embedding import Embedder, get_or_create_chunk_embeddings
+from bibleit_ingest.helpers import trigger_retrieval_eval
 from bibleit_ingest.pericopes import get_or_prepare_corpus
 from bibleit_ingest.report import format_passage, generate_retrieval_report
 from bibleit_ingest.types import Passage
@@ -36,7 +36,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
         "web_path",
     )
 
-    def make_slug(self) -> str:
+    def _make_slug(self) -> str:
         k = self.config.get("k", 1)
         f = self.config.get("floor", 5)
         c = self.config.get("ceiling", 30)
@@ -88,12 +88,18 @@ class EvalJobQuestionToPassage(EvalJobBase):
             chunks = []
             for item in raw_meta:
                 start_idx = corpus.address_index[(item["book"], item["chapter"], item["verse"])]
+                sections = []
+                for s in item.get("sections", []):
+                    sec_idx = corpus.address_index.get((item["book"], s["chapter"], s["verse"]), start_idx)
+                    sections.append((sec_idx, s["heading"]))
+                if not sections and "headings" in item:
+                    sections = [(start_idx, h) for h in item["headings"]]
                 chunks.append(
                     Passage(
                         book=item["book"],
                         start_idx=start_idx,
                         end_idx=start_idx + item["verse_count"],
-                        headings=tuple(item["headings"]),
+                        sections=tuple(sections),
                     )
                 )
         else:
@@ -107,7 +113,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
             ).chunk(corpus.pericopes)
 
             threads = int(self.config.get("threads", 4))
-            embedder = FastEmbedder(
+            embedder = Embedder(
                 model_name=embedding_model,
                 cache_dir=str(FASTEMBED_CACHE_DIR),
                 threads=threads,
@@ -126,7 +132,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
 
         # 2. Query embedder
         threads = int(self.config.get("threads", 4))
-        embedder = FastEmbedder(
+        embedder = Embedder(
             model_name=embedding_model,
             cache_dir=str(FASTEMBED_CACHE_DIR),
             threads=threads,
@@ -158,7 +164,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
         }
 
     def on_execute(self, prepared: dict) -> dict:
-        return trigger_eval(
+        return trigger_retrieval_eval(
             eval_path=self.eval_data_path,
             chunks=prepared["chunks"],
             chunk_embeddings=prepared["chunk_embeddings"],

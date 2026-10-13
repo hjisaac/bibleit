@@ -18,10 +18,16 @@ class Passage:
     book: str
     start_idx: int
     end_idx: int
+    sections: tuple[tuple[int, str | None], ...] = ()
     headings: tuple[str, ...] = ()
     start_address: VerseAddress | None = None
     end_address: VerseAddress | None = None
-    sections: tuple[tuple[int, str | None], ...] = ()
+
+    def __post_init__(self):
+        if not self.sections and self.headings:
+            object.__setattr__(self, "sections", tuple((self.start_idx, h) for h in self.headings))
+        elif not self.headings and self.sections:
+            object.__setattr__(self, "headings", tuple(dict.fromkeys(h for _, h in self.sections if h)))
 
     @property
     def verse_count(self) -> int:

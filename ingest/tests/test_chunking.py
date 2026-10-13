@@ -94,13 +94,13 @@ def test_chunker_overlap() -> None:
     assert chunks[0].verse_count == 6
 
     # Chunk 1 starts with 3 overlap verses from P1 (verse index 6 - 3 = 3)
-    assert list(chunks[1].headings) == ["P2"]
+    assert list(chunks[1].headings) == ["P1", "P2"]
     assert chunks[1].verse_count == 10  # 3 overlap + 7 fresh
     assert chunks[1].start_idx == 3
     assert chunks[1].end_idx == 13
 
     # Chunk 2 starts with 3 overlap verses from P2 (verse index 13 - 3 = 10)
-    assert list(chunks[2].headings) == ["P3"]
+    assert list(chunks[2].headings) == ["P2", "P3"]
     assert chunks[2].verse_count == 11  # 3 overlap + 8 fresh
     assert chunks[2].start_idx == 10
     assert chunks[2].end_idx == 21
@@ -279,12 +279,21 @@ def test_pericope_chunker() -> None:
     assert chunks[2].verse_count == 10
     assert list(chunks[2].headings) == ["Egypt"]
 
-    # With overlap: chunk 2 pulls up to 2 verses from chunk 1 (same book)
-    chunker_overlap = PericopeChunker(ceiling=30, overlap=2)
+    # With overlap + include_overlap_heading=True: chunk 2 includes Day 1 heading for lead-in
+    chunker_overlap = PericopeChunker(ceiling=30, overlap=2, include_overlap_heading=True)
     chunks_ov = chunker_overlap.chunk(pericopes)
     assert len(chunks_ov) == 3
     assert chunks_ov[0].verse_count == 5
     assert chunks_ov[1].verse_count == 5  # 3 fresh + 2 lead-in
+    assert list(chunks_ov[1].headings) == ["Day 1", "Day 2"]
     assert chunks_ov[2].verse_count == 10  # new book EXO, no overlap from GEN
+
+    # With overlap + include_overlap_heading=False: chunk 2 only has Day 2 heading
+    chunker_no_ovh = PericopeChunker(ceiling=30, overlap=2, include_overlap_heading=False)
+    chunks_no_ovh = chunker_no_ovh.chunk(pericopes)
+    assert len(chunks_no_ovh) == 3
+    assert chunks_no_ovh[1].verse_count == 5
+    assert list(chunks_no_ovh[1].headings) == ["Day 2"]
+    assert chunks_no_ovh[1].sections[0][1] is None  # lead-in section heading is None
 
 

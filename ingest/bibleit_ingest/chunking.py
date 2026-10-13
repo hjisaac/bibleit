@@ -52,6 +52,7 @@ class AdaptiveWindowChunker(Chunker):
         overlap: int = DEFAULT_OVERLAP,
         ordered_verses: Sequence[tuple[VerseAddress, str]] | None = None,
         address_index: dict[VerseAddress, int] | None = None,
+        include_overlap_heading: bool = True,
     ):
         if floor <= 0 or ceiling <= 0:
             raise ValueError("floor and ceiling must be positive")
@@ -64,6 +65,7 @@ class AdaptiveWindowChunker(Chunker):
         self.overlap = overlap
         self.ordered_verses = ordered_verses
         self.address_index = address_index
+        self.include_overlap_heading = include_overlap_heading
 
     def _resolve_spans(self, pericopes: Sequence[Pericope]) -> list[tuple[int, int]]:
         spans: list[tuple[int, int]] = []
@@ -82,8 +84,7 @@ class AdaptiveWindowChunker(Chunker):
         book: str,
         start_idx: int,
         end_idx: int,
-        headings: list[str],
-        sections: list[tuple[int, str | None]],
+        sections: list[tuple[int, str]],
     ) -> Passage:
         start_addr = self.ordered_verses[start_idx][0] if self.ordered_verses else None
         end_addr = self.ordered_verses[end_idx - 1][0] if self.ordered_verses and end_idx > start_idx else None
@@ -91,10 +92,9 @@ class AdaptiveWindowChunker(Chunker):
             book=book,
             start_idx=start_idx,
             end_idx=end_idx,
-            headings=tuple(headings),
+            sections=tuple(sections),
             start_address=start_addr,
             end_address=end_addr,
-            sections=tuple(sections),
         )
 
     def chunk(self, pericopes: Sequence[Pericope]) -> list[Passage]:
@@ -116,12 +116,15 @@ class AdaptiveWindowChunker(Chunker):
                 cand_overlap = min(self.overlap, prev.verse_count)
                 if cand_overlap + fresh_len <= self.ceiling:
                     overlap_len = cand_overlap
-                    sections.append((fresh_start - overlap_len, None))
+                    if self.include_overlap_heading:
+                        lead_heading = pericopes[i - 1].heading if i > 0 and pericopes[i - 1].heading else pericopes[i].heading
+                    else:
+                        lead_heading = None
+                    sections.append((fresh_start - overlap_len, lead_heading))
 
             start_idx = fresh_start - overlap_len
             end_idx = fresh_end
-            headings: list[str] = [pericopes[i].heading] if pericopes[i].heading else []
-            sections.append((fresh_start, pericopes[i].heading))
+            sections.append((fresh_start, pericopes[i].heading or current_book))
             size = end_idx - start_idx
             step = 1
 
@@ -135,9 +138,7 @@ class AdaptiveWindowChunker(Chunker):
                 _, nxt_end = spans[i + step]
                 end_idx = nxt_end
                 size = end_idx - start_idx
-                if nxt.heading and nxt.heading not in headings:
-                    headings.append(nxt.heading)
-                sections.append((spans[i + step][0], nxt.heading))
+                sections.append((spans[i + step][0], nxt.heading or current_book))
                 step += 1
 
             # Last-in-book backward merge if undersized
@@ -145,21 +146,16 @@ class AdaptiveWindowChunker(Chunker):
             if size < self.floor and is_last_in_book and passages and passages[-1].book == current_book:
                 prev = passages[-1]
                 if prev.verse_count + size <= self.ceiling:
-                    merged_headings = list(prev.headings)
-                    for h in headings:
-                        if h not in merged_headings:
-                            merged_headings.append(h)
                     passages[-1] = self._make_passage(
                         book=current_book,
                         start_idx=prev.start_idx,
                         end_idx=end_idx,
-                        headings=merged_headings,
                         sections=list(prev.sections) + sections,
                     )
                     i += step
                     continue
 
-            passages.append(self._make_passage(current_book, start_idx, end_idx, headings, sections))
+            passages.append(self._make_passage(current_book, start_idx, end_idx, sections))
             i += step
 
         return passages
@@ -174,6 +170,7 @@ class PericopeChunker(Chunker):
         overlap: int = 0,
         ordered_verses: Sequence[tuple[VerseAddress, str]] | None = None,
         address_index: dict[VerseAddress, int] | None = None,
+        include_overlap_heading: bool = True,
     ):
         if ceiling <= 0:
             raise ValueError("ceiling must be positive")
@@ -183,6 +180,7 @@ class PericopeChunker(Chunker):
         self.overlap = overlap
         self.ordered_verses = ordered_verses
         self.address_index = address_index
+        self.include_overlap_heading = include_overlap_heading
 
     def _resolve_spans(self, pericopes: Sequence[Pericope]) -> list[tuple[int, int]]:
         spans: list[tuple[int, int]] = []
@@ -219,18 +217,21 @@ class PericopeChunker(Chunker):
 
             sections: list[tuple[int, str | None]] = []
             if lead_in > 0:
-                sections.append((start_idx, None))
-            sections.append((fresh_start, p.heading))
+                if self.include_overlap_heading:
+                    lead_heading = pericopes[i - 1].heading if i > 0 and pericopes[i - 1].heading else p.heading
+                else:
+                    lead_heading = None
+                sections.append((start_idx, lead_heading))
+            sections.append((fresh_start, p.heading or current_book))
 
             passages.append(
                 Passage(
                     book=current_book,
                     start_idx=start_idx,
                     end_idx=end_idx,
-                    headings=(p.heading,) if p.heading else (),
+                    sections=tuple(sections),
                     start_address=start_addr,
                     end_address=end_addr,
-                    sections=tuple(sections),
                 )
             )
 

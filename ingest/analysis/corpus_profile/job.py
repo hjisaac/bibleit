@@ -6,7 +6,7 @@ from analysis.corpus_profile.plots import generate_corpus_plots
 from analysis.corpus_profile.profile import profile_corpus
 from analysis.job import AnalysisJobBase
 from bibleit_ingest.constants import FASTEMBED_CACHE_DIR
-from bibleit_ingest.embedding import FastEmbedder
+from bibleit_ingest.embedding import Embedder
 from bibleit_ingest.pericopes import get_or_prepare_corpus
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ class AnalysisJobCorpusProfile(AnalysisJobBase):
     def on_prepare(self) -> dict:
         corpus = get_or_prepare_corpus(self.web_path, self.bsb_dir)
         tok_model_name = self.config.get("tokenizer_model", "nomic-ai/nomic-embed-text-v1.5")
-        embedder = FastEmbedder(model_name=tok_model_name, cache_dir=str(FASTEMBED_CACHE_DIR))
+        embedder = Embedder(model_name=tok_model_name, cache_dir=str(FASTEMBED_CACHE_DIR))
         return {"corpus": corpus, "tokenizer": embedder.model.tokenizer}
 
     def on_execute(self, prepared: dict) -> dict[str, Any]:

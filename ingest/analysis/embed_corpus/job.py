@@ -11,7 +11,7 @@ from analysis.job import AnalysisJobBase
 from bibleit_ingest.artifacts import read_lock_file, resolve_matching_artifacts, write_lock_file
 from bibleit_ingest.chunking import AdaptiveWindowChunker
 from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, REPO
-from bibleit_ingest.embedding import FastEmbedder, embed_documents
+from bibleit_ingest.embedding import Embedder
 from bibleit_ingest.pericopes import get_or_prepare_corpus
 from bibleit_ingest.renderers import get_renderer
 from bibleit_ingest.types import Passage
@@ -50,7 +50,7 @@ def _compute_vector_health(matrix: np.ndarray) -> dict[str, Any]:
 class AnalysisJobEmbedCorpus(AnalysisJobBase):
     path_config_keys = ("web_path", "bsb_dir")
 
-    def make_slug(self) -> str:
+    def _make_slug(self) -> str:
         f = self.config.get("floor", 5)
         c = self.config.get("ceiling", 30)
         model = str(self.config.get("embedding_model", "nomic"))
@@ -84,12 +84,18 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
             chunks = []
             for item in raw_meta:
                 start_idx = corpus.address_index[(item["book"], item["chapter"], item["verse"])]
+                sections = []
+                for s in item.get("sections", []):
+                    sec_idx = corpus.address_index.get((item["book"], s["chapter"], s["verse"]), start_idx)
+                    sections.append((sec_idx, s["heading"]))
+                if not sections and "headings" in item:
+                    sections = [(start_idx, h) for h in item["headings"]]
                 chunks.append(
                     Passage(
                         book=item["book"],
                         start_idx=start_idx,
                         end_idx=start_idx + item["verse_count"],
-                        headings=tuple(item["headings"]),
+                        sections=tuple(sections),
                     )
                 )
         else:
@@ -106,7 +112,7 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
         # 2. Prepare Embedder
         embedding_model = str(self.config["embedding_model"])
         threads = int(self.config.get("threads", 4))
-        embedder = FastEmbedder(
+        embedder = Embedder(
             model_name=embedding_model,
             cache_dir=str(FASTEMBED_CACHE_DIR),
             threads=threads,
@@ -134,7 +140,7 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
         with Timer(text=f"Embedded {total} chunks in {{:.1f}}s", logger=logger.info):
             vectors = list(
                 tqdm(
-                    embed_documents(embedder, texts, batch_size=batch_size),
+                    embedder.embed_documents(texts, batch_size=batch_size),
                     total=total,
                     desc=f"embedding chunks [{render_strategy}]",
                     unit="chunk",

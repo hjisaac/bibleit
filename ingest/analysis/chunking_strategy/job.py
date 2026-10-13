@@ -8,7 +8,7 @@ from datalens import AnalysisConfig, run_analysis
 from bibleit_ingest.artifacts import write_inspection_samples, write_lock_file
 from bibleit_ingest.chunking import AdaptiveWindowChunker, PericopeChunker
 from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, OLD_TESTAMENT_BOOKS, REPO
-from bibleit_ingest.embedding import FastEmbedder
+from bibleit_ingest.embedding import Embedder
 from bibleit_ingest.pericopes import get_or_prepare_corpus
 from bibleit_ingest.renderers import get_renderer
 from analysis.job import AnalysisJobBase
@@ -19,10 +19,13 @@ logger = logging.getLogger(__name__)
 class AnalysisJobChunkingStrategy(AnalysisJobBase):
     path_config_keys = ("web_path", "bsb_dir")
 
-    def make_slug(self) -> str:
+    def _make_slug(self) -> str:
         f = self.config.get("floor", 5)
         c = self.config.get("ceiling", 30)
         o = self.config.get("overlap", 1)
+        ovh_flag = ""
+        if o > 0 and "include_overlap_heading" in self.config:
+            ovh_flag = "_ovh1" if self.config.get("include_overlap_heading") else "_ovh0"
         strat_map = {
             "text_only": "text",
             "heading_and_text": "heading",
@@ -32,8 +35,8 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         strat_key = str(self.config.get("render_strategy", "heading_and_text"))
         strat = strat_map.get(strat_key, strat_key[:8])
         if self.config.get("strategy") == "pericope":
-            return f"peri_c{c}_o{o}_{strat}"
-        return f"f{f}_c{c}_o{o}_{strat}"
+            return f"peri_c{c}_o{o}{ovh_flag}_{strat}"
+        return f"f{f}_c{c}_o{o}{ovh_flag}_{strat}"
 
     def on_prepare(self) -> dict:
         corpus = get_or_prepare_corpus(self.web_path, self.bsb_dir)
@@ -41,7 +44,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         tok_model_name = self.config.get(
             "tokenizer_model", "nomic-ai/nomic-embed-text-v1.5"
         )
-        embedder = FastEmbedder(
+        embedder = Embedder(
             model_name=tok_model_name, cache_dir=str(FASTEMBED_CACHE_DIR)
         )
 
@@ -55,6 +58,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
     def on_execute(self, prepared: dict) -> dict[str, Any]:
         ceiling = int(self.config["ceiling"])
         overlap = int(self.config.get("overlap", 1))
+        include_overlap_heading = bool(self.config.get("include_overlap_heading", True))
         strategy_name = self.config.get("strategy", "adaptive")
         ordered_verses = prepared["ordered_verses"]
         address_index = prepared["address_index"]
@@ -65,6 +69,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
                 overlap=overlap,
                 ordered_verses=ordered_verses,
                 address_index=address_index,
+                include_overlap_heading=include_overlap_heading,
             )
         else:
             floor = int(self.config.get("floor", 5))
@@ -74,6 +79,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
                 overlap=overlap,
                 ordered_verses=ordered_verses,
                 address_index=address_index,
+                include_overlap_heading=include_overlap_heading,
             )
         chunks = chunker.chunk(prepared["pericopes"])
 
@@ -159,16 +165,24 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
                 self.tracker.track_artifact(path, name=name, type="plot")
 
         # Save chunk definitions artifact
-        chunks_meta = [
-            {
+        ordered_verses = prepared.get("ordered_verses", ())
+        chunks_meta = []
+        for c in result["chunks"]:
+            sections_meta = []
+            for sec_idx, sec_heading in c.sections:
+                addr = ordered_verses[sec_idx][0] if ordered_verses and sec_idx < len(ordered_verses) else None
+                sections_meta.append({
+                    "chapter": addr[1] if addr else c.chapter,
+                    "verse": addr[2] if addr else c.verse,
+                    "heading": sec_heading,
+                })
+            chunks_meta.append({
                 "book": c.book,
                 "chapter": c.chapter,
                 "verse": c.verse,
-                "headings": list(c.headings),
                 "verse_count": c.verse_count,
-            }
-            for c in result["chunks"]
-        ]
+                "sections": sections_meta,
+            })
         chunks_path = self.run_dir / "chunks.json"
         chunks_path.write_text(json.dumps(chunks_meta, indent=2), encoding="utf-8")
 
@@ -178,6 +192,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
                 "floor": int(self.config.get("floor", 1)),
                 "ceiling": int(self.config["ceiling"]),
                 "overlap": int(self.config.get("overlap", 1)),
+                "include_overlap_heading": bool(self.config.get("include_overlap_heading", True)),
                 "strategy": self.config.get("strategy", "adaptive"),
                 "render_strategy": self.config.get("render_strategy", "heading_and_text"),
                 "tokenizer_model": self.config.get("tokenizer_model", "nomic-ai/nomic-embed-text-v1.5"),
