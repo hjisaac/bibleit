@@ -29,7 +29,10 @@ export function ReaderView({
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedVerse, setSelectedVerse] = useState<ChapterVerse | null>(null);
+  const [showActions, setShowActions] = useState<boolean>(false);
   const targetVerseRef = useRef<HTMLParagraphElement | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const bookMeta = BIBLE_BOOKS_BY_ID[book];
   const bookTitle = bookMeta ? bookMeta.name : book;
@@ -84,19 +87,118 @@ export function ReaderView({
     return () => clearTimeout(timer);
   }, [targetVerse, verses, scrollKey, book, chapter]);
 
-  const handleCopy = () => {
-    if (selectedVerse) {
-      void navigator.clipboard.writeText(`${book} ${chapter}:${selectedVerse.num} - ${selectedVerse.text}`);
-      onToast(`Copied ${book} ${chapter}:${selectedVerse.num}`);
+  const triggerHaptic = (duration: number = 20) => {
+    try {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(duration);
+      }
+    } catch {
+      // Ignore vibration errors if disabled by system policy
     }
   };
 
-  const handleSave = () => {
-    if (selectedVerse) {
-      onSaveVerse(`${book} ${chapter}:${selectedVerse.num}`, selectedVerse.text);
-      onToast(`Saved ${book} ${chapter}:${selectedVerse.num}`);
-      setSelectedVerse(null);
+  const copyTextToClipboard = async (text: string): Promise<boolean> => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (err) {
+        console.warn('Clipboard writeText failed, falling back to execCommand:', err);
+      }
     }
+
+    // Fallback using textarea for insecure contexts / mobile restrictions
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      textArea.style.top = '0';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return successful;
+    } catch (fallbackErr) {
+      console.error('Fallback clipboard copy failed:', fallbackErr);
+      return false;
+    }
+  };
+
+  const handleCopy = (e?: Event) => {
+    e?.stopPropagation();
+    if (!selectedVerse) return;
+
+    triggerHaptic(15);
+    const citation = `${bookTitle} ${chapter}:${selectedVerse.num}`;
+    const textToCopy = `${citation} - ${selectedVerse.text}`;
+
+    void copyTextToClipboard(textToCopy).then((success) => {
+      if (success) {
+        onToast(`Copied ${citation}`);
+      } else {
+        onToast(`Unable to copy automatically`);
+      }
+    });
+  };
+
+  const handleSave = (e?: Event) => {
+    e?.stopPropagation();
+    if (!selectedVerse) return;
+
+    triggerHaptic(25);
+    const citation = `${bookTitle} ${chapter}:${selectedVerse.num}`;
+    onSaveVerse(citation, selectedVerse.text);
+    onToast(`Saved ${citation} to bookmarks`);
+    setSelectedVerse(null);
+    setShowActions(false);
+  };
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current !== null) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleVerseClick = (v: ChapterVerse) => {
+    // If clicking a new verse or clicking the same verse, select and highlight it with border
+    if (selectedVerse?.num !== v.num) {
+      setSelectedVerse(v);
+      setShowActions(false);
+    }
+  };
+
+  const handleTouchStart = (verse: ChapterVerse, e: TouchEvent) => {
+    clearLongPressTimer();
+    const touch = e.touches[0];
+    if (touch) {
+      touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+    }
+    // Long-press activates the two action buttons on the selected verse
+    longPressTimerRef.current = setTimeout(() => {
+      setSelectedVerse(verse);
+      setShowActions(true);
+      triggerHaptic(20);
+    }, 450);
+  };
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (!touchStartPosRef.current) return;
+    const touch = e.touches[0];
+    if (touch) {
+      const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
+      const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
+      if (dx > 8 || dy > 8) {
+        clearLongPressTimer();
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    clearLongPressTimer();
+    touchStartPosRef.current = null;
   };
 
   return (
@@ -170,75 +272,67 @@ export function ReaderView({
         {!isLoading && !loadError && verses.map((v) => {
           const isTarget = targetVerse === v.num;
           const isSelected = selectedVerse?.num === v.num;
+          const hasActions = isSelected && showActions;
 
           return (
-            <p
-              key={v.num}
-              id={`verse-${v.num}`}
-              ref={isTarget ? targetVerseRef : undefined}
-              onClick={() => setSelectedVerse(v)}
-              class={`cursor-pointer transition-all p-2 rounded-xl scroll-mt-16 ${
-                isTarget ? 'ring-2 ring-amber-500/40' : ''
-              } ${isSelected ? 'ring-2 ring-stone-500/40' : ''}`}
-              style={{
-                backgroundColor: isTarget ? 'var(--highlight-verse)' : 'transparent',
-              }}
-            >
-              <sup class="text-xs opacity-50 font-sans mr-1 font-normal">
-                {v.num}
-              </sup>
-              {v.text}
-            </p>
+            <div key={v.num} class="transition-all">
+              <p
+                id={`verse-${v.num}`}
+                ref={isTarget ? targetVerseRef : undefined}
+                onClick={() => handleVerseClick(v)}
+                onTouchStart={(e) => handleTouchStart(v, e as unknown as TouchEvent)}
+                onTouchMove={(e) => handleTouchMove(e as unknown as TouchEvent)}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchEnd}
+                class={`cursor-pointer transition-all p-2 rounded-xl scroll-mt-16 select-none ${
+                  isTarget ? 'ring-2 ring-amber-500/40' : ''
+                } ${isSelected ? 'ring-2 ring-stone-500/40' : ''}`}
+                style={{
+                  backgroundColor: isTarget ? 'var(--highlight-verse)' : 'transparent',
+                }}
+              >
+                <sup class="text-xs opacity-50 font-sans mr-1 font-normal">
+                  {v.num}
+                </sup>
+                {v.text}
+              </p>
+
+              {/* Two buttons revealed directly below the verse on long-press with clear margin */}
+              {hasActions && (
+                <div
+                  class="mt-2 mb-1 flex items-center justify-end gap-2 px-1 animate-fadeIn"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    onClick={(e) => handleCopy(e)}
+                    class="px-3 py-1 rounded-lg border text-xs font-sans font-medium transition-all hover:opacity-85 active:scale-95"
+                    style={{
+                      borderColor: 'var(--border-subtle)',
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                      color: 'var(--text-main)',
+                    }}
+                  >
+                    Copy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => handleSave(e)}
+                    class="px-3 py-1 rounded-lg border text-xs font-sans font-medium transition-all hover:opacity-85 active:scale-95"
+                    style={{
+                      borderColor: 'var(--border-subtle)',
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                      color: 'var(--text-main)',
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
-
-      {/* Verse Action Tray */}
-      {selectedVerse && (
-        <div
-          class="px-5 py-3 border-t flex items-center justify-between sticky bottom-0 backdrop-blur-md"
-          style={{
-            backgroundColor: 'var(--bg-surface)',
-            borderColor: 'var(--border-subtle)',
-          }}
-        >
-          <span class="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
-            Verse {selectedVerse.num} selected
-          </span>
-          <div class="flex items-center gap-2 text-xs">
-            <button
-              type="button"
-              onClick={handleCopy}
-              class="px-2.5 py-1 rounded-lg border font-medium"
-              style={{
-                borderColor: 'var(--border-subtle)',
-                backgroundColor: 'var(--bg-surface-elevated)',
-              }}
-            >
-              Copy
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              class="px-2.5 py-1 rounded-lg border font-medium"
-              style={{
-                borderColor: 'var(--border-subtle)',
-                backgroundColor: 'var(--bg-surface-elevated)',
-              }}
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedVerse(null)}
-              class="p-1 text-xs"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
     </section>
   );
 }

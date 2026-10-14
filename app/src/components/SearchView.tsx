@@ -50,7 +50,10 @@ export function SearchView({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isQuestion = isQuestionQuery(query);
-  const matchedBook = findBookByPrefix(query);
+  const trimmedLower = query.trim().toLowerCase();
+  // Only match book picker if query is strictly a single book name / alias (no chapter numbers or extra words)
+  const isExactBookQuery = /^[1-3]?\s*[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF]+$/.test(trimmedLower);
+  const matchedBook = isExactBookQuery ? findBookByPrefix(trimmedLower) : undefined;
 
   const adjustHeight = () => {
     const el = textareaRef.current;
@@ -262,53 +265,57 @@ export function SearchView({
         </div>
       </div>
 
-      {/* Scripture Navigator Strip (Appears when query matches a book prefix) */}
+      {/* Scripture Navigator Strip (Compact: appears only when query is purely a book name) */}
       {matchedBook && (
         <div
-          class="mb-3 p-3 rounded-2xl border flex flex-col gap-2 animate-fadeIn shrink-0"
+          class="mb-2.5 px-3 py-2 rounded-xl border flex items-center gap-2.5 animate-fadeIn shrink-0 overflow-hidden"
           style={{
             backgroundColor: 'var(--bg-surface-elevated)',
             borderColor: 'var(--border-subtle)',
           }}
         >
-          <div class="flex items-center justify-between text-xs">
-            <span class="font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-              <svg
-                class="w-3.5 h-3.5"
-                style={{ color: 'var(--text-muted)' }}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                />
-              </svg>
-              <span>{matchedBook.name}</span>
-              <span class="text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>
-                ({matchedBook.chapters} chapters)
-              </span>
+          <button
+            type="button"
+            onClick={() => onOpenReader(matchedBook.id, 1, 1)}
+            class="flex items-center gap-1.5 shrink-0 text-xs font-semibold hover:opacity-80 transition-opacity text-left cursor-pointer"
+            style={{ color: 'var(--text-main)' }}
+            title={`Read ${matchedBook.name} 1:1`}
+          >
+            <svg
+              class="w-3.5 h-3.5 shrink-0"
+              style={{ color: 'var(--accent)' }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+              />
+            </svg>
+            <span class="hover:underline">{matchedBook.name}</span>
+            <span class="text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>
+              ({matchedBook.chapters} ch)
             </span>
-            <span class="text-[10px]" style={{ color: 'var(--text-subtle)' }}>
-              Tap chapter to jump
-            </span>
-          </div>
+          </button>
 
-          <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+          <div class="h-4 w-px shrink-0" style={{ backgroundColor: 'var(--border-subtle)' }} />
+
+          <div class="flex items-center gap-1 overflow-x-auto text-[11px] no-scrollbar py-0.5">
             {Array.from({ length: matchedBook.chapters }, (_, i) => i + 1).map((ch) => (
               <button
                 key={ch}
                 type="button"
                 onClick={() => onOpenReader(matchedBook.id, ch, 1)}
-                class="shrink-0 px-2.5 py-1 rounded-lg border font-medium transition-all hover:ring-2 hover:ring-amber-500/40"
+                class="shrink-0 w-6 h-6 rounded-md border flex items-center justify-center font-medium transition-all hover:ring-1 hover:ring-amber-500/40 hover:bg-amber-500/10"
                 style={{
                   backgroundColor: 'var(--bg-surface)',
                   borderColor: 'var(--border-subtle)',
                   color: 'var(--text-main)',
                 }}
+                title={`Open ${matchedBook.name} ${ch}`}
               >
                 {ch}
               </button>
