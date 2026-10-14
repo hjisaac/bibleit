@@ -29,6 +29,8 @@ export function getCachedVerse(bookId: string, chapter: number, verse: number): 
 
 /** Non-blocking background worker to populate the verse index from a loaded book */
 export function scheduleBookIndexing(bookData: BookData): void {
+  if (!bookData?.chapters || typeof bookData.chapters !== 'object') return;
+
   const runner = () => {
     const bookId = bookData.id.toUpperCase();
     for (const [chStr, verses] of Object.entries(bookData.chapters)) {
@@ -40,7 +42,11 @@ export function scheduleBookIndexing(bookData: BookData): void {
   };
 
   if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-    (window as unknown as { requestIdleCallback: (fn: () => void) => void }).requestIdleCallback(runner);
+    (
+      window as unknown as {
+        requestIdleCallback: (fn: () => void, opts?: { timeout: number }) => void;
+      }
+    ).requestIdleCallback(runner, { timeout: 2500 });
   } else {
     setTimeout(runner, 0);
   }
@@ -55,11 +61,15 @@ export async function resolveVerseText(
   const cached = getCachedVerse(bookId, chapter, verse);
   if (cached) return cached;
 
-  const bookData = await loadBook(bookId);
-  const chKey = String(chapter);
-  const chapterVerses = bookData.chapters[chKey];
-  const found = chapterVerses?.find((v) => v.num === verse);
-  return found?.text;
+  try {
+    const bookData = await loadBook(bookId);
+    const chKey = String(chapter);
+    const chapterVerses = bookData?.chapters?.[chKey];
+    const found = chapterVerses?.find((v) => v.num === verse);
+    return found?.text;
+  } catch {
+    return undefined;
+  }
 }
 
 function getBookUrl(bookId: string): string {
@@ -83,10 +93,17 @@ export async function loadBook(bookId: string): Promise<BookData> {
       const cache = await caches.open(CACHE_NAME);
       const match = await cache.match(url);
       if (match) {
-        const data: BookData = await match.json();
-        memoryCache.set(bookId, data);
-        scheduleBookIndexing(data);
-        return data;
+        try {
+          const data: BookData = await match.json();
+          if (data?.chapters) {
+            memoryCache.set(bookId, data);
+            scheduleBookIndexing(data);
+            return data;
+          }
+          await cache.delete(url);
+        } catch {
+          await cache.delete(url);
+        }
       }
     } catch {
       // Fall through to network if Cache API errors
