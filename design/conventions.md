@@ -11,5 +11,5 @@
 4. **Only public-domain translations get bundled.** Licensed texts (NIV, ESV,
    Segond 21…) stay out of the repo and out of the artifacts — API-only, later.
 5. **Offline seams mirror runtime seams.** Python ABCs in
-   `ingest/bibleit_ingest/ports.py`; a new translation or model is a new adapter
+   `ingest/rag_core/`; a new translation or model is a new adapter
    plus a CLI flag, never an edit to the pipeline core.

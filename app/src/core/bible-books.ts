@@ -78,6 +78,21 @@ export const BIBLE_BOOKS: readonly BibleBook[] = [
   { id: 'REV', name: 'Revelation', testament: 'NT', chapters: 22, aliases: ['rev', 'revelation', 'apocalypse'] },
 ];
 
+/** Fast O(1) dictionary indexed by canonical book ID (e.g. 'PHP', 'GEN'). */
+export const BIBLE_BOOKS_BY_ID: Readonly<Record<string, BibleBook>> = Object.freeze(
+  Object.fromEntries(BIBLE_BOOKS.map((b) => [b.id, b])),
+);
+
+/** Fast O(1) hash map indexing all lowercase IDs, names, and aliases. */
+const BOOK_BY_EXACT_ALIAS = new Map<string, BibleBook>();
+for (const b of BIBLE_BOOKS) {
+  BOOK_BY_EXACT_ALIAS.set(b.id.toLowerCase(), b);
+  BOOK_BY_EXACT_ALIAS.set(b.name.toLowerCase(), b);
+  for (const alias of b.aliases) {
+    BOOK_BY_EXACT_ALIAS.set(alias.toLowerCase(), b);
+  }
+}
+
 /** Matches query string prefix to a Bible book deterministically. */
 export function findBookByPrefix(query: string): BibleBook | undefined {
   const normalized = query.trim().toLowerCase();
@@ -85,13 +100,13 @@ export function findBookByPrefix(query: string): BibleBook | undefined {
     return undefined;
   }
 
-  // Check exact alias match first.
-  const exact = BIBLE_BOOKS.find((b) => b.aliases.some((a) => a === normalized));
+  // O(1) direct alias lookup first.
+  const exact = BOOK_BY_EXACT_ALIAS.get(normalized);
   if (exact) {
     return exact;
   }
 
-  // Check prefix match (e.g. 'phi' -> Philippians, 'rom' -> Romans).
+  // Prefix match fallback (only runs if not an exact alias).
   return BIBLE_BOOKS.find(
     (b) =>
       b.name.toLowerCase().startsWith(normalized) ||

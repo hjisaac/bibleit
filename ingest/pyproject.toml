@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-crucible = { path = "crucible", editable = true }
+crucible = { git = "https://github.com/hjisaac/cruciblelib.git" }
 datalens = { git = "https://github.com/hjisaac/datalens.git", branch = "feat/mcp-server" }
 
 [dependency-groups]
@@ -34,4 +34,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["bibleit_ingest", "eval", "analysis"]
+packages = ["bibleit_ingest", "rag_core", "eval", "analysis"]
+
+[tool.crucible]
+jobs_dirs = ["eval", "analysis"]

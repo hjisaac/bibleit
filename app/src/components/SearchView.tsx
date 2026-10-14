@@ -9,6 +9,10 @@ interface SearchViewProps {
   isOnline: boolean;
   isAiEnabled: boolean;
   isInspectorMode: boolean;
+  offlineTextStatus?: 'not_downloaded' | 'downloading' | 'ready';
+  hasSeenOnboarding?: boolean;
+  onOpenStorage?: () => void;
+  onDismissOnboarding?: () => void;
   onOpenReader: (book: string, chapter: number, verse: number) => void;
   onToast: (message: string) => void;
 }
@@ -29,6 +33,10 @@ export function SearchView({
   isOnline,
   isAiEnabled,
   isInspectorMode,
+  offlineTextStatus = 'ready',
+  hasSeenOnboarding = true,
+  onOpenStorage,
+  onDismissOnboarding,
   onOpenReader,
   onToast,
 }: SearchViewProps): JSX.Element {
@@ -42,7 +50,10 @@ export function SearchView({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isQuestion = isQuestionQuery(query);
-  const matchedBook = findBookByPrefix(query);
+  const trimmedLower = query.trim().toLowerCase();
+  // Only match book picker if query is strictly a single book name / alias (no chapter numbers or extra words)
+  const isExactBookQuery = /^[1-3]?\s*[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF]+$/.test(trimmedLower);
+  const matchedBook = isExactBookQuery ? findBookByPrefix(trimmedLower) : undefined;
 
   const adjustHeight = () => {
     const el = textareaRef.current;
@@ -112,6 +123,74 @@ export function SearchView({
 
   return (
     <section class="flex-1 flex flex-col p-4 sm:p-8 overflow-y-auto max-w-2xl mx-auto w-full">
+      {/* Offline Storage Status Banner / Super Tiny Reminder */}
+      {offlineTextStatus !== 'ready' && (
+        !hasSeenOnboarding ? (
+          <div
+            class="mb-3 px-3 py-1.5 rounded-xl border flex items-center justify-between gap-2.5 animate-fadeIn shrink-0 transition-all bg-amber-500/[0.07] border-amber-500/25"
+          >
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+              <svg
+                class="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              <span class="text-[11px] font-medium truncate" style={{ color: 'var(--text-main)' }}>
+                Save Scripture text (~2 MB) to read and search offline.
+              </span>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={onOpenStorage}
+                class="px-2 py-0.5 rounded-lg text-[11px] font-medium text-white transition-opacity hover:opacity-90 shadow-sm"
+                style={{ backgroundColor: 'var(--accent)' }}
+              >
+                Set Up →
+              </button>
+              {onDismissOnboarding && (
+                <button
+                  type="button"
+                  onClick={onDismissOnboarding}
+                  class="p-0.5 rounded-md text-[11px] hover:opacity-75"
+                  style={{ color: 'var(--text-muted)' }}
+                  title="Dismiss banner"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div class="flex items-center justify-between mb-2 px-1 text-[10px] shrink-0">
+            <button
+              type="button"
+              onClick={onOpenStorage}
+              class="flex items-center gap-1.5 transition-opacity hover:opacity-80"
+              style={{ color: 'var(--text-subtle)' }}
+            >
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500/70" />
+              <span>Offline storage not downloaded · Tap to set up →</span>
+            </button>
+          </div>
+        )
+      )}
+
       {/* Search & Question Prompt Box */}
       <div class="relative mb-2 shrink-0">
         <div
@@ -186,53 +265,57 @@ export function SearchView({
         </div>
       </div>
 
-      {/* Scripture Navigator Strip (Appears when query matches a book prefix) */}
+      {/* Scripture Navigator Strip (Compact: appears only when query is purely a book name) */}
       {matchedBook && (
         <div
-          class="mb-3 p-3 rounded-2xl border flex flex-col gap-2 animate-fadeIn shrink-0"
+          class="mb-2.5 px-3 py-2 rounded-xl border flex items-center gap-2.5 animate-fadeIn shrink-0 overflow-hidden"
           style={{
             backgroundColor: 'var(--bg-surface-elevated)',
             borderColor: 'var(--border-subtle)',
           }}
         >
-          <div class="flex items-center justify-between text-xs">
-            <span class="font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-              <svg
-                class="w-3.5 h-3.5"
-                style={{ color: 'var(--text-muted)' }}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                />
-              </svg>
-              <span>{matchedBook.name}</span>
-              <span class="text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>
-                ({matchedBook.chapters} chapters)
-              </span>
+          <button
+            type="button"
+            onClick={() => onOpenReader(matchedBook.id, 1, 1)}
+            class="flex items-center gap-1.5 shrink-0 text-xs font-semibold hover:opacity-80 transition-opacity text-left cursor-pointer"
+            style={{ color: 'var(--text-main)' }}
+            title={`Read ${matchedBook.name} 1:1`}
+          >
+            <svg
+              class="w-3.5 h-3.5 shrink-0"
+              style={{ color: 'var(--accent)' }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+              />
+            </svg>
+            <span class="hover:underline">{matchedBook.name}</span>
+            <span class="text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>
+              ({matchedBook.chapters} ch)
             </span>
-            <span class="text-[10px]" style={{ color: 'var(--text-subtle)' }}>
-              Tap chapter to jump
-            </span>
-          </div>
+          </button>
 
-          <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+          <div class="h-4 w-px shrink-0" style={{ backgroundColor: 'var(--border-subtle)' }} />
+
+          <div class="flex items-center gap-1 overflow-x-auto text-[11px] no-scrollbar py-0.5">
             {Array.from({ length: matchedBook.chapters }, (_, i) => i + 1).map((ch) => (
               <button
                 key={ch}
                 type="button"
                 onClick={() => onOpenReader(matchedBook.id, ch, 1)}
-                class="shrink-0 px-2.5 py-1 rounded-lg border font-medium transition-all hover:ring-2 hover:ring-amber-500/40"
+                class="shrink-0 w-6 h-6 rounded-md border flex items-center justify-center font-medium transition-all hover:ring-1 hover:ring-amber-500/40 hover:bg-amber-500/10"
                 style={{
                   backgroundColor: 'var(--bg-surface)',
                   borderColor: 'var(--border-subtle)',
                   color: 'var(--text-main)',
                 }}
+                title={`Open ${matchedBook.name} ${ch}`}
               >
                 {ch}
               </button>

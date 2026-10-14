@@ -4,50 +4,18 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 from .constants import BOOK_NAMES, USFM_ORDER
-
-VerseAddress = tuple[str, int, int]  # (book, chapter, verse)
-
-
-@dataclass(frozen=True)
-class Pericope:
-    """Canonical section heading and verse span defined by BSB translators."""
-
-    book: str
-    chapter: int
-    verse: int
-    heading: str
-    verse_count: int
-
-
-@dataclass(frozen=True)
-class Passage:
-    """A contiguous span of verses in reading order within a single book."""
-
-    book: str
-    start_idx: int
-    end_idx: int
-    headings: tuple[str, ...] = ()
-    start_address: VerseAddress | None = None
-    end_address: VerseAddress | None = None
-    sections: tuple[tuple[int, str | None], ...] = ()
-
-    @property
-    def verse_count(self) -> int:
-        return self.end_idx - self.start_idx
-
-    @property
-    def chapter(self) -> int:
-        return self.start_address[1] if self.start_address else 0
-
-    @property
-    def verse(self) -> int:
-        return self.start_address[2] if self.start_address else 0
-
-
-Chunk = Passage
+from .renderers import (
+    AddressAndHeadingRenderer,
+    BookAndHeadingRenderer,
+    HeadingAndTextRenderer,
+    PassageRenderer,
+    TextOnlyRenderer,
+    get_renderer,
+)
+from .types import Chunk, Passage, Pericope, VerseAddress
 
 
 class Chunker(ABC):
@@ -60,8 +28,17 @@ class Chunker(ABC):
 class AdaptiveWindowChunker(Chunker):
     """Slices Bible verses into passage chunks bounded by floor and ceiling.
 
-    Pericopes serve as initial semantic break points. Chunks never cross book
-    boundaries. Undersized tails at book ends merge backward into the preceding chunk.
+    Mechanics:
+    1. Takes pericopes (semantic heading sections) as initial candidate chunks.
+    2. Optional lead-in overlap: prepends up to `overlap` verses from the prior chunk
+       if within the same book and without exceeding `ceiling`.
+    3. Forward merge: while the accumulated verse count is strictly below `floor`,
+       it merges subsequent pericopes forward, provided they belong to the same book
+       and total size does not exceed `ceiling`.
+    4. Undersized tail handling: if the final chunk in a book remains below `floor`,
+       it merges backward into the preceding chunk (if it fits within `ceiling`).
+    5. Single oversize pericopes: pericopes that individually exceed `ceiling`
+       are emitted as single monolithic chunks without being sub-divided.
     """
 
     DEFAULT_FLOOR = 5
@@ -75,6 +52,7 @@ class AdaptiveWindowChunker(Chunker):
         overlap: int = DEFAULT_OVERLAP,
         ordered_verses: Sequence[tuple[VerseAddress, str]] | None = None,
         address_index: dict[VerseAddress, int] | None = None,
+        include_overlap_heading: bool = True,
     ):
         if floor <= 0 or ceiling <= 0:
             raise ValueError("floor and ceiling must be positive")
@@ -87,6 +65,7 @@ class AdaptiveWindowChunker(Chunker):
         self.overlap = overlap
         self.ordered_verses = ordered_verses
         self.address_index = address_index
+        self.include_overlap_heading = include_overlap_heading
 
     def _resolve_spans(self, pericopes: Sequence[Pericope]) -> list[tuple[int, int]]:
         spans: list[tuple[int, int]] = []
@@ -105,8 +84,7 @@ class AdaptiveWindowChunker(Chunker):
         book: str,
         start_idx: int,
         end_idx: int,
-        headings: list[str],
-        sections: list[tuple[int, str | None]],
+        sections: list[tuple[int, str]],
     ) -> Passage:
         start_addr = self.ordered_verses[start_idx][0] if self.ordered_verses else None
         end_addr = self.ordered_verses[end_idx - 1][0] if self.ordered_verses and end_idx > start_idx else None
@@ -114,10 +92,9 @@ class AdaptiveWindowChunker(Chunker):
             book=book,
             start_idx=start_idx,
             end_idx=end_idx,
-            headings=tuple(headings),
+            sections=tuple(sections),
             start_address=start_addr,
             end_address=end_addr,
-            sections=tuple(sections),
         )
 
     def chunk(self, pericopes: Sequence[Pericope]) -> list[Passage]:
@@ -139,12 +116,15 @@ class AdaptiveWindowChunker(Chunker):
                 cand_overlap = min(self.overlap, prev.verse_count)
                 if cand_overlap + fresh_len <= self.ceiling:
                     overlap_len = cand_overlap
-                    sections.append((fresh_start - overlap_len, None))
+                    if self.include_overlap_heading:
+                        lead_heading = pericopes[i - 1].heading if i > 0 and pericopes[i - 1].heading else pericopes[i].heading
+                    else:
+                        lead_heading = None
+                    sections.append((fresh_start - overlap_len, lead_heading))
 
             start_idx = fresh_start - overlap_len
             end_idx = fresh_end
-            headings: list[str] = [pericopes[i].heading] if pericopes[i].heading else []
-            sections.append((fresh_start, pericopes[i].heading))
+            sections.append((fresh_start, pericopes[i].heading or current_book))
             size = end_idx - start_idx
             step = 1
 
@@ -158,9 +138,7 @@ class AdaptiveWindowChunker(Chunker):
                 _, nxt_end = spans[i + step]
                 end_idx = nxt_end
                 size = end_idx - start_idx
-                if nxt.heading and nxt.heading not in headings:
-                    headings.append(nxt.heading)
-                sections.append((spans[i + step][0], nxt.heading))
+                sections.append((spans[i + step][0], nxt.heading or current_book))
                 step += 1
 
             # Last-in-book backward merge if undersized
@@ -168,38 +146,233 @@ class AdaptiveWindowChunker(Chunker):
             if size < self.floor and is_last_in_book and passages and passages[-1].book == current_book:
                 prev = passages[-1]
                 if prev.verse_count + size <= self.ceiling:
-                    merged_headings = list(prev.headings)
-                    for h in headings:
-                        if h not in merged_headings:
-                            merged_headings.append(h)
                     passages[-1] = self._make_passage(
                         book=current_book,
                         start_idx=prev.start_idx,
                         end_idx=end_idx,
-                        headings=merged_headings,
                         sections=list(prev.sections) + sections,
                     )
                     i += step
                     continue
 
-            passages.append(self._make_passage(current_book, start_idx, end_idx, headings, sections))
+            passages.append(self._make_passage(current_book, start_idx, end_idx, sections))
             i += step
 
         return passages
 
 
-def load_web_verses(web_path: Path) -> list[tuple[VerseAddress, str]]:
-    """Loads every verse from a WEB JSON file in reading order."""
-    web = json.loads(web_path.read_text())
-    ordered = []
-    for b in web["books"]:
-        code = USFM_ORDER[int(b["nr"]) - 1]
-        for ch in b["chapters"]:
-            for v in ch["verses"]:
-                ordered.append(
-                    ((code, int(ch["chapter"]), int(v["verse"])), v["text"])
+class PericopeChunker(Chunker):
+    """Chunks strictly per pericope with optional lead-in overlap bounded by ceiling."""
+
+    def __init__(
+        self,
+        ceiling: int = 30,
+        overlap: int = 0,
+        ordered_verses: Sequence[tuple[VerseAddress, str]] | None = None,
+        address_index: dict[VerseAddress, int] | None = None,
+        include_overlap_heading: bool = True,
+    ):
+        if ceiling <= 0:
+            raise ValueError("ceiling must be positive")
+        if overlap < 0:
+            raise ValueError("overlap cannot be negative")
+        self.ceiling = ceiling
+        self.overlap = overlap
+        self.ordered_verses = ordered_verses
+        self.address_index = address_index
+        self.include_overlap_heading = include_overlap_heading
+
+    def _resolve_spans(self, pericopes: Sequence[Pericope]) -> list[tuple[int, int]]:
+        spans: list[tuple[int, int]] = []
+        curr = 0
+        for p in pericopes:
+            if self.address_index is not None:
+                s = self.address_index[(p.book, p.chapter, p.verse)]
+            else:
+                s = curr
+                curr += p.verse_count
+            spans.append((s, s + p.verse_count))
+        return spans
+
+    def chunk(self, pericopes: Sequence[Pericope]) -> list[Passage]:
+        passages: list[Passage] = []
+        spans = self._resolve_spans(pericopes)
+
+        for i, p in enumerate(pericopes):
+            current_book = p.book
+            fresh_start, fresh_end = spans[i]
+            fresh_len = p.verse_count
+
+            lead_in = 0
+            if self.overlap > 0 and passages and passages[-1].book == current_book:
+                prev_passage = passages[-1]
+                cand_overlap = min(self.overlap, prev_passage.verse_count)
+                if cand_overlap + fresh_len <= self.ceiling:
+                    lead_in = cand_overlap
+
+            start_idx = fresh_start - lead_in
+            end_idx = fresh_end
+            start_addr = self.ordered_verses[start_idx][0] if self.ordered_verses else None
+            end_addr = self.ordered_verses[end_idx - 1][0] if self.ordered_verses and end_idx > start_idx else None
+
+            sections: list[tuple[int, str | None]] = []
+            if lead_in > 0:
+                if self.include_overlap_heading:
+                    lead_heading = pericopes[i - 1].heading if i > 0 and pericopes[i - 1].heading else p.heading
+                else:
+                    lead_heading = None
+                sections.append((start_idx, lead_heading))
+            sections.append((fresh_start, p.heading or current_book))
+
+            passages.append(
+                Passage(
+                    book=current_book,
+                    start_idx=start_idx,
+                    end_idx=end_idx,
+                    sections=tuple(sections),
+                    start_address=start_addr,
+                    end_address=end_addr,
                 )
-    return ordered
+            )
+
+        return passages
+
+
+class TokenWindowChunker(Chunker):
+    """Slices Bible verses into passage chunks bounded by a token ceiling.
+
+    Mechanics:
+    1. Accumulates whole verses sequentially up to (ceiling - headroom_margin) tokens.
+    2. Respects natural pericope boundaries as preferred clean split points.
+    3. If adding a verse exceeds the effective token ceiling, steps back to the previous verse
+       unless that single verse is alone (single-verse oversize guard).
+    4. Overlap is bounded by overlap verses within the same book boundary.
+    5. Headroom margin reserves token budget for downstream renderer headers (mean ~22 tokens).
+    """
+
+    DEFAULT_CEILING = 512
+    DEFAULT_OVERLAP = 0
+    DEFAULT_HEADROOM_MARGIN = 25
+
+    def __init__(
+        self,
+        ceiling: int = DEFAULT_CEILING,
+        overlap: int = DEFAULT_OVERLAP,
+        ordered_verses: Sequence[tuple[VerseAddress, str]] | None = None,
+        address_index: dict[VerseAddress, int] | None = None,
+        tokenizer: Any = None,
+        headroom_margin: int = DEFAULT_HEADROOM_MARGIN,
+        include_overlap_heading: bool = True,
+    ):
+        if ceiling <= 0:
+            raise ValueError("ceiling must be positive")
+        if overlap < 0:
+            raise ValueError("overlap cannot be negative")
+        if headroom_margin < 0:
+            raise ValueError("headroom_margin cannot be negative")
+        if headroom_margin >= ceiling:
+            raise ValueError("headroom_margin cannot meet or exceed ceiling")
+        self.ceiling = ceiling
+        self.overlap = overlap
+        self.ordered_verses = ordered_verses
+        self.address_index = address_index
+        self.tokenizer = tokenizer
+        # Headroom margin reserves budget for prepended book names, headings, and citations
+        # so that downstream rendered passages stay strictly <= ceiling tokens.
+        self.headroom_margin = headroom_margin
+        self.include_overlap_heading = include_overlap_heading
+
+    def _count_tokens(self, text: str) -> int:
+        if self.tokenizer is not None:
+            if hasattr(self.tokenizer, "encode"):
+                return len(self.tokenizer.encode(text))
+            if callable(self.tokenizer):
+                return len(self.tokenizer(text))
+        # Fallback approximation: 1.3 tokens per word
+        return max(1, int(len(text.split()) * 1.3))
+
+    def chunk(self, pericopes: Sequence[Pericope]) -> list[Passage]:
+        if not pericopes:
+            return []
+        if not self.ordered_verses:
+            raise ValueError("TokenWindowChunker requires ordered_verses to compute token lengths")
+
+        effective_ceiling = self.ceiling - self.headroom_margin
+        passages: list[Passage] = []
+
+        # Map each global verse index to its pericope start and heading
+        pericope_map: dict[int, tuple[str, str | None]] = {}
+        pericope_ends: set[int] = set()
+        curr_idx = 0
+        for p in pericopes:
+            if self.address_index is not None:
+                s = self.address_index[(p.book, p.chapter, p.verse)]
+            else:
+                s = curr_idx
+                curr_idx += p.verse_count
+            pericope_map[s] = (p.book, p.heading)
+            pericope_ends.add(s + p.verse_count)
+
+        # Pre-compute token length for each verse in ordered_verses
+        verse_tokens = [self._count_tokens(text) for _, text in self.ordered_verses]
+        total_verses = len(self.ordered_verses)
+
+        fresh_start = 0
+        while fresh_start < total_verses:
+            current_book = self.ordered_verses[fresh_start][0][0]
+
+            # Accumulate fresh verses within current book up to effective_ceiling
+            accum_tokens = 0
+            curr = fresh_start
+            while curr < total_verses and self.ordered_verses[curr][0][0] == current_book:
+                v_tok = verse_tokens[curr]
+                if accum_tokens + v_tok > effective_ceiling and curr > fresh_start:
+                    break
+                accum_tokens += v_tok
+                curr += 1
+                if curr in pericope_ends and accum_tokens >= (effective_ceiling // 2):
+                    break
+
+            fresh_end = curr
+
+            # Calculate overlap verses from previous passage if within the same book
+            lead_in = 0
+            if self.overlap > 0 and passages and passages[-1].book == current_book:
+                prev_passage = passages[-1]
+                cand_lead = min(self.overlap, fresh_start - prev_passage.start_idx)
+                lead_tokens = sum(verse_tokens[fresh_start - cand_lead : fresh_start])
+                if accum_tokens + lead_tokens <= effective_ceiling:
+                    lead_in = cand_lead
+
+            chunk_start = fresh_start - lead_in
+            chunk_end = fresh_end
+
+            # Build sections with heading attribution
+            sections: list[tuple[int, str | None]] = []
+            for v_idx in range(chunk_start, chunk_end):
+                if v_idx in pericope_map:
+                    _, heading = pericope_map[v_idx]
+                    if v_idx < fresh_start and not self.include_overlap_heading:
+                        heading = None
+                    sections.append((v_idx, heading))
+
+            if not sections:
+                sections.append((chunk_start, current_book))
+
+            passages.append(
+                Passage(
+                    book=current_book,
+                    start_idx=chunk_start,
+                    end_idx=chunk_end,
+                    sections=tuple(sections),
+                    start_address=self.ordered_verses[chunk_start][0],
+                    end_address=self.ordered_verses[chunk_end - 1][0],
+                )
+            )
+
+            fresh_start = fresh_end
+
+        return passages
 
 
 def index_verses_by_address(
@@ -207,84 +380,6 @@ def index_verses_by_address(
 ) -> dict[VerseAddress, int]:
     """Maps each verse address to its position in ordered_verses."""
     return {addr: i for i, (addr, _) in enumerate(ordered_verses)}
-
-
-class ChunkRenderer:
-    """Renders passages into formatted text strings for retrieval embedding."""
-
-    def __init__(
-        self,
-        ordered_verses: Sequence[tuple[VerseAddress, str]],
-        address_index: dict[VerseAddress, int] | None = None,
-        strategy: str = "heading_and_text",
-        include_headings: bool = True,
-        include_incomplete_headings: bool = True,
-    ):
-        self.ordered_verses = ordered_verses
-        self.address_index = address_index
-        self.strategy = strategy
-        self.include_headings = include_headings
-        self.include_incomplete_headings = include_incomplete_headings
-
-    def _format_address(self, start_idx: int, end_idx: int) -> str:
-        start_v = self.ordered_verses[start_idx][0]
-        end_v = self.ordered_verses[end_idx - 1][0]
-        book_name = BOOK_NAMES.get(start_v[0], start_v[0])
-        if start_v[1] == end_v[1]:
-            if start_v[2] == end_v[2]:
-                return f"[{book_name} {start_v[1]}:{start_v[2]}]"
-            return f"[{book_name} {start_v[1]}:{start_v[2]}–{end_v[2]}]"
-        return f"[{book_name} {start_v[1]}:{start_v[2]}–{end_v[1]}:{end_v[2]}]"
-
-    def _format_header(
-        self,
-        heading: str | None,
-        start_idx: int,
-        end_idx: int,
-        book: str,
-        is_first: bool = False,
-    ) -> str | None:
-        if self.strategy == "text_only":
-            return None
-        if self.strategy == "heading_and_text":
-            return heading if self.include_headings else None
-        book_name = BOOK_NAMES.get(book, book)
-        if self.strategy == "book_and_heading":
-            if heading and self.include_headings:
-                return f"{book_name} — {heading}"
-            return book_name if is_first else None
-        if self.strategy == "address_and_heading":
-            addr = self._format_address(start_idx, end_idx)
-            if heading and self.include_headings:
-                return f"{addr} {heading}"
-            return addr
-        raise ValueError(f"Unknown render strategy: {self.strategy}")
-
-    def render(self, passage: Passage) -> str:
-        if not passage.sections:
-            text = " ".join(
-                self.ordered_verses[k][1] for k in range(passage.start_idx, passage.end_idx)
-            )
-            heading = passage.headings[0] if passage.headings else None
-            header = self._format_header(
-                heading, passage.start_idx, passage.end_idx, passage.book, is_first=True
-            )
-            return f"{header}\n{text}" if header else text
-
-        blocks: list[str] = []
-        for i, (sec_start, heading) in enumerate(passage.sections):
-            sec_end = passage.sections[i + 1][0] if i + 1 < len(passage.sections) else passage.end_idx
-            sec_text = " ".join(
-                self.ordered_verses[k][1] for k in range(sec_start, sec_end)
-            )
-            header = self._format_header(
-                heading, sec_start, sec_end, passage.book, is_first=(i == 0)
-            )
-            if header:
-                blocks.append(f"{header}\n{sec_text}")
-            else:
-                blocks.append(sec_text)
-        return "\n\n".join(blocks)
 
 
 def resolve_verse_to_chunk_index(

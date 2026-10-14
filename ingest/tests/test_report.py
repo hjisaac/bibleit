@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from bibleit_ingest.chunking import Passage
-from eval.helpers.report import (
+from bibleit_ingest.report import (
     BaseRetrievalReport,
     DetailsBlock,
     RetrievalOutcome,

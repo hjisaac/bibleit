@@ -1,0 +1,14 @@
+log_console_level: INFO
+log_file_level: INFO
+
+k: 1
+floor: 5
+ceiling: 30
+overlap: 1
+render_strategy: heading_and_text
+
+# REPO-relative, not CWD-relative (see job.py).
+eval_data_path: ingest/data/eval/question_to_passage.json
+web_path: ingest/data/translations/web/en/web.json
+embedding_model: nomic-ai/nomic-embed-text-v1.5
+threads: 2

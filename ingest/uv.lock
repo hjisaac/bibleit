@@ -442,7 +442,7 @@ wheels = [
 [[package]]
 name = "crucible"
 version = "0.1.0"
-source = { editable = "crucible" }
+source = { git = "https://github.com/hjisaac/cruciblelib.git#40feab8f2ccbfbea3b48d3b6f1f8125a15d26efc" }
 dependencies = [
     { name = "dotenv" },
     { name = "hydra-core" },
@@ -457,19 +457,6 @@ dependencies = [
 wandb = [
     { name = "wandb" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "dotenv", specifier = ">=0.9.9" },
-    { name = "hydra-core", specifier = ">=1.3.2" },
-    { name = "joblib", specifier = ">=1.4.2" },
-    { name = "numpy", specifier = ">=2.4.4" },
-    { name = "omegaconf", specifier = ">=2.3.0" },
-    { name = "rich", specifier = ">=14.3.3" },
-    { name = "typer", specifier = ">=0.24.1" },
-    { name = "wandb", marker = "extra == 'wandb'", specifier = ">=0.25.0" },
-]
-provides-extras = ["wandb"]
 
 [[package]]
 name = "cycler"
@@ -804,7 +791,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "codetiming", specifier = ">=1.4.0" },
-    { name = "crucible", extras = ["wandb"], editable = "crucible" },
+    { name = "crucible", extras = ["wandb"], git = "https://github.com/hjisaac/cruciblelib.git" },
     { name = "datalens", extras = ["viz"], git = "https://github.com/hjisaac/datalens.git?branch=feat%2Fmcp-server" },
     { name = "fastembed", specifier = ">=0.8.0" },
     { name = "joblib", specifier = ">=1.3.0" },

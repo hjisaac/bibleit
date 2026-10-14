@@ -52,13 +52,13 @@ export function buildLocalEngine(p: Ports): SearchEngine {
       );
     }
 
-    const [verses, , emb] = await Promise.all([
+    const [, chunks, emb] = await Promise.all([
       p.store.verses(),
       p.store.chunks(),
       p.store.embeddings(),
     ]);
     await Promise.all([
-      p.lexical.build(verses),
+      p.lexical.build(chunks),
       p.vectors.build(manifest, emb.data, emb.scales),
       p.embedder.load(),
     ]);

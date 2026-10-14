@@ -38,9 +38,8 @@ The user is building this project to learn by doing and to have full ownership o
 - Do not write file-level (`"""..."""`) module docstrings in Python files. They go stale and will not be maintained.
 - Class and function docstrings are allowed where useful, but keep them concise.
 
-### 4. Protect Vendored Code (`crucible/`)
-- `ingest/eval/crucible/` is vendored external tooling.
-- **Never** style-groom, reformat, or trim comments in `crucible/`. Only edit it for functional bug fixes or explicit user requests.
+### 4. External Dependency (`cruciblelib`)
+- `cruciblelib` is an external experiment orchestrator dependency managed via git in `ingest/pyproject.toml`.
 
 ### 5. Swappable & Lightweight Experiment Tracking
 - Weights & Biases (W&B) is not a hard lock-in. Any similar metrics/artifact tracker is acceptable.

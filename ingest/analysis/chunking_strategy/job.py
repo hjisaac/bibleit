@@ -4,15 +4,13 @@ from pathlib import Path
 from typing import Any
 
 from datalens import AnalysisConfig, run_analysis
-from fastembed import TextEmbedding
 
-from bibleit_ingest.chunking import (
-    AdaptiveWindowChunker,
-    ChunkRenderer,
-)
+from bibleit_ingest.artifacts import write_inspection_samples, write_lock_file
+from bibleit_ingest.chunking import AdaptiveWindowChunker, PericopeChunker, TokenWindowChunker
 from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, OLD_TESTAMENT_BOOKS, REPO
-from bibleit_ingest.embedding import save_chunk_embeddings
+from bibleit_ingest.embedding import Embedder
 from bibleit_ingest.pericopes import get_or_prepare_corpus
+from bibleit_ingest.renderers import get_renderer
 from analysis.job import AnalysisJobBase
 
 logger = logging.getLogger(__name__)
@@ -21,14 +19,26 @@ logger = logging.getLogger(__name__)
 class AnalysisJobChunkingStrategy(AnalysisJobBase):
     path_config_keys = ("web_path", "bsb_dir")
 
-    def on_start(self) -> None:
-        super().on_start()
-        self.slug = self.make_slug({
-            "f": self.config["floor"],
-            "c": self.config["ceiling"],
-            "o": self.config.get("overlap", 1),
-        })
-        self.run_dir = Path(self.config["log_dir"]).resolve() / self.slug
+    def _make_slug(self) -> str:
+        f = self.config.get("floor", 5)
+        c = self.config.get("ceiling", 30)
+        o = self.config.get("overlap", 1)
+        ovh_flag = ""
+        if o > 0 and "include_overlap_heading" in self.config:
+            ovh_flag = "_ovh1" if self.config.get("include_overlap_heading") else "_ovh0"
+        strat_map = {
+            "text_only": "text",
+            "heading_and_text": "heading",
+            "book_and_heading": "book_heading",
+            "address_and_heading": "addr_heading",
+        }
+        strat_key = str(self.config.get("render_strategy", "heading_and_text"))
+        strat = strat_map.get(strat_key, strat_key[:8])
+        if self.config.get("strategy") == "pericope":
+            return f"peri_c{c}_o{o}{ovh_flag}_{strat}"
+        if self.config.get("strategy") == "token_window":
+            return f"tok_c{c}_o{o}{ovh_flag}_{strat}"
+        return f"f{f}_c{c}_o{o}{ovh_flag}_{strat}"
 
     def on_prepare(self) -> dict:
         corpus = get_or_prepare_corpus(self.web_path, self.bsb_dir)
@@ -36,7 +46,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         tok_model_name = self.config.get(
             "tokenizer_model", "nomic-ai/nomic-embed-text-v1.5"
         )
-        embed_model = TextEmbedding(
+        embedder = Embedder(
             model_name=tok_model_name, cache_dir=str(FASTEMBED_CACHE_DIR)
         )
 
@@ -44,32 +54,55 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
             "pericopes": corpus.pericopes,
             "ordered_verses": corpus.ordered_verses,
             "address_index": corpus.address_index,
-            "embed_model": embed_model,
+            "embedder": embedder,
         }
 
     def on_execute(self, prepared: dict) -> dict[str, Any]:
-        floor = int(self.config["floor"])
         ceiling = int(self.config["ceiling"])
         overlap = int(self.config.get("overlap", 1))
+        include_overlap_heading = bool(self.config.get("include_overlap_heading", True))
+        strategy_name = self.config.get("strategy", "adaptive")
         ordered_verses = prepared["ordered_verses"]
         address_index = prepared["address_index"]
 
-        chunker = AdaptiveWindowChunker(
-            floor=floor,
-            ceiling=ceiling,
-            overlap=overlap,
-            ordered_verses=ordered_verses,
-            address_index=address_index,
-        )
+        if strategy_name == "pericope":
+            chunker = PericopeChunker(
+                ceiling=ceiling,
+                overlap=overlap,
+                ordered_verses=ordered_verses,
+                address_index=address_index,
+                include_overlap_heading=include_overlap_heading,
+            )
+        elif strategy_name == "token_window":
+            headroom_margin = int(self.config.get("headroom_margin", 25))
+            chunker = TokenWindowChunker(
+                ceiling=ceiling,
+                overlap=overlap,
+                ordered_verses=ordered_verses,
+                address_index=address_index,
+                tokenizer=prepared["embedder"].model.tokenizer,
+                headroom_margin=headroom_margin,
+                include_overlap_heading=include_overlap_heading,
+            )
+        else:
+            floor = int(self.config.get("floor", 5))
+            chunker = AdaptiveWindowChunker(
+                floor=floor,
+                ceiling=ceiling,
+                overlap=overlap,
+                ordered_verses=ordered_verses,
+                address_index=address_index,
+                include_overlap_heading=include_overlap_heading,
+            )
         chunks = chunker.chunk(prepared["pericopes"])
 
-        tokenizer = prepared["embed_model"].model.tokenizer
+        tokenizer = prepared["embedder"].model.tokenizer
         limit = int(self.config.get("token_limit", 512))
-        renderer = ChunkRenderer(
+        strategy = self.config.get("render_strategy", "heading_and_text")
+        renderer = get_renderer(
+            strategy=strategy,
             ordered_verses=ordered_verses,
             address_index=address_index,
-            include_headings=bool(self.config.get("include_headings", True)),
-            include_incomplete_headings=bool(self.config.get("include_incomplete_headings", True)),
         )
 
         texts = []
@@ -96,8 +129,8 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         lens_cfg = AnalysisConfig(
             columns={
                 "token_count": "quantile",
-                "word_count": "numeric",
-                "verse_count": "numeric",
+                "word_count": "quantile",
+                "verse_count": "quantile",
                 "book": "categorical",
             },
             quantiles=[0.01, 0.05, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99],
@@ -119,8 +152,8 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
             "p99_tokens": round(float(tok.get("p99", 0)), 2),
             "truncated_count": truncated,
             "truncation_pct": round((truncated / len(chunks) * 100), 2) if chunks else 0.0,
-            "mean_words": round(float(words.get("mean", 0)), 2),
-            "mean_verses": round(float(verses.get("mean", 0)), 2),
+            "p50_words": round(float(words.get("p50", 0)), 2),
+            "p50_verses": round(float(verses.get("p50", 0)), 2),
         }
 
         return {
@@ -130,6 +163,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
             "metrics": metrics,
             "analysis_result": analysis_result,
             "corpus_stats": corpus_stats,
+            "renderer": renderer,
         }
 
     def on_finalize(self, prepared: dict, result: dict[str, Any]) -> None:
@@ -143,11 +177,50 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
             for name, path in plot_paths.items():
                 self.tracker.track_artifact(path, name=name, type="plot")
 
-        if emb_model := self.config.get("embedding_model"):
-            logger.info("Embedding %d chunks with %s", len(result["chunks"]), emb_model)
-            save_chunk_embeddings(
-                result["chunks"], result["texts"], prepared["embed_model"], self.run_dir
-            )
+        # Save chunk definitions artifact
+        ordered_verses = prepared.get("ordered_verses", ())
+        chunks_meta = []
+        for c in result["chunks"]:
+            sections_meta = []
+            for sec_idx, sec_heading in c.sections:
+                addr = ordered_verses[sec_idx][0] if ordered_verses and sec_idx < len(ordered_verses) else None
+                sections_meta.append({
+                    "chapter": addr[1] if addr else c.chapter,
+                    "verse": addr[2] if addr else c.verse,
+                    "heading": sec_heading,
+                })
+            chunks_meta.append({
+                "book": c.book,
+                "chapter": c.chapter,
+                "verse": c.verse,
+                "verse_count": c.verse_count,
+                "sections": sections_meta,
+            })
+        chunks_path = self.run_dir / "chunks.json"
+        chunks_path.write_text(json.dumps(chunks_meta, indent=2), encoding="utf-8")
+
+        lock_data = {
+            "stage": "chunking",
+            "parameters": {
+                "floor": int(self.config.get("floor", 1)),
+                "ceiling": int(self.config["ceiling"]),
+                "overlap": int(self.config.get("overlap", 1)),
+                "include_overlap_heading": bool(self.config.get("include_overlap_heading", True)),
+                "strategy": self.config.get("strategy", "adaptive"),
+                "render_strategy": self.config.get("render_strategy", "heading_and_text"),
+                "tokenizer_model": self.config.get("tokenizer_model", "nomic-ai/nomic-embed-text-v1.5"),
+            },
+            "output": {
+                "total_chunks": len(result["chunks"]),
+                "truncation_pct": result["metrics"]["truncation_pct"],
+                "p50_tokens": result["metrics"]["p50_tokens"],
+            },
+        }
+        write_lock_file(self.run_dir / "config.lock.yaml", lock_data)
+        renderer = result.get("renderer")
+        if renderer:
+            write_inspection_samples(self.run_dir, result["chunks"], renderer)
+        logger.info("Saved chunk artifact with lock to %s", self.run_dir)
 
 
 JOB_CLASS = AnalysisJobChunkingStrategy

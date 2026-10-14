@@ -16,25 +16,12 @@ from bibleit_ingest.constants import REPO
 logger = logging.getLogger(__name__)
 
 
-def dict_to_slug(params: dict[str, Any]) -> str:
-    """Format dict key-values into {key}-{value} pairs joined by underscores."""
-    return "_".join(f"{k}-{v}" for k, v in params.items() if v is not None)
-
-
 class EvalJobBase(AbstractJob):
     """Base class for all bibleit evaluation and profiling jobs.
     Handles path resolution, W&B tracking under bibleit-eval, and saving results."""
 
     path_config_keys: tuple[str, ...] = ()
     category: str = "eval"
-
-    def make_slug(self, params: dict[str, Any] | None = None) -> str:
-        parts = [self.run_id]
-        if tag := self.config.get("tag"):
-            parts.append(str(tag))
-        if params and (param_str := dict_to_slug(params)):
-            parts.append(param_str)
-        return "_".join(parts)
 
     @property
     def project_name(self) -> str:
@@ -43,14 +30,20 @@ class EvalJobBase(AbstractJob):
         name = raw.replace("_", "-").removesuffix("-eval").removesuffix("-analysis")
         return f"bibleit-{self.category}-{name}"
 
+    def _make_slug(self) -> str:
+        """Override in subclasses to provide a concise parameter suffix for the run folder."""
+        return ""
+
     def on_start(self) -> None:
         for key in self.path_config_keys:
             setattr(self, key, REPO / self.config[key])
+        slug = self._make_slug()
+        self.run_name = f"{self.run_id}_{slug}" if slug else self.run_id
+        self.run_dir = Path(self.config.get("log_dir", "outputs")).resolve() / self.run_name
 
     def on_track(self) -> None:
         logger.info("Using config:\n%s", json.dumps(self.config, indent=2, default=str))
-        run_name = getattr(self, "slug", self.run_id)
-        self.tracker = WBTracker(run_name=run_name, project=self.project_name, config=self.config)
+        self.tracker = WBTracker(run_name=getattr(self, "run_name", self.run_id), project=self.project_name, config=self.config)
 
     def on_finalize(self, prepared: dict, result: dict[str, Any]) -> None:
         metrics = result.get("metrics", {})
@@ -59,7 +52,7 @@ class EvalJobBase(AbstractJob):
         payload = {"run_conditions": self.config, **result}
         target_dir = getattr(self, "run_dir", Path(self.config.get("log_dir", "outputs")))
         target_dir.mkdir(parents=True, exist_ok=True)
-        out_path = target_dir / f"{self.run_id}.json"
+        out_path = target_dir / "run.json"
         out_path.write_text(json.dumps(payload, indent=2, default=str))
         logger.info("Saved to %s", out_path)
 
@@ -76,8 +69,8 @@ class EvalJobBase(AbstractJob):
         if hasattr(self, "run_dir"):
             log_dir = Path(self.config.get("log_dir", "outputs"))
             src_log = log_dir / f"{self.run_id}.log"
-            dst_log = self.run_dir / f"{self.run_id}.log"
-            if src_log.exists() and self.run_dir != log_dir:
+            dst_log = self.run_dir / "run.log"
+            if src_log.exists():
                 import shutil
                 self.run_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src_log, dst_log)
+                shutil.move(str(src_log), str(dst_log))

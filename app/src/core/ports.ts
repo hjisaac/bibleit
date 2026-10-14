@@ -60,7 +60,7 @@ export interface RefParser {
  * Swap: prebuilt serialized index shipped as an artifact.
  */
 export interface LexicalIndex {
-  build(verses: Verse[]): Promise<void>;
+  build(chunks: Chunk[]): Promise<void>;
   search(query: string, k: number): ScoredPassage[];
 }
 
