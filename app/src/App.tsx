@@ -45,13 +45,28 @@ export function App(): JSX.Element {
     scrollKey: 0,
   });
 
-  const [savedVerses, setSavedVerses] = useState<SavedVerse[]>([
-    {
-      id: '1',
-      ref: 'Philippians 4:7',
-      text: 'And the peace of God, which surpasses all understanding, will guard your hearts and your thoughts in Christ Jesus.',
-    },
-  ]);
+  const [savedVerses, setSavedVerses] = useState<SavedVerse[]>(() => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('bibleit_saved_verses');
+        if (stored) return JSON.parse(stored);
+      } catch {
+        // Fall back to default
+      }
+    }
+    return [
+      {
+        id: '1',
+        book: 'PHP',
+        bookName: 'Philippians',
+        chapter: 4,
+        verse: 7,
+        citation: 'Philippians 4:7',
+        text: 'And the peace of God, which surpasses all understanding, will guard your hearts and your thoughts in Christ Jesus.',
+        savedAt: Date.now(),
+      },
+    ];
+  });
 
   const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true,
@@ -186,11 +201,32 @@ export function App(): JSX.Element {
     setActiveTab('reader');
   };
 
-  const handleSaveVerse = (ref: string, text: string) => {
-    setSavedVerses((prev) => [
-      ...prev.filter((v) => v.ref !== ref),
-      { id: Date.now().toString(), ref, text },
-    ]);
+  const handleSaveVerse = (verse: {
+    book: string;
+    bookName: string;
+    chapter: number;
+    verse: number;
+    citation: string;
+    text: string;
+  }) => {
+    setSavedVerses((prev) => {
+      const next = [
+        ...prev.filter((v) => !(v.book === verse.book && v.chapter === verse.chapter && v.verse === verse.verse)),
+        {
+          id: Date.now().toString(),
+          ...verse,
+          savedAt: Date.now(),
+        },
+      ];
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem('bibleit_saved_verses', JSON.stringify(next));
+        } catch {
+          // Ignore quota errors
+        }
+      }
+      return next;
+    });
   };
 
   return (
@@ -240,10 +276,8 @@ export function App(): JSX.Element {
         {activeTab === 'saved' && (
           <SavedView
             savedVerses={savedVerses}
-            onOpenVerse={(ref) => {
-              const [book, rest] = ref.split(' ');
-              const [chapter, verse] = (rest ?? '').split(':');
-              handleOpenReader(book ?? 'PHP', Number(chapter ?? 4), Number(verse ?? 7));
+            onOpenVerse={(item) => {
+              handleOpenReader(item.book, item.chapter, item.verse);
             }}
           />
         )}

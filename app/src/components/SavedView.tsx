@@ -2,13 +2,18 @@ import type { JSX } from 'preact';
 
 export interface SavedVerse {
   id: string;
-  ref: string;
+  book: string;
+  bookName: string;
+  chapter: number;
+  verse: number;
+  citation: string;
   text: string;
+  savedAt: number;
 }
 
 interface SavedViewProps {
   savedVerses: SavedVerse[];
-  onOpenVerse: (ref: string) => void;
+  onOpenVerse: (verse: SavedVerse) => void;
 }
 
 export function SavedView({ savedVerses, onOpenVerse }: SavedViewProps): JSX.Element {
@@ -39,7 +44,7 @@ export function SavedView({ savedVerses, onOpenVerse }: SavedViewProps): JSX.Ele
           {savedVerses.map((item) => (
             <article
               key={item.id}
-              onClick={() => onOpenVerse(item.ref)}
+              onClick={() => onOpenVerse(item)}
               class="p-4 rounded-2xl border space-y-1 cursor-pointer hover:shadow-sm transition-all"
               style={{
                 backgroundColor: 'var(--bg-surface)',
@@ -47,7 +52,7 @@ export function SavedView({ savedVerses, onOpenVerse }: SavedViewProps): JSX.Ele
               }}
             >
               <div class="flex items-center justify-between text-xs" style={{ color: 'var(--text-muted)' }}>
-                <span class="font-semibold text-amber-700 dark:text-amber-400">{item.ref}</span>
+                <span class="font-semibold text-amber-700 dark:text-amber-400">{item.citation}</span>
                 <span class="text-[10px]">Saved</span>
               </div>
               <p class="font-serif text-sm leading-relaxed" style={{ color: 'var(--text-main)' }}>
