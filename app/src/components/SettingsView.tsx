@@ -11,6 +11,8 @@ interface SettingsViewProps {
   onToggleAi: (enabled: boolean) => void;
   isInspectorMode: boolean;
   onToggleInspector: (enabled: boolean) => void;
+  showHeadings: boolean;
+  onToggleHeadings: (enabled: boolean) => void;
   textPackageStatus: PackageStatus;
   aiPackageStatus: PackageStatus;
   textProgress: number;
@@ -29,6 +31,8 @@ export function SettingsView({
   onToggleAi,
   isInspectorMode,
   onToggleInspector,
+  showHeadings,
+  onToggleHeadings,
   textPackageStatus,
   aiPackageStatus,
   textProgress,
@@ -52,6 +56,7 @@ export function SettingsView({
       }, 2000);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [highlightStorage]);
   return (
     <section class="flex-1 flex flex-col p-4 sm:p-8 overflow-y-auto space-y-6 max-w-2xl mx-auto w-full">
@@ -205,6 +210,39 @@ export function SettingsView({
             <div>• Rank fusion: Reciprocal Rank Fusion (k=60)</div>
           </div>
         )}
+      </div>
+
+      {/* Pericope Headings Toggle */}
+      <div
+        class="p-4 rounded-2xl border space-y-3"
+        style={{
+          backgroundColor: 'var(--bg-surface-elevated)',
+          borderColor: 'var(--border-subtle)',
+        }}
+      >
+        <div class="flex items-center justify-between">
+          <div class="pr-3">
+            <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
+              <span>Pericope Headings</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 font-mono font-medium">
+                Context
+              </span>
+            </div>
+            <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              Display topical section headings above retrieved passages.
+            </p>
+          </div>
+
+          <label class="relative inline-flex items-center cursor-pointer shrink-0">
+            <input
+              type="checkbox"
+              checked={showHeadings}
+              onChange={(e) => onToggleHeadings((e.target as HTMLInputElement).checked)}
+              class="sr-only peer"
+            />
+            <div class="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
+          </label>
+        </div>
       </div>
 
       {/* Offline Packages & Storage Control */}

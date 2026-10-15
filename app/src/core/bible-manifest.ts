@@ -30,7 +30,8 @@ export function computeCrc32(data: string | Uint8Array): string {
   const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
   let crc = 0xffffffff;
   for (let i = 0; i < bytes.length; i++) {
-    crc = CRC_TABLE[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+    const b = bytes[i] ?? 0;
+    crc = (CRC_TABLE[(crc ^ b) & 0xff] ?? 0) ^ (crc >>> 8);
   }
   return ((crc ^ 0xffffffff) >>> 0).toString(16).padStart(8, '0');
 }

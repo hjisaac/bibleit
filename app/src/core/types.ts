@@ -18,8 +18,10 @@ export interface Verse extends VerseRef {
 /** Retrieval unit: a passage window over consecutive verses. */
 export interface Chunk {
   id: number;
-  start: VerseRef;
-  end: VerseRef;
+  book: string;
+  start: [number, number];
+  end: [number, number];
+  headings?: [number, number, string][];
   /** Concatenated verse text (for display / BM25 the app uses verses directly). */
   text: string;
 }
@@ -48,11 +50,11 @@ export interface RetrievalResult {
 }
 
 // ---------------------------------------------------------------------------
-// Artifact manifest (schema_version 1) — the offline/runtime boundary.
+// Artifact manifest (schema_version 2) — the offline/runtime boundary.
 // ---------------------------------------------------------------------------
 
 export interface Manifest {
-  schema_version: 1;
+  schema_version: 2;
   translation: {
     id: string;
     lang: string;

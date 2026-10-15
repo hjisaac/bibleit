@@ -351,3 +351,40 @@ def test_token_window_chunker() -> None:
         TokenWindowChunker(ceiling=50, headroom_margin=50)
 
 
+def test_passage_headings_meta_no_raw_book_codes() -> None:
+    ordered_verses = [
+        (("PHP", 4, 4), "Rejoice in the Lord always"),
+        (("PHP", 4, 7), "And the peace of God"),
+    ]
+    # Passage with a real heading and a raw book code in sections
+    passage = Passage(
+        book="PHP",
+        start_idx=0,
+        end_idx=2,
+        sections=((0, "Rejoice in the Lord"), (1, "PHP")),
+        start_address=("PHP", 4, 4),
+        end_address=("PHP", 4, 7),
+    )
+    meta = passage.get_headings_meta(ordered_verses)
+    assert meta == [[4, 4, "Rejoice in the Lord"]]
+    # Verify raw book code "PHP" was filtered out
+    assert not any("PHP" in item for item in meta)
+
+
+def test_adaptive_chunker_headings_clean() -> None:
+    ordered_verses = [(("GEN", 1, i), f"Verse {i}") for i in range(1, 11)]
+    pericopes = [
+        Pericope(book="GEN", chapter=1, verse=1, heading="The Creation", verse_count=5),
+        Pericope(book="GEN", chapter=1, verse=6, heading="", verse_count=5),
+    ]
+    chunker = AdaptiveWindowChunker(floor=8, ceiling=15, ordered_verses=ordered_verses)
+    chunks = chunker.chunk(pericopes)
+    assert len(chunks) == 1
+    # Check that sections do not contain "GEN"
+    for _, heading in chunks[0].sections:
+        assert heading != "GEN"
+    meta = chunks[0].get_headings_meta(ordered_verses)
+    assert meta == [[1, 1, "The Creation"]]
+
+
+

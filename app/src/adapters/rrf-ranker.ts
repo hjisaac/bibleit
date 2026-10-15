@@ -6,17 +6,18 @@ export interface RrfOptions {
   kConst?: number;
 }
 
+function compareCoord(a: [number, number], b: [number, number]): number {
+  if (a[0] !== b[0]) return a[0] - b[0];
+  return a[1] - b[1];
+}
+
 /**
  * Checks whether two passage chunks overlap in Scripture.
+ * Two intervals [start_a, end_a] and [start_b, end_b] overlap iff start_a <= end_b and start_b <= end_a.
  */
 function chunksOverlap(a: Chunk, b: Chunk): boolean {
-  if (a.start.book !== b.start.book) return false;
-  // If same chapter, check verse ranges
-  if (a.start.chapter === b.start.chapter && a.end.chapter === b.end.chapter) {
-    return !(a.end.verse < b.start.verse || b.end.verse < a.start.verse);
-  }
-  // Across chapters in the same book
-  return !(a.end.chapter < b.start.chapter || b.end.chapter < a.start.chapter);
+  if (a.book !== b.book) return false;
+  return compareCoord(a.start, b.end) <= 0 && compareCoord(b.start, a.end) <= 0;
 }
 
 /**

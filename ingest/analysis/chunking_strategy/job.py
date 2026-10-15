@@ -6,7 +6,7 @@ from typing import Any
 from datalens import AnalysisConfig, run_analysis
 
 from bibleit_ingest.artifacts import write_inspection_samples, write_lock_file
-from bibleit_ingest.chunking import AdaptiveWindowChunker, PericopeChunker, TokenWindowChunker
+from bibleit_ingest.chunking import get_chunker
 from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, OLD_TESTAMENT_BOOKS, REPO
 from bibleit_ingest.embedding import Embedder
 from bibleit_ingest.pericopes import get_or_prepare_corpus
@@ -58,42 +58,19 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         }
 
     def on_execute(self, prepared: dict) -> dict[str, Any]:
-        ceiling = int(self.config["ceiling"])
-        overlap = int(self.config.get("overlap", 1))
-        include_overlap_heading = bool(self.config.get("include_overlap_heading", True))
-        strategy_name = self.config.get("strategy", "adaptive")
         ordered_verses = prepared["ordered_verses"]
         address_index = prepared["address_index"]
+        if "strategy" not in self.config:
+            raise KeyError("Missing required 'strategy' parameter in chunking configuration")
+        strategy_name = str(self.config["strategy"])
 
-        if strategy_name == "pericope":
-            chunker = PericopeChunker(
-                ceiling=ceiling,
-                overlap=overlap,
-                ordered_verses=ordered_verses,
-                address_index=address_index,
-                include_overlap_heading=include_overlap_heading,
-            )
-        elif strategy_name == "token_window":
-            headroom_margin = int(self.config.get("headroom_margin", 25))
-            chunker = TokenWindowChunker(
-                ceiling=ceiling,
-                overlap=overlap,
-                ordered_verses=ordered_verses,
-                address_index=address_index,
-                tokenizer=prepared["embedder"].model.tokenizer,
-                headroom_margin=headroom_margin,
-                include_overlap_heading=include_overlap_heading,
-            )
-        else:
-            floor = int(self.config.get("floor", 5))
-            chunker = AdaptiveWindowChunker(
-                floor=floor,
-                ceiling=ceiling,
-                overlap=overlap,
-                ordered_verses=ordered_verses,
-                address_index=address_index,
-                include_overlap_heading=include_overlap_heading,
-            )
+        chunker = get_chunker(
+            strategy_name,
+            ordered_verses=ordered_verses,
+            address_index=address_index,
+            tokenizer=prepared["embedder"].model.tokenizer,
+            **self.config,
+        )
         chunks = chunker.chunk(prepared["pericopes"])
 
         tokenizer = prepared["embedder"].model.tokenizer
@@ -179,23 +156,16 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
 
         # Save chunk definitions artifact
         ordered_verses = prepared.get("ordered_verses", ())
-        chunks_meta = []
-        for c in result["chunks"]:
-            sections_meta = []
-            for sec_idx, sec_heading in c.sections:
-                addr = ordered_verses[sec_idx][0] if ordered_verses and sec_idx < len(ordered_verses) else None
-                sections_meta.append({
-                    "chapter": addr[1] if addr else c.chapter,
-                    "verse": addr[2] if addr else c.verse,
-                    "heading": sec_heading,
-                })
-            chunks_meta.append({
+        chunks_meta = [
+            {
                 "book": c.book,
-                "chapter": c.chapter,
-                "verse": c.verse,
+                "start": c.start,
+                "end": c.end,
                 "verse_count": c.verse_count,
-                "sections": sections_meta,
-            })
+                "headings": c.get_headings_meta(ordered_verses),
+            }
+            for c in result["chunks"]
+        ]
         chunks_path = self.run_dir / "chunks.json"
         chunks_path.write_text(json.dumps(chunks_meta, indent=2), encoding="utf-8")
 

@@ -88,6 +88,22 @@ export function App(): JSX.Element {
     showToast(enabled ? 'AI Scripture Overview enabled' : 'AI Scripture Overview deactivated');
   };
 
+  const [showHeadings, setShowHeadings] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bibleit_show_headings');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+
+  const handleToggleHeadings = (enabled: boolean) => {
+    setShowHeadings(enabled);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('bibleit_show_headings', String(enabled));
+    }
+    showToast(enabled ? 'Pericope headings enabled' : 'Pericope headings hidden');
+  };
+
   // Sync offline text package state with real Cache API on boot
   useEffect(() => {
     getCachedBooksCount().then((count) => {
@@ -251,6 +267,7 @@ export function App(): JSX.Element {
             isOnline={isOnline}
             isAiEnabled={isAiEnabled}
             isInspectorMode={isInspectorMode}
+            showHeadings={showHeadings}
             offlineTextStatus={textPackageStatus}
             hasSeenOnboarding={hasSeenStorageBanner}
             onOpenStorage={handleOpenStorage}
@@ -290,6 +307,8 @@ export function App(): JSX.Element {
             onToggleAi={handleToggleAi}
             isInspectorMode={isInspectorMode}
             onToggleInspector={setIsInspectorMode}
+            showHeadings={showHeadings}
+            onToggleHeadings={handleToggleHeadings}
             textPackageStatus={textPackageStatus}
             aiPackageStatus={aiPackageStatus}
             textProgress={textProgress}

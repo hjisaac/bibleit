@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import NamedTuple
+from typing import Any, NamedTuple, Sequence
 
 VerseAddress = tuple[str, int, int]  # (book, chapter, verse)
 
@@ -11,6 +11,10 @@ class Pericope:
     verse: int
     heading: str
     verse_count: int
+
+    @property
+    def start(self) -> list[int]:
+        return [self.chapter, self.verse]
 
 
 @dataclass(frozen=True)
@@ -40,6 +44,32 @@ class Passage:
     @property
     def verse(self) -> int:
         return self.start_address[2] if self.start_address else 0
+
+    @property
+    def start(self) -> list[int]:
+        return [self.chapter, self.verse]
+
+    @property
+    def end(self) -> list[int]:
+        if self.end_address:
+            return [self.end_address[1], self.end_address[2]]
+        return [self.chapter, self.verse]
+
+    def get_headings_meta(self, ordered_verses: Sequence[tuple[VerseAddress, str]] | None = None) -> list[list[Any]]:
+        """Returns [[chapter, verse, heading], ...] for genuine topical section headings."""
+        meta: list[list[Any]] = []
+        seen = set()
+        for sec_idx, sec_heading in self.sections:
+            if not sec_heading or sec_heading == self.book:
+                continue
+            addr = ordered_verses[sec_idx][0] if (ordered_verses and sec_idx < len(ordered_verses)) else None
+            ch = addr[1] if addr else self.chapter
+            v = addr[2] if addr else self.verse
+            key = (ch, v, sec_heading)
+            if key not in seen:
+                seen.add(key)
+                meta.append([ch, v, sec_heading])
+        return meta
 
 
 Chunk = Passage

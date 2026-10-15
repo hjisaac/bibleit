@@ -68,8 +68,10 @@ class StaticArtifactSink(BaseSink):
             chunks_payload.append(
                 {
                     "id": i,
-                    "start": {"book": start_addr[0], "chapter": start_addr[1], "verse": start_addr[2]},
-                    "end": {"book": end_addr[0], "chapter": end_addr[1], "verse": end_addr[2]},
+                    "book": chunk.book,
+                    "start": [start_addr[1], start_addr[2]],
+                    "end": [end_addr[1], end_addr[2]],
+                    "headings": chunk.get_headings_meta(corpus.ordered_verses),
                     "text": renderer.render(chunk),
                 }
             )
@@ -91,7 +93,7 @@ class StaticArtifactSink(BaseSink):
 
         # 4. Manifest
         manifest = {
-            "schema_version": 1,
+            "schema_version": 2,
             "translation": self.translation,
             "corpus": {"verses": verses_file.name, "count": len(corpus.ordered_verses)},
             "chunks": {"file": chunks_file.name, **meta},

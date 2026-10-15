@@ -8,9 +8,11 @@ batch_size: 4
 threads: 4
 
 # Upstream chunk artifact parameters (to auto-match from analysis/chunking_strategy/outputs)
+strategy: "adaptive"
 floor: 5
 ceiling: 30
 overlap: 1
+include_overlap_heading: true
 render_strategy: "heading_and_text"
 
 # Optional explicit path to an upstream chunk run dir
