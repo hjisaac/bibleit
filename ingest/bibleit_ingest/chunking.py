@@ -425,14 +425,15 @@ def load_pericopes(pericopes_path: Path) -> list[Pericope]:
 
 
 def get_chunker(
-    strategy: str = "adaptive",
-    *,
+    *args: Any,
     ordered_verses: Sequence[tuple[VerseAddress, str]] | None = None,
     address_index: dict[VerseAddress, int] | None = None,
     tokenizer: Any = None,
     **kwargs: Any,
 ) -> Chunker:
     """Instantiates the configured Chunker subclass."""
+    strategy = str(args[0] if args else kwargs.pop("strategy", "adaptive"))
+    kwargs.pop("strategy", None)
     if strategy == "adaptive":
         return AdaptiveWindowChunker(
             floor=int(kwargs.get("floor", AdaptiveWindowChunker.DEFAULT_FLOOR)),

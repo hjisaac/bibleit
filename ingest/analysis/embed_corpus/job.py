@@ -135,11 +135,13 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
                 )
         else:
             logger.info("No matching chunk artifact found; generating chunks in-line with strategy '%s'.", strategy_name)
+            chunk_cfg = dict(self.config)
+            chunk_cfg.pop("strategy", None)
             chunker = get_chunker(
                 strategy_name,
                 ordered_verses=corpus.ordered_verses,
                 address_index=corpus.address_index,
-                **self.config,
+                **chunk_cfg,
             )
             chunks = chunker.chunk(corpus.pericopes)
 

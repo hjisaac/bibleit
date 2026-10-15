@@ -64,12 +64,15 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
             raise KeyError("Missing required 'strategy' parameter in chunking configuration")
         strategy_name = str(self.config["strategy"])
 
+        chunk_cfg = dict(self.config)
+        chunk_cfg.pop("strategy", None)
+
         chunker = get_chunker(
             strategy_name,
             ordered_verses=ordered_verses,
             address_index=address_index,
             tokenizer=prepared["embedder"].model.tokenizer,
-            **self.config,
+            **chunk_cfg,
         )
         chunks = chunker.chunk(prepared["pericopes"])
 
