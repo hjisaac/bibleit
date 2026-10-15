@@ -99,10 +99,10 @@ def resolve_matching_artifacts(
             if not common_keys:
                 continue
             if all(params[k] == criteria[k] for k in common_keys):
-                # Ensure strategy matches if either specifies it
+                # Ensure strategy matches strictly if either specifies it
                 strat_req = criteria.get("strategy")
                 strat_act = params.get("strategy")
-                if strat_req and strat_act and strat_req != strat_act:
+                if (strat_req or strat_act) and strat_req != strat_act:
                     continue
                 matches.append(run_dir)
         except Exception as exc:
