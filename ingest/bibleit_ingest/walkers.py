@@ -111,8 +111,7 @@ class BsbPericopeWalker(BaseWalker[Pericope]):
                 )
                 yield Pericope(
                     book=addr[0],
-                    chapter=addr[1],
-                    verse=addr[2],
+                    start=(addr[1], addr[2]),
                     heading=heading,
                     verse_count=end - start,
                 )

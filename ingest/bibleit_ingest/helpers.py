@@ -9,7 +9,7 @@ from codetiming import Timer
 from tqdm import tqdm
 from usearch.index import Index
 
-from bibleit_ingest.chunking import resolve_verse_to_chunk_index
+from bibleit_ingest.chunking import resolve_verse_to_chunk_indices
 from rag_core.metrics import evaluate_retrieval
 
 
@@ -60,8 +60,8 @@ def trigger_retrieval_eval(
         for q in tqdm(eval_data["queries"], total=total_q, desc="evaluating queries", unit="query"):
             rel = q["relevant"][0]
             address = (rel["book"], rel["chapter"], rel["verse"])
-            relevant_idx = resolve_verse_to_chunk_index(address, chunks, address_index)
-            if relevant_idx is None:
+            relevant_indices = resolve_verse_to_chunk_indices(address, chunks, address_index)
+            if not relevant_indices:
                 unresolvable.append(q["id"])
                 continue
 
@@ -70,20 +70,22 @@ def trigger_retrieval_eval(
 
             target_rank = None
             match_records = []
+            rel_set = set(relevant_indices)
             for rank, m in enumerate(matches, 1):
                 score = round(float(1 - m.distance), 4)
                 match_records.append({"rank": rank, "chunk_idx": int(m.key), "score": score})
-                if int(m.key) == relevant_idx and target_rank is None:
+                if int(m.key) in rel_set and target_rank is None:
                     target_rank = rank
 
-            qrels_dict[q["id"]] = {str(relevant_idx): rel["relevance"]}
+            qrels_dict[q["id"]] = {str(idx): rel["relevance"] for idx in relevant_indices}
             run_dict[q["id"]] = {str(m.key): float(1 - m.distance) for m in matches}
 
             diagnostics.append({
                 "id": q["id"],
                 "query": q["query"],
                 "target_address": address,
-                "target_chunk_idx": relevant_idx,
+                "target_chunk_idx": relevant_indices[0],
+                "relevant_chunks": relevant_indices,
                 "target_rank": target_rank,
                 "matches": match_records,
             })

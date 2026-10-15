@@ -36,9 +36,9 @@ def test_chunker_validation() -> None:
 def test_chunker_merging_forward() -> None:
     chunker = AdaptiveWindowChunker(floor=5, ceiling=15, overlap=0)
     pericopes = [
-        Pericope(book="GEN", chapter=1, verse=1, heading="Heading 1", verse_count=2),
-        Pericope(book="GEN", chapter=1, verse=3, heading="Heading 2", verse_count=4),
-        Pericope(book="GEN", chapter=1, verse=7, heading="Heading 3", verse_count=8),
+        Pericope(book="GEN", start=(1, 1), heading="Heading 1", verse_count=2),
+        Pericope(book="GEN", start=(1, 3), heading="Heading 2", verse_count=4),
+        Pericope(book="GEN", start=(1, 7), heading="Heading 3", verse_count=8),
     ]
     chunks = chunker.chunk(pericopes)
 
@@ -56,8 +56,8 @@ def test_chunker_merging_forward() -> None:
 def test_chunker_backward_merge_last_pericope() -> None:
     chunker = AdaptiveWindowChunker(floor=5, ceiling=15, overlap=0)
     pericopes = [
-        Pericope(book="EXO", chapter=1, verse=1, heading="P1", verse_count=8),
-        Pericope(book="EXO", chapter=1, verse=9, heading="P2", verse_count=2),  # undersized at end
+        Pericope(book="EXO", start=(1, 1), heading="P1", verse_count=8),
+        Pericope(book="EXO", start=(1, 9), heading="P2", verse_count=2),  # undersized at end
     ]
     chunks = chunker.chunk(pericopes)
 
@@ -70,8 +70,8 @@ def test_chunker_backward_merge_last_pericope() -> None:
 def test_chunker_backward_merge_exceeding_ceiling() -> None:
     chunker = AdaptiveWindowChunker(floor=5, ceiling=10, overlap=0)
     pericopes = [
-        Pericope(book="EXO", chapter=1, verse=1, heading="P1", verse_count=9),
-        Pericope(book="EXO", chapter=1, verse=10, heading="P2", verse_count=2),  # 9 + 2 = 11 > 10
+        Pericope(book="EXO", start=(1, 1), heading="P1", verse_count=9),
+        Pericope(book="EXO", start=(1, 10), heading="P2", verse_count=2),  # 9 + 2 = 11 > 10
     ]
     chunks = chunker.chunk(pericopes)
 
@@ -84,9 +84,9 @@ def test_chunker_backward_merge_exceeding_ceiling() -> None:
 def test_chunker_overlap() -> None:
     chunker = AdaptiveWindowChunker(floor=5, ceiling=20, overlap=3)
     pericopes = [
-        Pericope(book="GEN", chapter=1, verse=1, heading="P1", verse_count=6),
-        Pericope(book="GEN", chapter=1, verse=7, heading="P2", verse_count=7),
-        Pericope(book="GEN", chapter=1, verse=14, heading="P3", verse_count=8),
+        Pericope(book="GEN", start=(1, 1), heading="P1", verse_count=6),
+        Pericope(book="GEN", start=(1, 7), heading="P2", verse_count=7),
+        Pericope(book="GEN", start=(1, 14), heading="P3", verse_count=8),
     ]
     chunks = chunker.chunk(pericopes)
 
@@ -110,8 +110,8 @@ def test_chunker_overlap() -> None:
 def test_chunker_overlap_skips_when_exceeding_ceiling() -> None:
     chunker = AdaptiveWindowChunker(floor=5, ceiling=15, overlap=4)
     pericopes = [
-        Pericope(book="GEN", chapter=1, verse=1, heading="P1", verse_count=12),
-        Pericope(book="GEN", chapter=1, verse=13, heading="P2", verse_count=12),
+        Pericope(book="GEN", start=(1, 1), heading="P1", verse_count=12),
+        Pericope(book="GEN", start=(1, 13), heading="P2", verse_count=12),
     ]
     chunks = chunker.chunk(pericopes)
 
@@ -190,8 +190,8 @@ def test_chunk_renderer_strategies() -> None:
 def test_chunk_multi_book_boundaries() -> None:
     chunker = AdaptiveWindowChunker(floor=5, ceiling=15, overlap=2)
     pericopes = [
-        Pericope(book="GEN", chapter=50, verse=22, heading="Death of Joseph", verse_count=5),
-        Pericope(book="EXO", chapter=1, verse=1, heading="Israel Multiplies", verse_count=7),
+        Pericope(book="GEN", start=(50, 22), heading="Death of Joseph", verse_count=5),
+        Pericope(book="EXO", start=(1, 1), heading="Israel Multiplies", verse_count=7),
     ]
     chunks = chunker.chunk(pericopes)
     assert len(chunks) == 2
@@ -265,9 +265,9 @@ def test_pericope_chunker() -> None:
     from bibleit_ingest.chunking import PericopeChunker
 
     pericopes = [
-        Pericope(book="GEN", chapter=1, verse=1, heading="Day 1", verse_count=5),
-        Pericope(book="GEN", chapter=1, verse=6, heading="Day 2", verse_count=3),
-        Pericope(book="EXO", chapter=1, verse=1, heading="Egypt", verse_count=10),
+        Pericope(book="GEN", start=(1, 1), heading="Day 1", verse_count=5),
+        Pericope(book="GEN", start=(1, 6), heading="Day 2", verse_count=3),
+        Pericope(book="EXO", start=(1, 1), heading="Egypt", verse_count=10),
     ]
     # No overlap: strictly 1 chunk per pericope
     chunker = PericopeChunker(ceiling=30, overlap=0)
@@ -312,9 +312,9 @@ def test_token_window_chunker() -> None:
     addr_index = {addr: i for i, (addr, _) in enumerate(ordered_verses)}
 
     pericopes = [
-        Pericope(book="GEN", chapter=1, verse=1, heading="Gen Part 1", verse_count=3),
-        Pericope(book="GEN", chapter=1, verse=4, heading="Gen Part 2", verse_count=3),
-        Pericope(book="EXO", chapter=1, verse=1, heading="Exo Story", verse_count=4),
+        Pericope(book="GEN", start=(1, 1), heading="Gen Part 1", verse_count=3),
+        Pericope(book="GEN", start=(1, 4), heading="Gen Part 2", verse_count=3),
+        Pericope(book="EXO", start=(1, 1), heading="Exo Story", verse_count=4),
     ]
 
     # Mock tokenizer returning 10 tokens per verse
@@ -349,5 +349,78 @@ def test_token_window_chunker() -> None:
         TokenWindowChunker(ceiling=0)
     with pytest.raises(ValueError, match="headroom_margin cannot meet or exceed ceiling"):
         TokenWindowChunker(ceiling=50, headroom_margin=50)
+
+
+def test_passage_headings_meta_no_raw_book_codes() -> None:
+    ordered_verses = [
+        (("PHP", 4, 4), "Rejoice in the Lord always"),
+        (("PHP", 4, 7), "And the peace of God"),
+    ]
+    # Passage with a real heading and a raw book code in sections
+    passage = Passage(
+        book="PHP",
+        start=(4, 4),
+        end=(4, 7),
+        start_idx=0,
+        end_idx=2,
+        sections=((0, "Rejoice in the Lord"), (1, "PHP")),
+    )
+    meta = passage.get_headings_meta(ordered_verses)
+    assert meta == [[4, 4, "Rejoice in the Lord"]]
+    # Verify raw book code "PHP" was filtered out
+    assert not any("PHP" in item for item in meta)
+
+
+def test_adaptive_chunker_headings_clean() -> None:
+    ordered_verses = [(("GEN", 1, i), f"Verse {i}") for i in range(1, 11)]
+    pericopes = [
+        Pericope(book="GEN", start=(1, 1), heading="The Creation", verse_count=5),
+        Pericope(book="GEN", start=(1, 6), heading="", verse_count=5),
+    ]
+    chunker = AdaptiveWindowChunker(floor=8, ceiling=15, ordered_verses=ordered_verses)
+    chunks = chunker.chunk(pericopes)
+    assert len(chunks) == 1
+    # Check that sections do not contain "GEN"
+    for _, heading in chunks[0].sections:
+        assert heading != "GEN"
+    meta = chunks[0].get_headings_meta(ordered_verses)
+    assert meta == [[1, 1, "The Creation"]]
+
+
+def test_coordinate_dataclasses_verse_pericope_passage() -> None:
+    from bibleit_ingest.types import Verse
+
+    # Verse with start coordinate
+    v = Verse(book="GEN", start=(1, 1), text="In the beginning")
+    assert v.book == "GEN"
+    assert v.start == (1, 1)
+    assert v.chapter == 1
+    assert v.verse == 1
+    assert v.address == ("GEN", 1, 1)
+
+    # Verse backward compatibility
+    v_legacy = Verse(book="JHN", chapter=3, verse=16, text="For God so loved the world")
+    assert v_legacy.start == (3, 16)
+    assert v_legacy.chapter == 3
+    assert v_legacy.verse == 16
+    assert v_legacy.address == ("JHN", 3, 16)
+
+    # Pericope with start coordinate
+    p = Pericope(book="GEN", start=(1, 1), heading="Creation", verse_count=31)
+    assert p.start == (1, 1)
+    assert p.chapter == 1
+    assert p.verse == 1
+    assert p.address == ("GEN", 1, 1)
+
+    # Passage with start and end coordinates
+    passage = Passage(book="GEN", start=(1, 1), end=(1, 31), start_idx=0, end_idx=31)
+    assert passage.start == (1, 1)
+    assert passage.end == (1, 31)
+    assert passage.chapter == 1
+    assert passage.verse == 1
+    assert passage.start_address == ("GEN", 1, 1)
+    assert passage.end_address == ("GEN", 1, 31)
+    assert passage.verse_count == 31
+
 
 

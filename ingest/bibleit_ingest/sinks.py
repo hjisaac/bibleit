@@ -63,13 +63,15 @@ class StaticArtifactSink(BaseSink):
         )
         chunks_payload = []
         for i, chunk in enumerate(chunks):
-            start_addr = chunk.start_address or corpus.ordered_verses[chunk.start_idx][0]
-            end_addr = chunk.end_address or corpus.ordered_verses[chunk.end_idx - 1][0]
+            start = list(chunk.start) if chunk.start != (0, 0) else [corpus.ordered_verses[chunk.start_idx][0][1], corpus.ordered_verses[chunk.start_idx][0][2]]
+            end = list(chunk.end) if chunk.end != (0, 0) else [corpus.ordered_verses[chunk.end_idx - 1][0][1], corpus.ordered_verses[chunk.end_idx - 1][0][2]]
             chunks_payload.append(
                 {
                     "id": i,
-                    "start": {"book": start_addr[0], "chapter": start_addr[1], "verse": start_addr[2]},
-                    "end": {"book": end_addr[0], "chapter": end_addr[1], "verse": end_addr[2]},
+                    "book": chunk.book,
+                    "start": start,
+                    "end": end,
+                    "headings": chunk.get_headings_meta(corpus.ordered_verses),
                     "text": renderer.render(chunk),
                 }
             )
@@ -91,7 +93,7 @@ class StaticArtifactSink(BaseSink):
 
         # 4. Manifest
         manifest = {
-            "schema_version": 1,
+            "schema_version": 2,
             "translation": self.translation,
             "corpus": {"verses": verses_file.name, "count": len(corpus.ordered_verses)},
             "chunks": {"file": chunks_file.name, **meta},

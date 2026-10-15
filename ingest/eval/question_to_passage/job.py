@@ -12,7 +12,7 @@ from bibleit_ingest.artifacts import (
     resolve_matching_artifacts,
     write_lock_file,
 )
-from bibleit_ingest.chunking import AdaptiveWindowChunker, resolve_verse_to_chunk_index
+from bibleit_ingest.chunking import get_chunker, resolve_verse_to_chunk_index
 from bibleit_ingest.constants import (
     BSB_DIR,
     FASTEMBED_CACHE_DIR,
@@ -63,15 +63,22 @@ class EvalJobQuestionToPassage(EvalJobBase):
         emb_dir_override = self.config.get("embedding_artifact_dir")
         emb_run_dir = Path(emb_dir_override) if emb_dir_override else None
 
+        if "strategy" not in self.config:
+            raise KeyError("Missing required 'strategy' parameter in evaluation configuration")
+        strategy_name = str(self.config["strategy"])
         if not emb_run_dir:
             emb_outputs = REPO / "ingest" / "analysis" / "embed_corpus" / "outputs"
             emb_criteria = {
-                "floor": floor,
+                "strategy": strategy_name,
                 "ceiling": ceiling,
                 "overlap": overlap,
                 "render_strategy": render_strategy,
                 "embedding_model": str(embedding_model),
             }
+            if strategy_name == "adaptive":
+                emb_criteria["floor"] = floor
+            if "include_overlap_heading" in self.config:
+                emb_criteria["include_overlap_heading"] = bool(self.config["include_overlap_heading"])
             emb_run_dir = resolve_matching_artifacts(emb_outputs, emb_criteria)
 
         chunks: list[Passage]
@@ -87,30 +94,55 @@ class EvalJobQuestionToPassage(EvalJobBase):
             raw_meta = json.loads((emb_run_dir / "chunks.json").read_text(encoding="utf-8"))
             chunks = []
             for item in raw_meta:
-                start_idx = corpus.address_index[(item["book"], item["chapter"], item["verse"])]
+                book = item["book"]
+                if "start" in item:
+                    ch_s, v_s = item["start"]
+                    ch_e, v_e = item["end"]
+                elif "start_addr" in item:
+                    ch_s, v_s = item["start_addr"]
+                    ch_e, v_e = item["end_addr"]
+                else:
+                    ch_s, v_s = item["chapter"], item["verse"]
+                    ch_e, v_e = ch_s, v_s + item["verse_count"] - 1
+
+                start_idx = corpus.address_index[(book, ch_s, v_s)]
+                end_idx = start_idx + item["verse_count"]
+
                 sections = []
-                for s in item.get("sections", []):
-                    sec_idx = corpus.address_index.get((item["book"], s["chapter"], s["verse"]), start_idx)
-                    sections.append((sec_idx, s["heading"]))
-                if not sections and "headings" in item:
-                    sections = [(start_idx, h) for h in item["headings"]]
+                headings_raw = item.get("headings", [])
+                if headings_raw and isinstance(headings_raw[0], (list, tuple)):
+                    for ch, v, h in headings_raw:
+                        sec_idx = corpus.address_index.get((book, ch, v), start_idx)
+                        sections.append((sec_idx, h))
+                elif "sections" in item:
+                    for s in item["sections"]:
+                        sec_idx = corpus.address_index.get((book, s["chapter"], s["verse"]), start_idx)
+                        sections.append((sec_idx, s["heading"]))
+                elif headings_raw and isinstance(headings_raw[0], str):
+                    sections = [(start_idx, h) for h in headings_raw]
+
+                end_addr = corpus.ordered_verses[end_idx - 1][0] if end_idx > start_idx else (book, ch_e, v_e)
                 chunks.append(
                     Passage(
-                        book=item["book"],
+                        book=book,
+                        start=(ch_s, v_s),
+                        end=(end_addr[1], end_addr[2]),
                         start_idx=start_idx,
-                        end_idx=start_idx + item["verse_count"],
+                        end_idx=end_idx,
                         sections=tuple(sections),
                     )
                 )
         else:
-            logger.info("No matching embedding artifact found; computing in-line.")
-            chunks = AdaptiveWindowChunker(
+            logger.info("No matching embedding artifact found; computing in-line with strategy '%s'.", strategy_name)
+            chunk_cfg = dict(self.config)
+            chunk_cfg.pop("strategy", None)
+            chunker = get_chunker(
+                strategy_name,
                 ordered_verses=corpus.ordered_verses,
                 address_index=corpus.address_index,
-                floor=floor,
-                ceiling=ceiling,
-                overlap=overlap,
-            ).chunk(corpus.pericopes)
+                **chunk_cfg,
+            )
+            chunks = chunker.chunk(corpus.pericopes)
 
             threads = int(self.config.get("threads", 4))
             embedder = Embedder(

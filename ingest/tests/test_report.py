@@ -154,12 +154,12 @@ def test_format_passage_citation() -> None:
         (("GEN", 2, 1), "Thus the heavens were finished,"),
     ]
 
-    p_same_chapter = Passage(book="GEN", start_idx=0, end_idx=2, headings=("Creation",))
+    p_same_chapter = Passage(book="GEN", start=(1, 1), end=(1, 2), start_idx=0, end_idx=2, headings=("Creation",))
     hdr, txt = format_passage(p_same_chapter, ordered_verses)
     assert hdr == "[GEN 1:1–2] — Creation"
     assert txt == "In the beginning, the earth was formless,"
 
-    p_cross_chapter = Passage(book="GEN", start_idx=0, end_idx=3, headings=())
+    p_cross_chapter = Passage(book="GEN", start=(1, 1), end=(2, 1), start_idx=0, end_idx=3, headings=())
     hdr2, txt2 = format_passage(p_cross_chapter, ordered_verses)
     assert hdr2 == "[GEN 1:1–2:1]"
     assert "Thus the heavens were finished," in txt2

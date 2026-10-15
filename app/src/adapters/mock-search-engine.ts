@@ -5,8 +5,10 @@ const FIXTURE_PASSAGES: ScoredPassage[] = [
   {
     chunk: {
       id: 1,
-      start: { book: 'PHP', chapter: 4, verse: 7 },
-      end: { book: 'PHP', chapter: 4, verse: 7 },
+      book: 'PHP',
+      start: [4, 7],
+      end: [4, 7],
+      headings: [[4, 4, 'Rejoice in the Lord']],
       text: 'And the peace of God, which surpasses all understanding, will guard your hearts and your thoughts in Christ Jesus.',
     },
     score: 1.0,
@@ -15,8 +17,10 @@ const FIXTURE_PASSAGES: ScoredPassage[] = [
   {
     chunk: {
       id: 2,
-      start: { book: 'JHN', chapter: 14, verse: 27 },
-      end: { book: 'JHN', chapter: 14, verse: 27 },
+      book: 'JHN',
+      start: [14, 27],
+      end: [14, 27],
+      headings: [[14, 25, 'The Promise of the Holy Spirit']],
       text: 'Peace I leave with you. My peace I give to you; not as the world gives, do I give to you. Don’t let your heart be troubled, neither let it be fearful.',
     },
     score: 0.912,
@@ -25,9 +29,11 @@ const FIXTURE_PASSAGES: ScoredPassage[] = [
   {
     chunk: {
       id: 3,
-      start: { book: 'ISA', chapter: 26, verse: 3 },
-      end: { book: 'ISA', chapter: 26, verse: 3 },
-      text: 'You will keep whoever’s mind is steadfast in perfect peace, because he trusts in you.',
+      book: 'ISA',
+      start: [26, 3],
+      end: [26, 4],
+      headings: [[26, 1, 'A Song of Trust']],
+      text: 'You will keep whoever’s mind is steadfast in perfect peace, because he trusts in you. Trust in Yahweh forever; for in Yah, Yahweh, is an everlasting Rock.',
     },
     score: 4.82,
     source: 'lexical',

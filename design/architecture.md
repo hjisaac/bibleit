@@ -87,7 +87,7 @@ adapter + a CLI flag.
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "translation": {"id": "web", "lang": "en", "name": "World English Bible", "license": "public domain"},
   "corpus": {"verses": "verses.json.gz", "count": 31102},
   "chunks": {"file": "chunks.json.gz", "strategy": "window", "window": 7, "overlap": 2},
@@ -101,11 +101,28 @@ adapter + a CLI flag.
 }
 ```
 
+### Chunks Artifact (`chunks.json.gz`)
+
+Each retrieval unit in `chunks.json.gz` conforms to:
+```json
+{
+  "id": 0,
+  "book": "GEN",
+  "start": [1, 1],
+  "end": [1, 31],
+  "headings": [[1, 1, "The Creation of the World"]],
+  "text": "..."
+}
+```
+- `start` and `end`: Canonical `[chapter, verse]` coordinate pairs.
+- `headings`: Pericope section headings within chunk bounds: `[[chapter, verse, "Heading"], ...]`.
+- `text`: Rendered passage scripture text.
+
 Rules:
 - `schema_version` bumps on breaking changes; the app refuses newer schemas it doesn't know.
-- Verse metadata (book/chapter/verse) lives on chunks so citations stay verse-precise even
+- Verse metadata lives directly on chunks so citations stay verse-precise even
   though retrieval units are passages.
-- Everything is static files → cacheable, versioned by directory (`artifacts/web@v1/`).
+- Everything is static files → cacheable, versioned by directory (`artifacts/web@v2/`).
 
 ## Retrieval flow (v1)
 

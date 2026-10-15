@@ -11,7 +11,14 @@ interface ReaderViewProps {
   scrollKey?: number;
   onBackToSearch: () => void;
   onOpenSelector: () => void;
-  onSaveVerse: (ref: string, text: string) => void;
+  onSaveVerse: (verse: {
+    book: string;
+    bookName: string;
+    chapter: number;
+    verse: number;
+    citation: string;
+    text: string;
+  }) => void;
   onToast: (msg: string) => void;
 }
 
@@ -149,8 +156,14 @@ export function ReaderView({
 
     triggerHaptic(25);
     const citation = `${bookTitle} ${chapter}:${selectedVerse.num}`;
-    onSaveVerse(citation, selectedVerse.text);
-    onToast(`Saved ${citation} to bookmarks`);
+    onSaveVerse({
+      book,
+      bookName: bookTitle,
+      chapter,
+      verse: selectedVerse.num,
+      citation,
+      text: selectedVerse.text,
+    });
     setSelectedVerse(null);
     setShowActions(false);
   };

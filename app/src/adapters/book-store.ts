@@ -14,6 +14,64 @@ export interface BookData {
 const CACHE_NAME = 'bibleit-books-v1';
 const memoryCache = new Map<string, BookData>();
 
+/** Canonical in-memory address index for instant O(1) verse lookups: "PHP:4:7" -> text */
+const verseIndex = new Map<string, string>();
+
+/** Generates canonical string key for address indexing */
+export function verseKey(bookId: string, chapter: number, verse: number): string {
+  return `${bookId.toUpperCase()}:${chapter}:${verse}`;
+}
+
+/** Synchronous O(1) lookup from the verse index. Returns undefined if not yet indexed. */
+export function getCachedVerse(bookId: string, chapter: number, verse: number): string | undefined {
+  return verseIndex.get(verseKey(bookId, chapter, verse));
+}
+
+/** Non-blocking background worker to populate the verse index from a loaded book */
+export function scheduleBookIndexing(bookData: BookData): void {
+  if (!bookData?.chapters || typeof bookData.chapters !== 'object') return;
+
+  const runner = () => {
+    const bookId = bookData.id.toUpperCase();
+    for (const [chStr, verses] of Object.entries(bookData.chapters)) {
+      const ch = parseInt(chStr, 10);
+      for (const v of verses) {
+        verseIndex.set(`${bookId}:${ch}:${v.num}`, v.text);
+      }
+    }
+  };
+
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    (
+      window as unknown as {
+        requestIdleCallback: (fn: () => void, opts?: { timeout: number }) => void;
+      }
+    ).requestIdleCallback(runner, { timeout: 2500 });
+  } else {
+    setTimeout(runner, 0);
+  }
+}
+
+/** Resolves verse text: checks index first, or loads book asynchronously if missing */
+export async function resolveVerseText(
+  bookId: string,
+  chapter: number,
+  verse: number,
+): Promise<string | undefined> {
+  const cached = getCachedVerse(bookId, chapter, verse);
+  if (cached) return cached;
+
+  try {
+    const bookData = await loadBook(bookId);
+    const chKey = String(chapter);
+    const chapterVerses = bookData?.chapters?.[chKey];
+    const found = chapterVerses?.find((v) => v.num === verse);
+    return found?.text;
+  } catch {
+    return undefined;
+  }
+}
+
 function getBookUrl(bookId: string): string {
   const baseUrl = import.meta.env.BASE_URL ?? '/';
   const cleanBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
@@ -35,9 +93,17 @@ export async function loadBook(bookId: string): Promise<BookData> {
       const cache = await caches.open(CACHE_NAME);
       const match = await cache.match(url);
       if (match) {
-        const data: BookData = await match.json();
-        memoryCache.set(bookId, data);
-        return data;
+        try {
+          const data: BookData = await match.json();
+          if (data?.chapters) {
+            memoryCache.set(bookId, data);
+            scheduleBookIndexing(data);
+            return data;
+          }
+          await cache.delete(url);
+        } catch {
+          await cache.delete(url);
+        }
       }
     } catch {
       // Fall through to network if Cache API errors
@@ -59,6 +125,7 @@ export async function loadBook(bookId: string): Promise<BookData> {
 
   const data: BookData = JSON.parse(text);
   memoryCache.set(bookId, data);
+  scheduleBookIndexing(data);
 
   // Persist verified book into Cache API
   if (typeof caches !== 'undefined') {

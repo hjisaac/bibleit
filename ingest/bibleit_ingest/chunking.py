@@ -90,11 +90,11 @@ class AdaptiveWindowChunker(Chunker):
         end_addr = self.ordered_verses[end_idx - 1][0] if self.ordered_verses and end_idx > start_idx else None
         return Passage(
             book=book,
+            start=(start_addr[1], start_addr[2]) if start_addr else (0, 0),
+            end=(end_addr[1], end_addr[2]) if end_addr else (0, 0),
             start_idx=start_idx,
             end_idx=end_idx,
             sections=tuple(sections),
-            start_address=start_addr,
-            end_address=end_addr,
         )
 
     def chunk(self, pericopes: Sequence[Pericope]) -> list[Passage]:
@@ -124,7 +124,7 @@ class AdaptiveWindowChunker(Chunker):
 
             start_idx = fresh_start - overlap_len
             end_idx = fresh_end
-            sections.append((fresh_start, pericopes[i].heading or current_book))
+            sections.append((fresh_start, pericopes[i].heading or None))
             size = end_idx - start_idx
             step = 1
 
@@ -138,7 +138,7 @@ class AdaptiveWindowChunker(Chunker):
                 _, nxt_end = spans[i + step]
                 end_idx = nxt_end
                 size = end_idx - start_idx
-                sections.append((spans[i + step][0], nxt.heading or current_book))
+                sections.append((spans[i + step][0], nxt.heading or None))
                 step += 1
 
             # Last-in-book backward merge if undersized
@@ -222,16 +222,16 @@ class PericopeChunker(Chunker):
                 else:
                     lead_heading = None
                 sections.append((start_idx, lead_heading))
-            sections.append((fresh_start, p.heading or current_book))
+            sections.append((fresh_start, p.heading or None))
 
             passages.append(
                 Passage(
                     book=current_book,
+                    start=(start_addr[1], start_addr[2]) if start_addr else (0, 0),
+                    end=(end_addr[1], end_addr[2]) if end_addr else (0, 0),
                     start_idx=start_idx,
                     end_idx=end_idx,
                     sections=tuple(sections),
-                    start_address=start_addr,
-                    end_address=end_addr,
                 )
             )
 
@@ -357,16 +357,16 @@ class TokenWindowChunker(Chunker):
                     sections.append((v_idx, heading))
 
             if not sections:
-                sections.append((chunk_start, current_book))
+                sections.append((chunk_start, None))
 
             passages.append(
                 Passage(
                     book=current_book,
+                    start=(self.ordered_verses[chunk_start][0][1], self.ordered_verses[chunk_start][0][2]),
+                    end=(self.ordered_verses[chunk_end - 1][0][1], self.ordered_verses[chunk_end - 1][0][2]),
                     start_idx=chunk_start,
                     end_idx=chunk_end,
                     sections=tuple(sections),
-                    start_address=self.ordered_verses[chunk_start][0],
-                    end_address=self.ordered_verses[chunk_end - 1][0],
                 )
             )
 
@@ -397,16 +397,68 @@ def resolve_verse_to_chunk_index(
     return None
 
 
+def resolve_verse_to_chunk_indices(
+    address: VerseAddress,
+    chunks: Sequence[Passage],
+    address_index: dict[VerseAddress, int],
+) -> list[int]:
+    """Finds all passage chunks containing the target verse address."""
+    target_pos = address_index.get(address)
+    if target_pos is None:
+        return []
+    return [i for i, p in enumerate(chunks) if p.start_idx <= target_pos < p.end_idx]
+
+
 def load_pericopes(pericopes_path: Path) -> list[Pericope]:
     """Reads a pericopes artifact and returns all pericopes in reading order."""
     data = json.loads(pericopes_path.read_text())
     return [
         Pericope(
             book=p["book"],
-            chapter=p["chapter"],
-            verse=p["verse"],
+            start=tuple(p["start"]) if "start" in p else (p["chapter"], p["verse"]),
             heading=p["heading"],
             verse_count=p["verse_count"],
         )
         for p in data["pericopes"]
     ]
+
+
+def get_chunker(
+    *args: Any,
+    ordered_verses: Sequence[tuple[VerseAddress, str]] | None = None,
+    address_index: dict[VerseAddress, int] | None = None,
+    tokenizer: Any = None,
+    **kwargs: Any,
+) -> Chunker:
+    """Instantiates the configured Chunker subclass."""
+    strategy = str(args[0] if args else kwargs.pop("strategy", "adaptive"))
+    kwargs.pop("strategy", None)
+    if strategy == "adaptive":
+        return AdaptiveWindowChunker(
+            floor=int(kwargs.get("floor", AdaptiveWindowChunker.DEFAULT_FLOOR)),
+            ceiling=int(kwargs.get("ceiling", AdaptiveWindowChunker.DEFAULT_CEILING)),
+            overlap=int(kwargs.get("overlap", AdaptiveWindowChunker.DEFAULT_OVERLAP)),
+            ordered_verses=ordered_verses,
+            address_index=address_index,
+            include_overlap_heading=bool(kwargs.get("include_overlap_heading", True)),
+        )
+    if strategy == "pericope":
+        return PericopeChunker(
+            ceiling=int(kwargs.get("ceiling", PericopeChunker.DEFAULT_CEILING)),
+            overlap=int(kwargs.get("overlap", PericopeChunker.DEFAULT_OVERLAP)),
+            ordered_verses=ordered_verses,
+            address_index=address_index,
+            include_overlap_heading=bool(kwargs.get("include_overlap_heading", True)),
+        )
+    if strategy == "token_window":
+        return TokenWindowChunker(
+            ceiling=int(kwargs.get("ceiling", TokenWindowChunker.DEFAULT_CEILING)),
+            overlap=int(kwargs.get("overlap", TokenWindowChunker.DEFAULT_OVERLAP)),
+            ordered_verses=ordered_verses,
+            address_index=address_index,
+            tokenizer=tokenizer,
+            headroom_margin=int(kwargs.get("headroom_margin", TokenWindowChunker.DEFAULT_HEADROOM_MARGIN)),
+            include_overlap_heading=bool(kwargs.get("include_overlap_heading", True)),
+        )
+    raise ValueError(f"Unknown chunking strategy: '{strategy}'")
+

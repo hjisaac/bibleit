@@ -94,9 +94,15 @@ def test_bsb_pericope_walker(tmp_path: Path) -> None:
     assert isinstance(pericopes, list)
     assert len(pericopes) == 2
     assert pericopes[0].book == "GEN"
+    assert pericopes[0].start == (1, 1)
+    assert pericopes[0].chapter == 1
+    assert pericopes[0].verse == 1
     assert pericopes[0].heading == "The Creation"
     assert pericopes[0].verse_count == 2
     assert pericopes[1].book == "GEN"
+    assert pericopes[1].start == (1, 3)
+    assert pericopes[1].chapter == 1
+    assert pericopes[1].verse == 3
     assert pericopes[1].heading == "Light"
     assert pericopes[1].verse_count == 1
 

@@ -1,0 +1,23 @@
+# Token ceiling ablation sweep
+strategy: "token_window"
+ceiling:
+  - 256
+  - 512
+  - 1024
+overlap:
+  - 0
+  - 1
+include_overlap_heading:
+  - true
+  - false
+render_strategy:
+  - "heading_and_text"
+  - "book_and_heading"
+headroom_margin: 25
+
+token_limit: 512
+tokenizer_model: "nomic-ai/nomic-embed-text-v1.5"
+embedding_model: null
+
+web_path: "ingest/data/translations/web/en/web.json"
+bsb_dir: "ingest/data/translations/bsb/en"

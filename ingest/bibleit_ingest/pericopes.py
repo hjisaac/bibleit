@@ -26,8 +26,7 @@ def save_pericopes(pericopes: Sequence[Pericope], path: Path) -> None:
         "pericopes": [
             {
                 "book": p.book,
-                "chapter": p.chapter,
-                "verse": p.verse,
+                "start": list(p.start),
                 "heading": p.heading,
                 "verse_count": p.verse_count,
             }
@@ -74,8 +73,7 @@ def project_pericopes(
         resolved.append(
             Pericope(
                 book=p.book,
-                chapter=p.chapter,
-                verse=p.verse,
+                start=p.start,
                 heading=p.heading,
                 verse_count=end - start,
             )

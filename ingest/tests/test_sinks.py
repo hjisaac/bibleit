@@ -40,11 +40,11 @@ def test_static_artifact_sink(tmp_path: Path) -> None:
     chunks = [
         Passage(
             book="GEN",
+            start=(1, 1),
+            end=(1, 2),
             start_idx=0,
             end_idx=2,
             headings=("Creation",),
-            start_address=("GEN", 1, 1),
-            end_address=("GEN", 1, 2),
         )
     ]
     embeddings = np.array([[0.5, -0.5, 0.25, 1.0]], dtype=np.float32)
@@ -63,7 +63,7 @@ def test_static_artifact_sink(tmp_path: Path) -> None:
     manifest_path = tmp_path / "manifest.json"
     assert manifest_path.exists()
     manifest = json.loads(manifest_path.read_text())
-    assert manifest["schema_version"] == 1
+    assert manifest["schema_version"] == 2
     assert manifest["translation"]["id"] == "web"
     assert manifest["corpus"]["count"] == 2
     assert manifest["embeddings"]["model"] == "test-embedder-v1"
@@ -86,8 +86,10 @@ def test_static_artifact_sink(tmp_path: Path) -> None:
     with gzip.open(chunks_path, "rt", encoding="utf-8") as f:
         chunks_data = json.load(f)
     assert len(chunks_data) == 1
-    assert chunks_data[0]["start"] == {"book": "GEN", "chapter": 1, "verse": 1}
-    assert chunks_data[0]["end"] == {"book": "GEN", "chapter": 1, "verse": 2}
+    assert chunks_data[0]["book"] == "GEN"
+    assert chunks_data[0]["start"] == [1, 1]
+    assert chunks_data[0]["end"] == [1, 2]
+    assert chunks_data[0]["headings"] == [[1, 1, "Creation"]]
     assert "In the beginning" in chunks_data[0]["text"]
 
     # Verify binary embeddings and scales

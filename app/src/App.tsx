@@ -1,5 +1,5 @@
 import type { JSX } from 'preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { createDefaultEngine } from './composition';
 import { Header, type Theme } from './components/Header';
 import { Navbar, type ViewTab } from './components/Navbar';
@@ -45,13 +45,28 @@ export function App(): JSX.Element {
     scrollKey: 0,
   });
 
-  const [savedVerses, setSavedVerses] = useState<SavedVerse[]>([
-    {
-      id: '1',
-      ref: 'Philippians 4:7',
-      text: 'And the peace of God, which surpasses all understanding, will guard your hearts and your thoughts in Christ Jesus.',
-    },
-  ]);
+  const [savedVerses, setSavedVerses] = useState<SavedVerse[]>(() => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('bibleit_saved_verses');
+        if (stored) return JSON.parse(stored);
+      } catch {
+        // Fall back to default
+      }
+    }
+    return [
+      {
+        id: '1',
+        book: 'PHP',
+        bookName: 'Philippians',
+        chapter: 4,
+        verse: 7,
+        citation: 'Philippians 4:7',
+        text: 'And the peace of God, which surpasses all understanding, will guard your hearts and your thoughts in Christ Jesus.',
+        savedAt: Date.now(),
+      },
+    ];
+  });
 
   const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true,
@@ -71,6 +86,22 @@ export function App(): JSX.Element {
       localStorage.setItem('bibleit_ai_enabled', String(enabled));
     }
     showToast(enabled ? 'AI Scripture Overview enabled' : 'AI Scripture Overview deactivated');
+  };
+
+  const [showHeadings, setShowHeadings] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bibleit_show_headings');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+
+  const handleToggleHeadings = (enabled: boolean) => {
+    setShowHeadings(enabled);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('bibleit_show_headings', String(enabled));
+    }
+    showToast(enabled ? 'Pericope headings enabled' : 'Pericope headings hidden');
   };
 
   // Sync offline text package state with real Cache API on boot
@@ -174,10 +205,16 @@ export function App(): JSX.Element {
     };
   }, []);
 
+  const toastTimerRef = useRef<number | null>(null);
+
   const showToast = (message: string) => {
+    if (toastTimerRef.current !== null) {
+      clearTimeout(toastTimerRef.current);
+    }
     setToastMessage(message);
-    setTimeout(() => {
+    toastTimerRef.current = window.setTimeout(() => {
       setToastMessage(null);
+      toastTimerRef.current = null;
     }, 2200);
   };
 
@@ -186,11 +223,44 @@ export function App(): JSX.Element {
     setActiveTab('reader');
   };
 
-  const handleSaveVerse = (ref: string, text: string) => {
-    setSavedVerses((prev) => [
-      ...prev.filter((v) => v.ref !== ref),
-      { id: Date.now().toString(), ref, text },
-    ]);
+  const handleSaveVerse = (verse: {
+    book: string;
+    bookName: string;
+    chapter: number;
+    verse: number;
+    citation: string;
+    text: string;
+  }) => {
+    setSavedVerses((prev) => {
+      const exists = prev.some(
+        (v) => v.book === verse.book && v.chapter === verse.chapter && v.verse === verse.verse,
+      );
+      let next;
+      if (exists) {
+        next = prev.filter(
+          (v) => !(v.book === verse.book && v.chapter === verse.chapter && v.verse === verse.verse),
+        );
+        showToast(`Removed ${verse.citation} from bookmarks`);
+      } else {
+        next = [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            ...verse,
+            savedAt: Date.now(),
+          },
+        ];
+        showToast(`Saved ${verse.citation} to bookmarks`);
+      }
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem('bibleit_saved_verses', JSON.stringify(next));
+        } catch {
+          // Ignore quota errors
+        }
+      }
+      return next;
+    });
   };
 
   return (
@@ -215,11 +285,14 @@ export function App(): JSX.Element {
             isOnline={isOnline}
             isAiEnabled={isAiEnabled}
             isInspectorMode={isInspectorMode}
+            showHeadings={showHeadings}
             offlineTextStatus={textPackageStatus}
             hasSeenOnboarding={hasSeenStorageBanner}
+            savedVerses={savedVerses}
             onOpenStorage={handleOpenStorage}
             onDismissOnboarding={handleDismissOnboarding}
             onOpenReader={handleOpenReader}
+            onSaveVerse={handleSaveVerse}
             onToast={showToast}
           />
         )}
@@ -240,10 +313,8 @@ export function App(): JSX.Element {
         {activeTab === 'saved' && (
           <SavedView
             savedVerses={savedVerses}
-            onOpenVerse={(ref) => {
-              const [book, rest] = ref.split(' ');
-              const [chapter, verse] = (rest ?? '').split(':');
-              handleOpenReader(book ?? 'PHP', Number(chapter ?? 4), Number(verse ?? 7));
+            onOpenVerse={(item) => {
+              handleOpenReader(item.book, item.chapter, item.verse);
             }}
           />
         )}
@@ -256,6 +327,8 @@ export function App(): JSX.Element {
             onToggleAi={handleToggleAi}
             isInspectorMode={isInspectorMode}
             onToggleInspector={setIsInspectorMode}
+            showHeadings={showHeadings}
+            onToggleHeadings={handleToggleHeadings}
             textPackageStatus={textPackageStatus}
             aiPackageStatus={aiPackageStatus}
             textProgress={textProgress}
