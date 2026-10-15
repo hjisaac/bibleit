@@ -28,6 +28,18 @@ A lightweight, offline-ready web application built with Preact and TypeScript:
 - **Client-Side Storage**: Entire Bible corpora and retrieval models cache locally using Cache Storage and IndexedDB.
 - **Reader & Discovery**: Renders canonical citation spans, pericope section titles, and transitions smoothly into full-chapter Scripture reading.
 
+## Empirical Evaluation & Experiments
+
+Offline semantic retrieval in the browser requires strict trade-offs between passage granularity, embedding token limits, and ranking accuracy. Instead of arbitrary chunking heuristics, `bibleit` evaluates chunking configurations, token headroom margins, and embedding models through systematic ablation sweeps using Crucible and streaming quantiles.
+
+All experimental runs and benchmark metrics are tracked and published openly:
+
+- **Chunking Strategy Analysis**: [Weights & Biases — `bibleit-analysis-chunking-strategy`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-analysis-chunking-strategy)  
+  Ablation sweeps over token ceilings (256, 512, 1024), verse overlaps, and header render strategies to measure token distributions (P50, P90, P99), pericope preservation, and truncation boundaries.
+- **Retrieval Benchmark**: [Weights & Biases — `bibleit-eval-question-to-passage`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-eval-question-to-passage)  
+  Retrieval ranking performance (MRR, Hits@1, Hits@5, Hits@10) across embedding models and vector quantization targets.
+- **Public Workspace**: [Weights & Biases — `hjisaach-aims-south-africa`](https://wandb.ai/hjisaach-aims-south-africa)
+
 ## Documentation
 
 - [design/architecture.md](design/architecture.md) — System design, artifact contract, and component ports.
