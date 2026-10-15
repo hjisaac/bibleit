@@ -1,5 +1,5 @@
 import type { JSX } from 'preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { createDefaultEngine } from './composition';
 import { Header, type Theme } from './components/Header';
 import { Navbar, type ViewTab } from './components/Navbar';
@@ -205,10 +205,16 @@ export function App(): JSX.Element {
     };
   }, []);
 
+  const toastTimerRef = useRef<number | null>(null);
+
   const showToast = (message: string) => {
+    if (toastTimerRef.current !== null) {
+      clearTimeout(toastTimerRef.current);
+    }
     setToastMessage(message);
-    setTimeout(() => {
+    toastTimerRef.current = window.setTimeout(() => {
       setToastMessage(null);
+      toastTimerRef.current = null;
     }, 2200);
   };
 
@@ -226,14 +232,26 @@ export function App(): JSX.Element {
     text: string;
   }) => {
     setSavedVerses((prev) => {
-      const next = [
-        ...prev.filter((v) => !(v.book === verse.book && v.chapter === verse.chapter && v.verse === verse.verse)),
-        {
-          id: Date.now().toString(),
-          ...verse,
-          savedAt: Date.now(),
-        },
-      ];
+      const exists = prev.some(
+        (v) => v.book === verse.book && v.chapter === verse.chapter && v.verse === verse.verse,
+      );
+      let next;
+      if (exists) {
+        next = prev.filter(
+          (v) => !(v.book === verse.book && v.chapter === verse.chapter && v.verse === verse.verse),
+        );
+        showToast(`Removed ${verse.citation} from bookmarks`);
+      } else {
+        next = [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            ...verse,
+            savedAt: Date.now(),
+          },
+        ];
+        showToast(`Saved ${verse.citation} to bookmarks`);
+      }
       if (typeof localStorage !== 'undefined') {
         try {
           localStorage.setItem('bibleit_saved_verses', JSON.stringify(next));
@@ -270,9 +288,11 @@ export function App(): JSX.Element {
             showHeadings={showHeadings}
             offlineTextStatus={textPackageStatus}
             hasSeenOnboarding={hasSeenStorageBanner}
+            savedVerses={savedVerses}
             onOpenStorage={handleOpenStorage}
             onDismissOnboarding={handleDismissOnboarding}
             onOpenReader={handleOpenReader}
+            onSaveVerse={handleSaveVerse}
             onToast={showToast}
           />
         )}

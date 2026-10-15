@@ -164,7 +164,6 @@ export function ReaderView({
       citation,
       text: selectedVerse.text,
     });
-    onToast(`Saved ${citation} to bookmarks`);
     setSelectedVerse(null);
     setShowActions(false);
   };
@@ -177,10 +176,12 @@ export function ReaderView({
   };
 
   const handleVerseClick = (v: ChapterVerse) => {
-    // If clicking a new verse or clicking the same verse, select and highlight it with border
-    if (selectedVerse?.num !== v.num) {
-      setSelectedVerse(v);
+    if (selectedVerse?.num === v.num && showActions) {
+      setSelectedVerse(null);
       setShowActions(false);
+    } else {
+      setSelectedVerse(v);
+      setShowActions(true);
     }
   };
 

@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { SearchEngine } from '../core/ports';
 import type { ScoredPassage } from '../core/types';
 import { BIBLE_BOOKS_BY_ID, findBookByPrefix } from '../core/bible-books';
+import { resolveVerseText } from '../adapters/book-store';
+import type { SavedVerse } from './SavedView';
 
 interface SearchViewProps {
   engine: SearchEngine;
@@ -12,9 +14,18 @@ interface SearchViewProps {
   showHeadings?: boolean;
   offlineTextStatus?: 'not_downloaded' | 'downloading' | 'ready';
   hasSeenOnboarding?: boolean;
+  savedVerses?: SavedVerse[];
   onOpenStorage?: () => void;
   onDismissOnboarding?: () => void;
   onOpenReader: (book: string, chapter: number, verse: number) => void;
+  onSaveVerse?: (verse: {
+    book: string;
+    bookName: string;
+    chapter: number;
+    verse: number;
+    citation: string;
+    text: string;
+  }) => void;
   onToast: (message: string) => void;
 }
 
@@ -51,15 +62,20 @@ export function SearchView({
   showHeadings = true,
   offlineTextStatus = 'ready',
   hasSeenOnboarding = true,
+  savedVerses,
   onOpenStorage,
   onDismissOnboarding,
   onOpenReader,
+  onSaveVerse,
   onToast,
 }: SearchViewProps): JSX.Element {
   const [query, setQuery] = useState('peace that surpasses understanding');
   const [passages, setPassages] = useState<ScoredPassage[]>([]);
   const [latencyMs, setLatencyMs] = useState(38);
   const [expandedCardId, setExpandedCardId] = useState<number | null>(null);
+  const [surroundingVerses, setSurroundingVerses] = useState<
+    Record<number, { prev?: string; next?: string }>
+  >({});
 
   const [answerText, setAnswerText] = useState<string>('');
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
@@ -103,6 +119,35 @@ export function SearchView({
     setAnswerText('');
     setIsSynthesizing(false);
   }, [query]);
+
+  useEffect(() => {
+    if (expandedCardId === null) return;
+    const passage = passages.find((p) => p.chunk.id === expandedCardId);
+    if (!passage || surroundingVerses[expandedCardId]) return;
+
+    let isSubscribed = true;
+    const book = passage.chunk.book;
+    const chStart = passage.chunk.start[0];
+    const vStart = passage.chunk.start[1];
+    const chEnd = passage.chunk.end[0];
+    const vEnd = passage.chunk.end[1];
+
+    void Promise.all([
+      vStart > 1 ? resolveVerseText(book, chStart, vStart - 1) : Promise.resolve(undefined),
+      resolveVerseText(book, chEnd, vEnd + 1),
+    ]).then(([prev, next]) => {
+      if (isSubscribed) {
+        setSurroundingVerses((curr) => ({
+          ...curr,
+          [expandedCardId]: { prev, next },
+        }));
+      }
+    });
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [expandedCardId, passages, surroundingVerses]);
 
   const toggleContext = (id: number) => {
     setExpandedCardId((prev) => (prev === id ? null : id));
@@ -553,6 +598,16 @@ export function SearchView({
               ? p.chunk.headings.map(([,, title]) => title).join(' • ')
               : null;
 
+          const isSaved =
+            savedVerses?.some(
+              (v) =>
+                v.book === p.chunk.book &&
+                v.chapter === p.chunk.start[0] &&
+                v.verse === p.chunk.start[1],
+            ) ?? false;
+
+          const surrounding = surroundingVerses[p.chunk.id];
+
           return (
             <article
               key={p.chunk.id}
@@ -601,7 +656,41 @@ export function SearchView({
                   )}
                 </div>
 
-                <div class="flex items-center gap-1">
+                <div class="flex items-center gap-1.5">
+                  {onSaveVerse && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const bookName = BIBLE_BOOKS_BY_ID[p.chunk.book]?.name ?? p.chunk.book;
+                        onSaveVerse({
+                          book: p.chunk.book,
+                          bookName,
+                          chapter: p.chunk.start[0],
+                          verse: p.chunk.start[1],
+                          citation: refString,
+                          text: p.chunk.text,
+                        });
+                      }}
+                      title={isSaved ? 'Remove from bookmarks' : 'Save to bookmarks'}
+                      class="p-1 rounded hover:opacity-75 transition-opacity"
+                      style={{ color: isSaved ? 'var(--text-main)' : 'var(--text-muted)' }}
+                    >
+                      <svg
+                        class="w-3.5 h-3.5"
+                        fill={isSaved ? 'currentColor' : 'none'}
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                        />
+                      </svg>
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={() => copyToClipboard(`${refString} - ${p.chunk.text}`)}
@@ -622,26 +711,22 @@ export function SearchView({
               </div>
 
               {/* Title & Scripture Citation Hierarchy */}
-              {primaryHeading ? (
-                <div class="mb-2">
-                  <h2
-                    class="font-serif text-lg font-semibold tracking-tight"
-                    style={{ color: 'var(--text-main)' }}
-                  >
-                    {primaryHeading}
-                  </h2>
-                  <div class="text-xs font-semibold text-amber-800 dark:text-amber-300 mt-0.5">
-                    {refString}
-                  </div>
-                </div>
-              ) : (
+              <div class="mb-2">
                 <h2
-                  class="font-serif text-lg font-semibold mb-2 tracking-tight"
+                  class="font-serif text-lg font-semibold tracking-tight"
                   style={{ color: 'var(--text-main)' }}
                 >
                   {refString}
                 </h2>
-              )}
+                {primaryHeading && (
+                  <div
+                    class="text-xs font-medium mt-0.5"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    {primaryHeading}
+                  </div>
+                )}
+              </div>
 
               <p
                 class="font-serif text-[17px] leading-relaxed"
@@ -662,26 +747,31 @@ export function SearchView({
                     color: 'var(--text-muted)',
                   }}
                 >
-                  <div class="text-xs font-sans text-stone-500 mb-1 flex items-center justify-between">
-                    <span>Passage Context ({refString})</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onOpenReader(
-                          p.chunk.book,
-                          p.chunk.start[0],
-                          p.chunk.start[1],
-                        )
-                      }
-                      class="text-amber-700 dark:text-amber-400 hover:underline font-medium text-xs font-sans"
-                    >
-                      Open chapter {p.chunk.start[0]} in Reader →
-                    </button>
-                  </div>
-                  <p class="font-medium" style={{ color: 'var(--text-main)' }}>
-                    <sup class="text-xs opacity-50 font-sans mr-1">{verseLabel}</sup>
+                  {surrounding?.prev && (
+                    <p class="opacity-70 leading-relaxed">
+                      <sup class="text-xs font-sans mr-1 opacity-50 font-normal">
+                        {p.chunk.start[1] - 1}
+                      </sup>
+                      {surrounding.prev}
+                    </p>
+                  )}
+                  <p class="font-medium leading-relaxed" style={{ color: 'var(--text-main)' }}>
+                    <sup class="text-xs opacity-60 font-sans mr-1 font-semibold">{verseLabel}</sup>
                     {p.chunk.text}
                   </p>
+                  {surrounding?.next && (
+                    <p class="opacity-70 leading-relaxed">
+                      <sup class="text-xs font-sans mr-1 opacity-50 font-normal">
+                        {p.chunk.end[1] + 1}
+                      </sup>
+                      {surrounding.next}
+                    </p>
+                  )}
+                  {!surrounding && (
+                    <div class="text-xs font-sans italic" style={{ color: 'var(--text-muted)' }}>
+                      Loading surrounding verses...
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -708,7 +798,8 @@ export function SearchView({
                       p.chunk.start[1],
                     )
                   }
-                  class="font-medium flex items-center gap-1 text-amber-700 dark:text-amber-400 hover:underline"
+                  class="font-medium flex items-center gap-1 hover:underline"
+                  style={{ color: 'var(--text-main)' }}
                 >
                   <span>Read chapter</span>
                   <span>→</span>
