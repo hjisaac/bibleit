@@ -63,6 +63,15 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         if "strategy" not in self.config:
             raise KeyError("Missing required 'strategy' parameter in chunking configuration")
         strategy_name = str(self.config["strategy"])
+        render_strategy = str(self.config.get("render_strategy", "heading_and_text"))
+        logger.info(
+            "Chunking corpus: strategy=%s, ceiling=%s, overlap=%s, include_overlap_heading=%s, renderer=%s",
+            strategy_name,
+            self.config.get("ceiling"),
+            self.config.get("overlap"),
+            self.config.get("include_overlap_heading"),
+            render_strategy,
+        )
 
         chunk_cfg = dict(self.config)
         chunk_cfg.pop("strategy", None)
@@ -75,6 +84,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
             **chunk_cfg,
         )
         chunks = chunker.chunk(prepared["pericopes"])
+        logger.info("Generated %d chunks; evaluating token distributions...", len(chunks))
 
         tokenizer = prepared["embedder"].model.tokenizer
         limit = int(self.config.get("token_limit", 512))
