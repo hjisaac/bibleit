@@ -52,7 +52,7 @@ export function SavedView({ savedVerses, onOpenVerse }: SavedViewProps): JSX.Ele
               }}
             >
               <div class="flex items-center justify-between text-xs" style={{ color: 'var(--text-muted)' }}>
-                <span class="font-semibold" style={{ color: 'var(--text-main)' }}>{item.citation}</span>
+                <span class="font-semibold text-amber-700 dark:text-amber-400">{item.citation}</span>
                 <span class="text-[10px]">Saved</span>
               </div>
               <p class="font-serif text-sm leading-relaxed" style={{ color: 'var(--text-main)' }}>

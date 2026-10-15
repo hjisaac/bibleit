@@ -176,12 +176,10 @@ export function ReaderView({
   };
 
   const handleVerseClick = (v: ChapterVerse) => {
-    if (selectedVerse?.num === v.num && showActions) {
-      setSelectedVerse(null);
-      setShowActions(false);
-    } else {
+    // If clicking a new verse or clicking the same verse, select and highlight it with border
+    if (selectedVerse?.num !== v.num) {
       setSelectedVerse(v);
-      setShowActions(true);
+      setShowActions(false);
     }
   };
 

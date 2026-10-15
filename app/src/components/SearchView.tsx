@@ -798,8 +798,7 @@ export function SearchView({
                       p.chunk.start[1],
                     )
                   }
-                  class="font-medium flex items-center gap-1 hover:underline"
-                  style={{ color: 'var(--text-main)' }}
+                  class="font-medium flex items-center gap-1 text-amber-700 dark:text-amber-400 hover:underline"
                 >
                   <span>Read chapter</span>
                   <span>→</span>
