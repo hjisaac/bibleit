@@ -34,6 +34,8 @@ Offline semantic retrieval in the browser requires strict trade-offs between pas
 
 All experimental runs and benchmark metrics are tracked and published openly:
 
+- **Corpus Linguistic Profiling**: [Weights & Biases — `bibleit-analysis-corpus-profile`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-analysis-corpus-profile)  
+  Statistical distributions of raw verse lengths, pericope token budgets, and chapter structures across testaments.
 - **Chunking Strategy Analysis**: [Weights & Biases — `bibleit-analysis-chunking-strategy`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-analysis-chunking-strategy)  
   Ablation sweeps over token ceilings (256, 512, 1024), verse overlaps, and header render strategies to measure token distributions (P50, P90, P99), pericope preservation, and truncation boundaries.
 - **Embedding Space Diagnostics**: [Weights & Biases — `bibleit-analysis-embed-corpus`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-analysis-embed-corpus)  
