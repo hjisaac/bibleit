@@ -63,14 +63,14 @@ class StaticArtifactSink(BaseSink):
         )
         chunks_payload = []
         for i, chunk in enumerate(chunks):
-            start_addr = chunk.start_address or corpus.ordered_verses[chunk.start_idx][0]
-            end_addr = chunk.end_address or corpus.ordered_verses[chunk.end_idx - 1][0]
+            start = list(chunk.start) if chunk.start != (0, 0) else [corpus.ordered_verses[chunk.start_idx][0][1], corpus.ordered_verses[chunk.start_idx][0][2]]
+            end = list(chunk.end) if chunk.end != (0, 0) else [corpus.ordered_verses[chunk.end_idx - 1][0][1], corpus.ordered_verses[chunk.end_idx - 1][0][2]]
             chunks_payload.append(
                 {
                     "id": i,
                     "book": chunk.book,
-                    "start": [start_addr[1], start_addr[2]],
-                    "end": [end_addr[1], end_addr[2]],
+                    "start": start,
+                    "end": end,
                     "headings": chunk.get_headings_meta(corpus.ordered_verses),
                     "text": renderer.render(chunk),
                 }

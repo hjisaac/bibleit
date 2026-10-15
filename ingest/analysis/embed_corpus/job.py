@@ -121,16 +121,15 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
                 elif headings_raw and isinstance(headings_raw[0], str):
                     sections = [(start_idx, h) for h in headings_raw]
 
-                start_addr = (book, ch_s, v_s)
                 end_addr = corpus.ordered_verses[end_idx - 1][0] if end_idx > start_idx else (book, ch_e, v_e)
                 chunks.append(
                     Passage(
                         book=book,
+                        start=(ch_s, v_s),
+                        end=(end_addr[1], end_addr[2]),
                         start_idx=start_idx,
                         end_idx=end_idx,
                         sections=tuple(sections),
-                        start_address=start_addr,
-                        end_address=end_addr,
                     )
                 )
         else:

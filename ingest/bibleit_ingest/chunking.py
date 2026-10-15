@@ -90,11 +90,11 @@ class AdaptiveWindowChunker(Chunker):
         end_addr = self.ordered_verses[end_idx - 1][0] if self.ordered_verses and end_idx > start_idx else None
         return Passage(
             book=book,
+            start=(start_addr[1], start_addr[2]) if start_addr else (0, 0),
+            end=(end_addr[1], end_addr[2]) if end_addr else (0, 0),
             start_idx=start_idx,
             end_idx=end_idx,
             sections=tuple(sections),
-            start_address=start_addr,
-            end_address=end_addr,
         )
 
     def chunk(self, pericopes: Sequence[Pericope]) -> list[Passage]:
@@ -227,11 +227,11 @@ class PericopeChunker(Chunker):
             passages.append(
                 Passage(
                     book=current_book,
+                    start=(start_addr[1], start_addr[2]) if start_addr else (0, 0),
+                    end=(end_addr[1], end_addr[2]) if end_addr else (0, 0),
                     start_idx=start_idx,
                     end_idx=end_idx,
                     sections=tuple(sections),
-                    start_address=start_addr,
-                    end_address=end_addr,
                 )
             )
 
@@ -362,11 +362,11 @@ class TokenWindowChunker(Chunker):
             passages.append(
                 Passage(
                     book=current_book,
+                    start=(self.ordered_verses[chunk_start][0][1], self.ordered_verses[chunk_start][0][2]),
+                    end=(self.ordered_verses[chunk_end - 1][0][1], self.ordered_verses[chunk_end - 1][0][2]),
                     start_idx=chunk_start,
                     end_idx=chunk_end,
                     sections=tuple(sections),
-                    start_address=self.ordered_verses[chunk_start][0],
-                    end_address=self.ordered_verses[chunk_end - 1][0],
                 )
             )
 
@@ -415,8 +415,7 @@ def load_pericopes(pericopes_path: Path) -> list[Pericope]:
     return [
         Pericope(
             book=p["book"],
-            chapter=p["chapter"],
-            verse=p["verse"],
+            start=tuple(p["start"]) if "start" in p else (p["chapter"], p["verse"]),
             heading=p["heading"],
             verse_count=p["verse_count"],
         )

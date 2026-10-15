@@ -10,6 +10,9 @@ def test_get_or_prepare_corpus() -> None:
     assert isinstance(corpus.pericopes, list)
     assert len(corpus.pericopes) > 3000
     assert corpus.pericopes[0].book == "GEN"
+    assert corpus.pericopes[0].start == (1, 1)
+    assert corpus.pericopes[0].chapter == 1
+    assert corpus.pericopes[0].verse == 1
     assert len(corpus.ordered_verses) > 30_000
     assert ("GEN", 1, 1) in corpus.address_index
 

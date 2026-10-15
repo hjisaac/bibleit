@@ -40,11 +40,11 @@ def test_static_artifact_sink(tmp_path: Path) -> None:
     chunks = [
         Passage(
             book="GEN",
+            start=(1, 1),
+            end=(1, 2),
             start_idx=0,
             end_idx=2,
             headings=("Creation",),
-            start_address=("GEN", 1, 1),
-            end_address=("GEN", 1, 2),
         )
     ]
     embeddings = np.array([[0.5, -0.5, 0.25, 1.0]], dtype=np.float32)
