@@ -10,6 +10,8 @@ Most Scripture search tools force a trade-off between brittle keyword matching a
 - **Exact Reference**: Instant verse and chapter lookups (e.g., `John 3:16`, `Genesis 1:1–31`).
 - **Keyword Search**: Inverted index / BM25 lexical matching for precise phrasing.
 - **Semantic Search**: Dense vector retrieval running locally in-browser via quantized embeddings, matching conceptual queries (e.g., "comfort in sorrow", "handling anxiety") without requiring exact word matches.
+- **RAG**: Passage grounded generation answer generation.
+
 
 ## Architecture
 
