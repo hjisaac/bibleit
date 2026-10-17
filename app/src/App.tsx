@@ -325,10 +325,10 @@ export function App(): JSX.Element {
       }}
     >
       <div
-        class={`transition-all duration-300 ease-in-out overflow-hidden shrink-0 ${
+        class={`transition-[margin,transform,opacity] duration-300 ease-in-out shrink-0 z-20 ${
           isHeaderVisible
-            ? 'max-h-20 opacity-100 translate-y-0'
-            : 'max-h-0 opacity-0 -translate-y-full pointer-events-none'
+            ? 'mt-0 translate-y-0 opacity-100'
+            : '-mt-[57px] -translate-y-full opacity-0 pointer-events-none'
         }`}
       >
         <Header

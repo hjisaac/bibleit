@@ -64,32 +64,43 @@ export function computeHeadroomState(
  */
 export function useHeadroom(options: HeadroomOptions = {}): [boolean, (visible: boolean) => void] {
   const [isVisible, setIsVisible] = useState<boolean>(true);
+  const isVisibleRef = useRef<boolean>(true);
   const lastScrollTopRef = useRef<number>(0);
+
+  isVisibleRef.current = isVisible;
 
   useEffect(() => {
     const handleScroll = (event: Event) => {
-      const target = event.target as HTMLElement | Document;
+      const target = event.target as HTMLElement | Document | null;
+      if (!target) return;
+
       const scrollTop =
         target instanceof HTMLElement
           ? target.scrollTop
-          : window.scrollY || document.documentElement.scrollTop;
+          : window.scrollY || document.documentElement.scrollTop || document.body.scrollTop;
 
       const next = computeHeadroomState(
         scrollTop,
         lastScrollTopRef.current,
-        isVisible,
+        isVisibleRef.current,
         options,
       );
 
       lastScrollTopRef.current = next.newLastScrollTop;
-      setIsVisible((prev) => (prev !== next.isVisible ? next.isVisible : prev));
+      if (next.isVisible !== isVisibleRef.current) {
+        setIsVisible(next.isVisible);
+      }
     };
 
+    // Attach on both document and window with capture to guarantee capture across all browsers
+    document.addEventListener('scroll', handleScroll, { capture: true, passive: true });
     window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+
     return () => {
+      document.removeEventListener('scroll', handleScroll, { capture: true });
       window.removeEventListener('scroll', handleScroll, { capture: true });
     };
-  }, [options.threshold, options.deltaThreshold, isVisible]);
+  }, [options.threshold, options.deltaThreshold]);
 
   return [isVisible, setIsVisible];
 }
