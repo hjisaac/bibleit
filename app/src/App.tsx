@@ -356,7 +356,6 @@ export function App(): JSX.Element {
             chapter={readerLocation.chapter}
             targetVerse={readerLocation.targetVerse}
             scrollKey={readerLocation.scrollKey}
-            onBackToSearch={() => handleTabChange('search')}
             onOpenSelector={() => setIsSelectorOpen(true)}
             onSaveVerse={handleSaveVerse}
             onToast={showToast}
