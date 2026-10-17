@@ -125,6 +125,31 @@ describe('Navbar Auto-Hide DOM Integration', () => {
     expect(nav.className).toContain('translate-y-0');
     expect(nav.className).not.toContain('translate-y-full');
   });
-});
 
+  it('ignores scroll events originating inside modal dialogs ([role="dialog"])', async () => {
+    const { container } = render(
+      <div>
+        <TestNavbarScrollComponent />
+        <div role="dialog" aria-modal="true">
+          <div data-testid="modal-scroll" style={{ overflowY: 'auto' }}>
+            Modal content
+          </div>
+        </div>
+      </div>,
+    );
+    const nav = container.querySelector('nav')!;
+    const modalScroll = container.querySelector('[data-testid="modal-scroll"]')!;
+
+    Object.defineProperty(modalScroll, 'scrollHeight', { value: 1200, configurable: true });
+    Object.defineProperty(modalScroll, 'clientHeight', { value: 400, configurable: true });
+    Object.defineProperty(modalScroll, 'scrollTop', { value: 250, writable: true, configurable: true });
+
+    await act(async () => {
+      fireEvent.scroll(modalScroll);
+    });
+
+    expect(nav.className).toContain('translate-y-0');
+    expect(nav.className).not.toContain('translate-y-full');
+  });
+});
 

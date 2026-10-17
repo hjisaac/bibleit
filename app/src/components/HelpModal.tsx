@@ -51,11 +51,13 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps): JSX.Element | nu
 
   return (
     <div
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn"
+      role="dialog"
+      aria-modal="true"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn overflow-hidden overscroll-contain"
       onClick={onClose}
     >
       <div
-        class="w-full max-w-lg rounded-2xl border p-5 sm:p-6 shadow-xl space-y-4 max-h-[85vh] flex flex-col"
+        class="w-full max-w-lg rounded-2xl border p-5 sm:p-6 shadow-xl space-y-4 max-h-[85vh] flex flex-col overscroll-contain"
         style={{
           backgroundColor: 'var(--bg-surface)',
           borderColor: 'var(--border-subtle)',
@@ -85,7 +87,7 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps): JSX.Element | nu
         </div>
 
         {/* Expandable Accordion List */}
-        <div class="flex-1 overflow-y-auto space-y-2 pr-1">
+        <div class="flex-1 overflow-y-auto overscroll-contain space-y-2 pr-1">
           {SECTIONS.map((sec) => {
             const isExpanded = expandedId === sec.id;
 

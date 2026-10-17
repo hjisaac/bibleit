@@ -181,7 +181,7 @@ export function SearchView({
   };
 
   return (
-    <section class="flex-1 flex flex-col p-4 sm:p-8 overflow-y-auto max-w-2xl mx-auto w-full">
+    <section class="flex-1 flex flex-col p-4 sm:p-8 pb-24 sm:pb-24 overflow-y-auto overscroll-y-contain max-w-2xl mx-auto w-full">
       {/* Offline Storage Status Banner / Super Tiny Reminder */}
       {offlineTextStatus !== 'ready' && (
         !hasSeenOnboarding ? (

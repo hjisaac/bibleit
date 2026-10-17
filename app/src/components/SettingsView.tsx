@@ -59,7 +59,7 @@ export function SettingsView({
     return undefined;
   }, [highlightStorage]);
   return (
-    <section class="flex-1 flex flex-col p-4 sm:p-8 overflow-y-auto space-y-6 max-w-2xl mx-auto w-full">
+    <section class="flex-1 flex flex-col p-4 sm:p-8 pb-24 sm:pb-24 overflow-y-auto overscroll-y-contain space-y-6 max-w-2xl mx-auto w-full">
       <div>
         <h1 class="text-xl font-bold tracking-tight" style={{ color: 'var(--text-main)' }}>
           Settings

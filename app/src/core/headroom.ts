@@ -59,6 +59,7 @@ export function computeHeadroomState(
 }
 
 interface ScrollMetrics {
+  readonly key: EventTarget;
   readonly scrollTop: number;
   readonly maxScroll: number;
 }
@@ -71,12 +72,17 @@ function getScrollMetrics(event?: Event): ScrollMetrics | null {
     target !== document.documentElement &&
     target !== document.body
   ) {
-    // Ignore horizontal scrollers or inner elements when window is the active scroller
-    if (window.scrollY > 0 || target.scrollHeight <= target.clientHeight) {
+    // Never react to scroll events inside modals/dialogs, horizontal scrollers, or when window scrolls
+    if (
+      window.scrollY > 0 ||
+      target.scrollHeight <= target.clientHeight ||
+      target.closest('[role="dialog"], [aria-modal="true"]')
+    ) {
       return null;
     }
     const maxScroll = Math.max(0, target.scrollHeight - target.clientHeight);
     return {
+      key: target,
       scrollTop: Math.min(Math.max(0, target.scrollTop), maxScroll || target.scrollTop),
       maxScroll,
     };
@@ -90,6 +96,7 @@ function getScrollMetrics(event?: Event): ScrollMetrics | null {
       : 0;
 
   return {
+    key: window,
     scrollTop: maxScroll > 0 ? Math.min(Math.max(0, rawTop), maxScroll) : Math.max(0, rawTop),
     maxScroll,
   };
@@ -101,16 +108,12 @@ function getScrollMetrics(event?: Event): ScrollMetrics | null {
 export function useHeadroom(options: HeadroomOptions = {}): [boolean, (visible: boolean) => void] {
   const [isVisible, setIsVisible] = useState<boolean>(true);
   const isVisibleRef = useRef<boolean>(true);
-  const lastScrollTopRef = useRef<number>(0);
+  const lastScrollMapRef = useRef<WeakMap<EventTarget, number>>(new WeakMap());
 
   isVisibleRef.current = isVisible;
 
   const setVisible = (visible: boolean) => {
     isVisibleRef.current = visible;
-    const metrics = getScrollMetrics();
-    if (metrics) {
-      lastScrollTopRef.current = metrics.scrollTop;
-    }
     setIsVisible(visible);
   };
 
@@ -123,7 +126,7 @@ export function useHeadroom(options: HeadroomOptions = {}): [boolean, (visible: 
 
       // Keep bar visible if the page barely scrolls (prevents boundary oscillation)
       if (metrics.maxScroll > 0 && metrics.maxScroll < threshold + 40) {
-        lastScrollTopRef.current = metrics.scrollTop;
+        lastScrollMapRef.current.set(metrics.key, metrics.scrollTop);
         if (!isVisibleRef.current) {
           isVisibleRef.current = true;
           setIsVisible(true);
@@ -131,14 +134,15 @@ export function useHeadroom(options: HeadroomOptions = {}): [boolean, (visible: 
         return;
       }
 
+      const prevScrollTop = lastScrollMapRef.current.get(metrics.key) ?? 0;
       const next = computeHeadroomState(
         metrics.scrollTop,
-        lastScrollTopRef.current,
+        prevScrollTop,
         isVisibleRef.current,
         options,
       );
 
-      lastScrollTopRef.current = next.newLastScrollTop;
+      lastScrollMapRef.current.set(metrics.key, next.newLastScrollTop);
       if (next.isVisible !== isVisibleRef.current) {
         isVisibleRef.current = next.isVisible;
         setIsVisible(next.isVisible);
@@ -153,4 +157,5 @@ export function useHeadroom(options: HeadroomOptions = {}): [boolean, (visible: 
 
   return [isVisible, setVisible];
 }
+
 

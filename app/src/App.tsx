@@ -221,7 +221,7 @@ export function App(): JSX.Element {
 
   // Sync theme class to document body.
   useEffect(() => {
-    document.body.className = `antialiased font-sans min-h-screen theme-${theme}`;
+    document.body.className = `antialiased font-sans h-full overflow-hidden theme-${theme}`;
   }, [theme]);
 
   // Monitor network status in real time with event listeners and polling heartbeat
@@ -318,7 +318,7 @@ export function App(): JSX.Element {
 
   return (
     <div
-      class="w-full max-w-3xl min-h-screen flex flex-col sm:border-x shadow-sm relative transition-colors"
+      class="w-full max-w-3xl h-full overflow-hidden flex flex-col sm:border-x shadow-sm relative transition-colors"
       style={{
         backgroundColor: 'var(--bg-surface)',
         borderColor: 'var(--border-subtle)',
@@ -331,7 +331,7 @@ export function App(): JSX.Element {
         onOpenAccount={() => showToast('Offline profile (Guest mode)')}
       />
 
-      <main class="flex-1 flex flex-col overflow-hidden pb-16">
+      <main class="flex-1 flex flex-col overflow-hidden">
         <div class={activeTab === 'search' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
           <SearchView
             engine={engine}

@@ -222,7 +222,7 @@ export function ReaderView({
   };
 
   return (
-    <section id="reader-scroll-container" class="flex-1 flex flex-col overflow-y-auto">
+    <section id="reader-scroll-container" class="flex-1 flex flex-col overflow-y-auto overscroll-y-contain">
       {/* Reader Navigation Header */}
       <div
         class="px-4 sm:px-6 py-3 border-b flex items-center sticky top-0 z-10 backdrop-blur-md"
@@ -245,7 +245,7 @@ export function ReaderView({
       </div>
 
       {/* Chapter Text */}
-      <div class="p-5 sm:p-8 font-serif text-[18px] sm:text-[19px] leading-[1.85] space-y-4 max-w-2xl mx-auto w-full" style={{ color: 'var(--text-main)' }}>
+      <div class="p-5 sm:p-8 pb-24 sm:pb-24 font-serif text-[18px] sm:text-[19px] leading-[1.85] space-y-4 max-w-2xl mx-auto w-full" style={{ color: 'var(--text-main)' }}>
         <div class="flex flex-col items-center mb-6">
           <button
             type="button"

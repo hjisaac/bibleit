@@ -94,7 +94,7 @@ export function BookSelectorModal({
     <div
       role="dialog"
       aria-modal="true"
-      class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4 animate-fadeIn"
+      class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4 animate-fadeIn overflow-hidden overscroll-contain"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
@@ -102,7 +102,7 @@ export function BookSelectorModal({
       }}
     >
       <div
-        class="w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col rounded-t-[28px] sm:rounded-2xl border shadow-2xl overflow-hidden"
+        class="w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] flex flex-col rounded-t-[28px] sm:rounded-2xl border shadow-2xl overflow-hidden overscroll-contain"
         style={{
           backgroundColor: 'var(--bg-surface)',
           borderColor: 'var(--border-subtle)',
@@ -206,7 +206,7 @@ export function BookSelectorModal({
         </div>
 
         {/* Content Body */}
-        <div class="p-4 overflow-y-auto flex-1 custom-scroll">
+        <div class="p-4 overflow-y-auto overscroll-contain flex-1 custom-scroll">
           {/* Step 1: Books */}
           {currentStep === 'book' && (
             <div class="space-y-3">
