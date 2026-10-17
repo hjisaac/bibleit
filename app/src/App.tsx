@@ -331,7 +331,7 @@ export function App(): JSX.Element {
         onOpenAccount={() => showToast('Offline profile (Guest mode)')}
       />
 
-      <main class="flex-1 flex flex-col overflow-hidden">
+      <main class="flex-1 flex flex-col overflow-hidden pb-16">
         <div class={activeTab === 'search' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
           <SearchView
             engine={engine}

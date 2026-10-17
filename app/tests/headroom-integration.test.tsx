@@ -39,12 +39,12 @@ describe('Navbar Auto-Hide DOM Integration', () => {
     });
   });
 
-  it('pins Navbar with sticky bottom-0 and slides down/up on window scroll', async () => {
+  it('pins Navbar with fixed bottom-0 and slides down/up on window scroll', async () => {
     const { container } = render(<TestNavbarScrollComponent />);
     const nav = container.querySelector('nav')!;
 
-    // Initial state: sticky bottom-0 and visible (translate-y-0)
-    expect(nav.className).toContain('sticky');
+    // Initial state: fixed bottom-0 and visible (translate-y-0)
+    expect(nav.className).toContain('fixed');
     expect(nav.className).toContain('bottom-0');
     expect(nav.className).toContain('translate-y-0');
     expect(nav.className).not.toContain('translate-y-full');
@@ -107,5 +107,24 @@ describe('Navbar Auto-Hide DOM Integration', () => {
     expect(nav.className).toContain('translate-y-0');
     expect(nav.className).not.toContain('translate-y-full');
   });
+
+  it('never hides or shakes on short pages where maxScroll is below threshold + 40', async () => {
+    const { container, getByTestId } = render(<TestNavbarScrollComponent />);
+    const nav = container.querySelector('nav')!;
+    const scrollContainer = getByTestId('scroll-container');
+
+    // maxScroll = 660 - 600 = 60 (< 50 + 40 = 90)
+    Object.defineProperty(scrollContainer, 'scrollHeight', { value: 660, configurable: true });
+    Object.defineProperty(scrollContainer, 'clientHeight', { value: 600, configurable: true });
+    Object.defineProperty(scrollContainer, 'scrollTop', { value: 58, writable: true, configurable: true });
+
+    await act(async () => {
+      fireEvent.scroll(scrollContainer);
+    });
+
+    expect(nav.className).toContain('translate-y-0');
+    expect(nav.className).not.toContain('translate-y-full');
+  });
 });
+
 

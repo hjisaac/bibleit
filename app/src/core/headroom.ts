@@ -58,17 +58,41 @@ export function computeHeadroomState(
   };
 }
 
-function getScrollTop(event?: Event): number {
+interface ScrollMetrics {
+  readonly scrollTop: number;
+  readonly maxScroll: number;
+}
+
+function getScrollMetrics(event?: Event): ScrollMetrics | null {
   const target = event?.target;
+
   if (
     target instanceof HTMLElement &&
     target !== document.documentElement &&
-    target !== document.body &&
-    target.scrollHeight > target.clientHeight
+    target !== document.body
   ) {
-    return target.scrollTop;
+    // Ignore horizontal scrollers or inner elements when window is the active scroller
+    if (window.scrollY > 0 || target.scrollHeight <= target.clientHeight) {
+      return null;
+    }
+    const maxScroll = Math.max(0, target.scrollHeight - target.clientHeight);
+    return {
+      scrollTop: Math.min(Math.max(0, target.scrollTop), maxScroll || target.scrollTop),
+      maxScroll,
+    };
   }
-  return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+
+  const rawTop = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+  const docEl = document.documentElement;
+  const maxScroll =
+    docEl && docEl.scrollHeight > docEl.clientHeight
+      ? docEl.scrollHeight - docEl.clientHeight
+      : 0;
+
+  return {
+    scrollTop: maxScroll > 0 ? Math.min(Math.max(0, rawTop), maxScroll) : Math.max(0, rawTop),
+    maxScroll,
+  };
 }
 
 /**
@@ -81,11 +105,34 @@ export function useHeadroom(options: HeadroomOptions = {}): [boolean, (visible: 
 
   isVisibleRef.current = isVisible;
 
+  const setVisible = (visible: boolean) => {
+    isVisibleRef.current = visible;
+    const metrics = getScrollMetrics();
+    if (metrics) {
+      lastScrollTopRef.current = metrics.scrollTop;
+    }
+    setIsVisible(visible);
+  };
+
   useEffect(() => {
+    const threshold = options.threshold ?? 50;
+
     const handleScroll = (event: Event) => {
-      const scrollTop = getScrollTop(event);
+      const metrics = getScrollMetrics(event);
+      if (!metrics) return;
+
+      // Keep bar visible if the page barely scrolls (prevents boundary oscillation)
+      if (metrics.maxScroll > 0 && metrics.maxScroll < threshold + 40) {
+        lastScrollTopRef.current = metrics.scrollTop;
+        if (!isVisibleRef.current) {
+          isVisibleRef.current = true;
+          setIsVisible(true);
+        }
+        return;
+      }
+
       const next = computeHeadroomState(
-        scrollTop,
+        metrics.scrollTop,
         lastScrollTopRef.current,
         isVisibleRef.current,
         options,
@@ -104,5 +151,6 @@ export function useHeadroom(options: HeadroomOptions = {}): [boolean, (visible: 
     };
   }, [options.threshold, options.deltaThreshold]);
 
-  return [isVisible, setIsVisible];
+  return [isVisible, setVisible];
 }
+
