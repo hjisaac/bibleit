@@ -1,4 +1,4 @@
-.PHONY: dev build install test
+.PHONY: dev build install test test-app test-ingest
 
 SHELL := /bin/bash
 
@@ -20,6 +20,13 @@ install:
 build:
 	pnpm --prefix app build
 
-# Run python ingest tests
-test:
-	pytest ingest/tests
+# Run all test suites (frontend and ingest)
+test: test-app test-ingest
+
+# Run frontend UI and component tests (Vitest)
+test-app:
+	pnpm --prefix app test
+
+# Run python ingest pipeline test suite
+test-ingest:
+	cd ingest && uv run pytest -q

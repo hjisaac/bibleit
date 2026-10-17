@@ -15,7 +15,23 @@ export function App(): JSX.Element {
   const engine = useMemo(() => createDefaultEngine(), []);
 
   const [theme, setTheme] = useState<Theme>('paper');
-  const [activeTab, setActiveTab] = useState<ViewTab>('search');
+  const [activeTab, setActiveTab] = useState<ViewTab>(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('bibleit_active_tab') as ViewTab | null;
+      if (saved && ['search', 'reader', 'saved', 'settings'].includes(saved)) {
+        return saved;
+      }
+    }
+    return 'search';
+  });
+
+  const handleTabChange = (tab: ViewTab) => {
+    setActiveTab(tab);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('bibleit_active_tab', tab);
+    }
+  };
+
   const [isInspectorMode, setIsInspectorMode] = useState<boolean>(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
@@ -38,12 +54,45 @@ export function App(): JSX.Element {
     chapter: number;
     targetVerse?: number;
     scrollKey: number;
-  }>({
-    book: 'PHP',
-    chapter: 4,
-    targetVerse: 7,
-    scrollKey: 0,
+  }>(() => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('bibleit_last_read');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed.book === 'string' && typeof parsed.chapter === 'number') {
+            return {
+              book: parsed.book,
+              chapter: parsed.chapter,
+              targetVerse: parsed.targetVerse ?? 1,
+              scrollKey: 0,
+            };
+          }
+        }
+      } catch {
+        // Fall back to default
+      }
+    }
+    return {
+      book: 'GEN',
+      chapter: 1,
+      targetVerse: 1,
+      scrollKey: 0,
+    };
   });
+
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(
+        'bibleit_last_read',
+        JSON.stringify({
+          book: readerLocation.book,
+          chapter: readerLocation.chapter,
+          targetVerse: readerLocation.targetVerse,
+        }),
+      );
+    }
+  }, [readerLocation.book, readerLocation.chapter, readerLocation.targetVerse]);
 
   const [savedVerses, setSavedVerses] = useState<SavedVerse[]>(() => {
     if (typeof localStorage !== 'undefined') {
@@ -155,7 +204,7 @@ export function App(): JSX.Element {
   };
 
   const handleOpenStorage = () => {
-    setActiveTab('settings');
+    handleTabChange('settings');
     setHighlightStorage(true);
   };
 
@@ -220,7 +269,7 @@ export function App(): JSX.Element {
 
   const handleOpenReader = (book: string, chapter: number, verse: number) => {
     setReaderLocation({ book, chapter, targetVerse: verse, scrollKey: Date.now() });
-    setActiveTab('reader');
+    handleTabChange('reader');
   };
 
   const handleSaveVerse = (verse: {
@@ -279,7 +328,7 @@ export function App(): JSX.Element {
       />
 
       <main class="flex-1 flex flex-col overflow-hidden">
-        {activeTab === 'search' && (
+        <div class={activeTab === 'search' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
           <SearchView
             engine={engine}
             isOnline={isOnline}
@@ -295,20 +344,20 @@ export function App(): JSX.Element {
             onSaveVerse={handleSaveVerse}
             onToast={showToast}
           />
-        )}
+        </div>
 
-        {activeTab === 'reader' && (
+        <div class={activeTab === 'reader' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
           <ReaderView
             book={readerLocation.book}
             chapter={readerLocation.chapter}
             targetVerse={readerLocation.targetVerse}
             scrollKey={readerLocation.scrollKey}
-            onBackToSearch={() => setActiveTab('search')}
+            onBackToSearch={() => handleTabChange('search')}
             onOpenSelector={() => setIsSelectorOpen(true)}
             onSaveVerse={handleSaveVerse}
             onToast={showToast}
           />
-        )}
+        </div>
 
         {activeTab === 'saved' && (
           <SavedView
@@ -342,7 +391,7 @@ export function App(): JSX.Element {
         )}
       </main>
 
-      <Navbar activeTab={activeTab} onTabChange={setActiveTab} />
+      <Navbar activeTab={activeTab} onTabChange={handleTabChange} />
 
       {/* Book, Chapter & Verse Selection Modal */}
       <BookSelectorModal

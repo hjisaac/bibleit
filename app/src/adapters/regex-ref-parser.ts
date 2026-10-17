@@ -39,7 +39,7 @@ export class RegexRefParser implements RefParser {
   // Group 4: Start verse number
   // Group 5: Optional end verse number
   private static readonly REF_PATTERN =
-    /\b([1-3]?\s*[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF]+)\s+(\d+)(?::(\d+)(?:[-–—](\d+))?)?\b/g;
+    /\b([1-3]?\s*[\p{L}\p{M}]+)\s+(\d+)(?::(\d+)(?:[-–—](\d+))?)?\b/gu;
 
   constructor(aliasMap?: Map<string, BibleBook>) {
     this.aliasMap = aliasMap ?? buildBookAliasMap();

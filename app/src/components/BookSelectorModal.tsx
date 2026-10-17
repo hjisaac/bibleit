@@ -35,7 +35,7 @@ export function BookSelectorModal({
   useEffect(() => {
     if (isOpen) {
       const initial = initialBookId ? BIBLE_BOOKS_BY_ID[initialBookId] : null;
-      setSelectedBook(initial ?? BIBLE_BOOKS_BY_ID['PHP'] ?? BIBLE_BOOKS[0]!);
+      setSelectedBook(initial ?? BIBLE_BOOKS[0]!);
       setSelectedChapter(initialChapter ?? 1);
       setCurrentStep('book');
       setSearchFilter('');

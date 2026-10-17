@@ -94,13 +94,20 @@ export function ReaderView({
     return () => clearTimeout(timer);
   }, [targetVerse, verses, scrollKey, book, chapter]);
 
-  const triggerHaptic = (duration: number = 20) => {
+  const triggerHaptic = (pattern: number | number[] = 40) => {
     try {
-      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-        navigator.vibrate(duration);
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        const ok = navigator.vibrate(pattern);
+        if (ok) {
+          console.log('[Haptic] Vibrate triggered successfully with pattern:', pattern);
+        } else {
+          console.warn('[Haptic] navigator.vibrate returned false (gesture expired, blocked by OS, or inactive window)');
+        }
+      } else {
+        console.warn('[Haptic] navigator.vibrate is not supported on this browser or platform');
       }
-    } catch {
-      // Ignore vibration errors if disabled by system policy
+    } catch (err) {
+      console.warn('[Haptic] Exception during vibration:', err);
     }
   };
 
@@ -193,7 +200,7 @@ export function ReaderView({
     longPressTimerRef.current = setTimeout(() => {
       setSelectedVerse(verse);
       setShowActions(true);
-      triggerHaptic(20);
+      triggerHaptic(40);
     }, 450);
   };
 
@@ -203,7 +210,7 @@ export function ReaderView({
     if (touch) {
       const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
       const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
-      if (dx > 8 || dy > 8) {
+      if (dx > 16 || dy > 16) {
         clearLongPressTimer();
       }
     }
@@ -293,6 +300,11 @@ export function ReaderView({
                 id={`verse-${v.num}`}
                 ref={isTarget ? targetVerseRef : undefined}
                 onClick={() => handleVerseClick(v)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setSelectedVerse(v);
+                  setShowActions(true);
+                }}
                 onTouchStart={(e) => handleTouchStart(v, e as unknown as TouchEvent)}
                 onTouchMove={(e) => handleTouchMove(e as unknown as TouchEvent)}
                 onTouchEnd={handleTouchEnd}
@@ -302,6 +314,7 @@ export function ReaderView({
                 } ${isSelected ? 'ring-2 ring-stone-500/40' : ''}`}
                 style={{
                   backgroundColor: isTarget ? 'var(--highlight-verse)' : 'transparent',
+                  WebkitTouchCallout: 'none',
                 }}
               >
                 <sup class="text-xs opacity-50 font-sans mr-1 font-normal">

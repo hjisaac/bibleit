@@ -7,22 +7,25 @@ describe('RrfRanker', () => {
 
   const chunk1: Chunk = {
     id: 1,
-    start: { book: 'JHN', chapter: 3, verse: 16 },
-    end: { book: 'JHN', chapter: 3, verse: 16 },
+    book: 'JHN',
+    start: [3, 16],
+    end: [3, 16],
     text: 'For God so loved the world...',
   };
 
   const chunk2: Chunk = {
     id: 2,
-    start: { book: 'GEN', chapter: 1, verse: 1 },
-    end: { book: 'GEN', chapter: 1, verse: 1 },
+    book: 'GEN',
+    start: [1, 1],
+    end: [1, 1],
     text: 'In the beginning...',
   };
 
   const chunk3: Chunk = {
     id: 3,
-    start: { book: 'JHN', chapter: 3, verse: 15 },
-    end: { book: 'JHN', chapter: 3, verse: 17 },
+    book: 'JHN',
+    start: [3, 15],
+    end: [3, 17],
     text: 'Overlapping John passage...',
   };
 
