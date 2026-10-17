@@ -9,7 +9,6 @@ interface ReaderViewProps {
   chapter: number;
   targetVerse?: number;
   scrollKey?: number;
-  onBackToSearch: () => void;
   onOpenSelector: () => void;
   onSaveVerse: (verse: {
     book: string;
@@ -27,7 +26,6 @@ export function ReaderView({
   chapter,
   targetVerse,
   scrollKey,
-  onBackToSearch,
   onOpenSelector,
   onSaveVerse,
   onToast,
@@ -94,13 +92,20 @@ export function ReaderView({
     return () => clearTimeout(timer);
   }, [targetVerse, verses, scrollKey, book, chapter]);
 
-  const triggerHaptic = (duration: number = 20) => {
+  const triggerHaptic = (pattern: number | number[] = 40) => {
     try {
-      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-        navigator.vibrate(duration);
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        const ok = navigator.vibrate(pattern);
+        if (ok) {
+          console.log('[Haptic] Vibrate triggered successfully with pattern:', pattern);
+        } else {
+          console.warn('[Haptic] navigator.vibrate returned false (gesture expired, blocked by OS, or inactive window)');
+        }
+      } else {
+        console.warn('[Haptic] navigator.vibrate is not supported on this browser or platform');
       }
-    } catch {
-      // Ignore vibration errors if disabled by system policy
+    } catch (err) {
+      console.warn('[Haptic] Exception during vibration:', err);
     }
   };
 
@@ -193,7 +198,7 @@ export function ReaderView({
     longPressTimerRef.current = setTimeout(() => {
       setSelectedVerse(verse);
       setShowActions(true);
-      triggerHaptic(20);
+      triggerHaptic(40);
     }, 450);
   };
 
@@ -203,7 +208,7 @@ export function ReaderView({
     if (touch) {
       const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
       const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
-      if (dx > 8 || dy > 8) {
+      if (dx > 16 || dy > 16) {
         clearLongPressTimer();
       }
     }
@@ -215,30 +220,9 @@ export function ReaderView({
   };
 
   return (
-    <section id="reader-scroll-container" class="flex-1 flex flex-col overflow-y-auto">
-      {/* Reader Navigation Header */}
-      <div
-        class="px-4 sm:px-6 py-3 border-b flex items-center sticky top-0 z-10 backdrop-blur-md"
-        style={{
-          backgroundColor: 'var(--bg-surface)',
-          borderColor: 'var(--border-subtle)',
-        }}
-      >
-        <button
-          type="button"
-          onClick={onBackToSearch}
-          class="flex items-center gap-1.5 text-xs font-medium px-2 py-1.5 rounded-lg transition-opacity hover:opacity-75"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-          </svg>
-          <span>Back to search</span>
-        </button>
-      </div>
-
+    <section id="reader-scroll-container" class="flex-1 flex flex-col overflow-y-auto overscroll-y-contain">
       {/* Chapter Text */}
-      <div class="p-5 sm:p-8 font-serif text-[18px] sm:text-[19px] leading-[1.85] space-y-4 max-w-2xl mx-auto w-full" style={{ color: 'var(--text-main)' }}>
+      <div class="p-5 sm:p-8 pb-24 sm:pb-24 font-serif text-[18px] sm:text-[19px] leading-[1.85] space-y-4 max-w-2xl mx-auto w-full" style={{ color: 'var(--text-main)' }}>
         <div class="flex flex-col items-center mb-6">
           <button
             type="button"
@@ -293,6 +277,11 @@ export function ReaderView({
                 id={`verse-${v.num}`}
                 ref={isTarget ? targetVerseRef : undefined}
                 onClick={() => handleVerseClick(v)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setSelectedVerse(v);
+                  setShowActions(true);
+                }}
                 onTouchStart={(e) => handleTouchStart(v, e as unknown as TouchEvent)}
                 onTouchMove={(e) => handleTouchMove(e as unknown as TouchEvent)}
                 onTouchEnd={handleTouchEnd}
@@ -302,6 +291,7 @@ export function ReaderView({
                 } ${isSelected ? 'ring-2 ring-stone-500/40' : ''}`}
                 style={{
                   backgroundColor: isTarget ? 'var(--highlight-verse)' : 'transparent',
+                  WebkitTouchCallout: 'none',
                 }}
               >
                 <sup class="text-xs opacity-50 font-sans mr-1 font-normal">

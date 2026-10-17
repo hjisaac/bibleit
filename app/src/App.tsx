@@ -10,12 +10,32 @@ import { SettingsView, type PackageStatus } from './components/SettingsView';
 import { BookSelectorModal } from './components/BookSelectorModal';
 import { HelpModal } from './components/HelpModal';
 import { clearBookCache, downloadAllBooks, getCachedBooksCount } from './adapters/book-store';
+import { useHeadroom } from './core/headroom';
 
 export function App(): JSX.Element {
   const engine = useMemo(() => createDefaultEngine(), []);
 
   const [theme, setTheme] = useState<Theme>('paper');
-  const [activeTab, setActiveTab] = useState<ViewTab>('search');
+  const [activeTab, setActiveTab] = useState<ViewTab>(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('bibleit_active_tab') as ViewTab | null;
+      if (saved && ['search', 'reader', 'saved', 'settings'].includes(saved)) {
+        return saved;
+      }
+    }
+    return 'search';
+  });
+
+  const [isBarVisible, setIsBarVisible] = useHeadroom({ threshold: 50, deltaThreshold: 8 });
+
+  const handleTabChange = (tab: ViewTab) => {
+    setActiveTab(tab);
+    setIsBarVisible(true);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('bibleit_active_tab', tab);
+    }
+  };
+
   const [isInspectorMode, setIsInspectorMode] = useState<boolean>(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
@@ -38,12 +58,45 @@ export function App(): JSX.Element {
     chapter: number;
     targetVerse?: number;
     scrollKey: number;
-  }>({
-    book: 'PHP',
-    chapter: 4,
-    targetVerse: 7,
-    scrollKey: 0,
+  }>(() => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('bibleit_last_read');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed.book === 'string' && typeof parsed.chapter === 'number') {
+            return {
+              book: parsed.book,
+              chapter: parsed.chapter,
+              targetVerse: parsed.targetVerse ?? 1,
+              scrollKey: 0,
+            };
+          }
+        }
+      } catch {
+        // Fall back to default
+      }
+    }
+    return {
+      book: 'GEN',
+      chapter: 1,
+      targetVerse: 1,
+      scrollKey: 0,
+    };
   });
+
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(
+        'bibleit_last_read',
+        JSON.stringify({
+          book: readerLocation.book,
+          chapter: readerLocation.chapter,
+          targetVerse: readerLocation.targetVerse,
+        }),
+      );
+    }
+  }, [readerLocation.book, readerLocation.chapter, readerLocation.targetVerse]);
 
   const [savedVerses, setSavedVerses] = useState<SavedVerse[]>(() => {
     if (typeof localStorage !== 'undefined') {
@@ -155,7 +208,7 @@ export function App(): JSX.Element {
   };
 
   const handleOpenStorage = () => {
-    setActiveTab('settings');
+    handleTabChange('settings');
     setHighlightStorage(true);
   };
 
@@ -168,7 +221,7 @@ export function App(): JSX.Element {
 
   // Sync theme class to document body.
   useEffect(() => {
-    document.body.className = `antialiased font-sans min-h-screen theme-${theme}`;
+    document.body.className = `antialiased font-sans h-full overflow-hidden theme-${theme}`;
   }, [theme]);
 
   // Monitor network status in real time with event listeners and polling heartbeat
@@ -220,7 +273,7 @@ export function App(): JSX.Element {
 
   const handleOpenReader = (book: string, chapter: number, verse: number) => {
     setReaderLocation({ book, chapter, targetVerse: verse, scrollKey: Date.now() });
-    setActiveTab('reader');
+    handleTabChange('reader');
   };
 
   const handleSaveVerse = (verse: {
@@ -265,7 +318,7 @@ export function App(): JSX.Element {
 
   return (
     <div
-      class="w-full max-w-3xl min-h-screen flex flex-col sm:border-x shadow-sm relative transition-colors"
+      class="w-full max-w-3xl h-full overflow-hidden flex flex-col sm:border-x shadow-sm relative transition-colors"
       style={{
         backgroundColor: 'var(--bg-surface)',
         borderColor: 'var(--border-subtle)',
@@ -279,7 +332,7 @@ export function App(): JSX.Element {
       />
 
       <main class="flex-1 flex flex-col overflow-hidden">
-        {activeTab === 'search' && (
+        <div class={activeTab === 'search' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
           <SearchView
             engine={engine}
             isOnline={isOnline}
@@ -295,20 +348,19 @@ export function App(): JSX.Element {
             onSaveVerse={handleSaveVerse}
             onToast={showToast}
           />
-        )}
+        </div>
 
-        {activeTab === 'reader' && (
+        <div class={activeTab === 'reader' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
           <ReaderView
             book={readerLocation.book}
             chapter={readerLocation.chapter}
             targetVerse={readerLocation.targetVerse}
             scrollKey={readerLocation.scrollKey}
-            onBackToSearch={() => setActiveTab('search')}
             onOpenSelector={() => setIsSelectorOpen(true)}
             onSaveVerse={handleSaveVerse}
             onToast={showToast}
           />
-        )}
+        </div>
 
         {activeTab === 'saved' && (
           <SavedView
@@ -342,7 +394,7 @@ export function App(): JSX.Element {
         )}
       </main>
 
-      <Navbar activeTab={activeTab} onTabChange={setActiveTab} />
+      <Navbar activeTab={activeTab} onTabChange={handleTabChange} isVisible={isBarVisible} />
 
       {/* Book, Chapter & Verse Selection Modal */}
       <BookSelectorModal
@@ -358,7 +410,7 @@ export function App(): JSX.Element {
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div class="absolute bottom-16 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full shadow-lg text-xs font-semibold text-white bg-stone-900 border border-stone-700 animate-fadeIn">
+        <div class="fixed bottom-16 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-full shadow-lg text-xs font-semibold text-white bg-stone-900 border border-stone-700 animate-fadeIn">
           {toastMessage}
         </div>
       )}

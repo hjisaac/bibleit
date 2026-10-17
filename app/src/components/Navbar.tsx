@@ -5,12 +5,15 @@ export type ViewTab = 'search' | 'reader' | 'saved' | 'settings';
 interface NavbarProps {
   activeTab: ViewTab;
   onTabChange: (tab: ViewTab) => void;
+  isVisible?: boolean;
 }
 
-export function Navbar({ activeTab, onTabChange }: NavbarProps): JSX.Element {
+export function Navbar({ activeTab, onTabChange, isVisible = true }: NavbarProps): JSX.Element {
   return (
     <nav
-      class="px-6 py-3 border-t flex items-center justify-around text-xs font-medium shrink-0"
+      class={`fixed bottom-0 left-0 right-0 max-w-3xl mx-auto z-30 px-6 py-3 border-t flex items-center justify-around text-xs font-medium shrink-0 transition-transform duration-300 ease-in-out will-change-transform ${
+        isVisible ? 'translate-y-0' : 'translate-y-full pointer-events-none'
+      }`}
       style={{
         backgroundColor: 'var(--bg-surface)',
         borderColor: 'var(--border-subtle)',

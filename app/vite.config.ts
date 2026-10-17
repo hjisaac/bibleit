@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -34,5 +35,9 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
   },
 });
