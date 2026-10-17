@@ -10,6 +10,7 @@ import { SettingsView, type PackageStatus } from './components/SettingsView';
 import { BookSelectorModal } from './components/BookSelectorModal';
 import { HelpModal } from './components/HelpModal';
 import { clearBookCache, downloadAllBooks, getCachedBooksCount } from './adapters/book-store';
+import { useHeadroom } from './core/headroom';
 
 export function App(): JSX.Element {
   const engine = useMemo(() => createDefaultEngine(), []);
@@ -25,8 +26,11 @@ export function App(): JSX.Element {
     return 'search';
   });
 
+  const [isHeaderVisible, setIsHeaderVisible] = useHeadroom({ threshold: 50, deltaThreshold: 8 });
+
   const handleTabChange = (tab: ViewTab) => {
     setActiveTab(tab);
+    setIsHeaderVisible(true);
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('bibleit_active_tab', tab);
     }
@@ -320,12 +324,20 @@ export function App(): JSX.Element {
         borderColor: 'var(--border-subtle)',
       }}
     >
-      <Header
-        isOnline={isOnline}
-        isAiEnabled={isAiEnabled}
-        onOpenHelp={() => setIsHelpOpen(true)}
-        onOpenAccount={() => showToast('Offline profile (Guest mode)')}
-      />
+      <div
+        class={`transition-all duration-300 ease-in-out overflow-hidden shrink-0 ${
+          isHeaderVisible
+            ? 'max-h-20 opacity-100 translate-y-0'
+            : 'max-h-0 opacity-0 -translate-y-full pointer-events-none'
+        }`}
+      >
+        <Header
+          isOnline={isOnline}
+          isAiEnabled={isAiEnabled}
+          onOpenHelp={() => setIsHelpOpen(true)}
+          onOpenAccount={() => showToast('Offline profile (Guest mode)')}
+        />
+      </div>
 
       <main class="flex-1 flex flex-col overflow-hidden">
         <div class={activeTab === 'search' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
