@@ -69,7 +69,7 @@ export function SearchView({
   onSaveVerse,
   onToast,
 }: SearchViewProps): JSX.Element {
-  const [query, setQuery] = useState('peace that surpasses understanding');
+  const [query, setQuery] = useState('');
   const [passages, setPassages] = useState<ScoredPassage[]>([]);
   const [latencyMs, setLatencyMs] = useState(38);
   const [expandedCardId, setExpandedCardId] = useState<number | null>(null);
@@ -80,6 +80,16 @@ export function SearchView({
   const [answerText, setAnswerText] = useState<string>('');
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleApplySuggestion = (text: string) => {
+    setQuery(text);
+    setAnswerText('');
+    const el = textareaRef.current;
+    if (el) {
+      el.focus();
+      el.setSelectionRange(text.length, text.length);
+    }
+  };
 
   const isQuestion = isQuestionQuery(query);
   const trimmedLower = query.trim().toLowerCase();
@@ -292,7 +302,7 @@ export function SearchView({
               ref={textareaRef}
               rows={1}
               value={query}
-              placeholder="Search verses (e.g. John 3:16) or ask a question..."
+              placeholder="Search verses (e.g. John 3:16, Psalm 23), topics, or questions..."
               class="w-full bg-transparent text-sm font-medium outline-none resize-none leading-relaxed"
               style={{
                 color: 'var(--text-main)',
@@ -399,16 +409,13 @@ export function SearchView({
 
       {/* Mixed Suggestion Chips */}
       <div class="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2 text-xs shrink-0 no-scrollbar">
-        <span class="text-[11px] shrink-0 font-medium" style={{ color: 'var(--text-subtle)' }}>
+        <span class="text-[10px] shrink-0 font-medium tracking-wide uppercase" style={{ color: 'var(--text-subtle)' }}>
           Try:
         </span>
         <button
           type="button"
-          onClick={() => {
-            setQuery('Philippians 4:7');
-            setAnswerText('');
-          }}
-          class="shrink-0 px-2.5 py-1 rounded-lg border text-xs transition-opacity hover:opacity-80"
+          onClick={() => handleApplySuggestion('Philippians 4:7')}
+          class="shrink-0 px-2 py-0.5 rounded-md border text-[11px] transition-opacity hover:opacity-80"
           style={{
             borderColor: 'var(--border-subtle)',
             backgroundColor: 'var(--bg-surface-elevated)',
@@ -419,11 +426,8 @@ export function SearchView({
         </button>
         <button
           type="button"
-          onClick={() => {
-            setQuery('peace that surpasses');
-            setAnswerText('');
-          }}
-          class="shrink-0 px-2.5 py-1 rounded-lg border text-xs transition-opacity hover:opacity-80"
+          onClick={() => handleApplySuggestion('peace that surpasses')}
+          class="shrink-0 px-2 py-0.5 rounded-md border text-[11px] transition-opacity hover:opacity-80"
           style={{
             borderColor: 'var(--border-subtle)',
             backgroundColor: 'var(--bg-surface-elevated)',
@@ -434,11 +438,8 @@ export function SearchView({
         </button>
         <button
           type="button"
-          onClick={() => {
-            setQuery('What did Jesus teach about worry and peace?');
-            setAnswerText('');
-          }}
-          class="shrink-0 px-2.5 py-1 rounded-lg border text-xs transition-opacity hover:opacity-80"
+          onClick={() => handleApplySuggestion('What did Jesus teach about worry and peace?')}
+          class="shrink-0 px-2 py-0.5 rounded-md border text-[11px] transition-opacity hover:opacity-80"
           style={{
             borderColor: 'var(--border-subtle)',
             backgroundColor: 'var(--bg-surface-elevated)',
