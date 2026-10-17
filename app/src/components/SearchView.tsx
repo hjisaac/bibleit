@@ -266,33 +266,19 @@ export function SearchView({
       <div class="relative mb-2 shrink-0">
         <div
           onClick={() => inputRef.current?.focus()}
-          class="flex items-center gap-2.5 rounded-2xl border px-3 py-2.5 transition-all focus-within:ring-2 focus-within:ring-amber-500/30 shadow-sm cursor-text"
+          class="flex items-center rounded-2xl border px-3 py-2.5 transition-all focus-within:ring-2 focus-within:ring-amber-500/30 shadow-sm cursor-text"
           style={{
             backgroundColor: 'var(--bg-surface-elevated)',
             borderColor: 'var(--border-subtle)',
           }}
         >
-          <svg
-            class="w-4 h-4 shrink-0"
-            style={{ color: 'var(--text-muted)' }}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
           <input
             ref={inputRef}
             type="text"
             inputMode="search"
             enterKeyHint="search"
             value={query}
-            placeholder="Search verses (e.g. John 3:16, Psalm 23), topics, or questions..."
+            placeholder="🔍  Search verses, topics, or questions..."
             class="w-full bg-transparent text-sm font-medium outline-none leading-normal"
             style={{
               color: 'var(--text-main)',
@@ -437,18 +423,20 @@ export function SearchView({
         </button>
       </div>
 
-      {/* Technical Diagnostics Bar (Shown only in Inspector Mode) */}
-      {isInspectorMode && (
+      {/* Technical Diagnostics Bar (Shown only in Inspector Mode when a query has run) */}
+      {isInspectorMode && query.trim().length > 0 && (
         <div
-          class="flex items-center justify-between text-[11px] mb-2 px-2 py-1 rounded-lg border text-xs font-mono"
+          class="flex items-center justify-between text-[10px] sm:text-[11px] mb-2.5 px-1 py-1 border-b border-dashed font-mono shrink-0"
           style={{
-            backgroundColor: 'var(--bg-surface-elevated)',
             borderColor: 'var(--border-subtle)',
-            color: 'var(--text-muted)',
+            color: 'var(--text-subtle)',
           }}
         >
-          <span>MiniLM-L6 (int8) · 31,102 verses</span>
-          <span class="text-emerald-600 font-semibold">{latencyMs}ms latency</span>
+          <div class="flex items-center gap-1.5">
+            <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span>MiniLM-L6 (int8) · 31,102 verses</span>
+          </div>
+          <span class="text-emerald-600 dark:text-emerald-400 font-semibold">{latencyMs}ms latency</span>
         </div>
       )}
 
