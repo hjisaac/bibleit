@@ -79,12 +79,12 @@ export function SearchView({
 
   const [answerText, setAnswerText] = useState<string>('');
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleApplySuggestion = (text: string) => {
     setQuery(text);
     setAnswerText('');
-    const el = textareaRef.current;
+    const el = inputRef.current;
     if (el) {
       el.focus();
       el.setSelectionRange(text.length, text.length);
@@ -96,18 +96,6 @@ export function SearchView({
   // Only match book picker if query is strictly a single book name / alias (no chapter numbers or extra words)
   const isExactBookQuery = /^[1-3]?\s*[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF]+$/.test(trimmedLower);
   const matchedBook = isExactBookQuery ? findBookByPrefix(trimmedLower) : undefined;
-
-  const adjustHeight = () => {
-    const el = textareaRef.current;
-    if (el) {
-      el.style.height = 'auto';
-      el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
-    }
-  };
-
-  useEffect(() => {
-    adjustHeight();
-  }, [query]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -215,7 +203,7 @@ export function SearchView({
                 />
               </svg>
               <span class="text-[11px] font-medium truncate" style={{ color: 'var(--text-main)' }}>
-                Save Scripture text (~2 MB) to read and search offline.
+                Save scripture for offline searches
               </span>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
@@ -268,7 +256,7 @@ export function SearchView({
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                 />
               </svg>
-              <span>Scripture text not saved for offline usage · Tap to set up →</span>
+              <span>Save scripture for offline searches · Tap to set up →</span>
             </button>
           </div>
         )
@@ -277,74 +265,73 @@ export function SearchView({
       {/* Search & Question Prompt Box */}
       <div class="relative mb-2 shrink-0">
         <div
-          class="flex flex-col rounded-2xl border p-3 transition-all focus-within:ring-2 focus-within:ring-amber-500/30 shadow-sm"
+          onClick={() => inputRef.current?.focus()}
+          class="flex items-center gap-2.5 rounded-2xl border px-3 py-2.5 transition-all focus-within:ring-2 focus-within:ring-amber-500/30 shadow-sm cursor-text"
           style={{
             backgroundColor: 'var(--bg-surface-elevated)',
             borderColor: 'var(--border-subtle)',
           }}
         >
-          <div class="flex items-start gap-2.5">
-            <svg
-              class="w-4 h-4 mt-1 shrink-0"
-              style={{ color: 'var(--text-muted)' }}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              value={query}
-              placeholder="Search verses (e.g. John 3:16, Psalm 23), topics, or questions..."
-              class="w-full bg-transparent text-sm font-medium outline-none resize-none leading-relaxed"
-              style={{
-                color: 'var(--text-main)',
-                minHeight: '26px',
-                maxHeight: '120px',
-              }}
-              onInput={(e) => {
-                setQuery((e.target as HTMLTextAreaElement).value);
-                adjustHeight();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  (e.target as HTMLTextAreaElement).blur();
-                  if (isQuestion && isAiEnabled && engine.answers.available && isOnline && !isSynthesizing) {
-                    void handleSynthesize();
-                  }
-                }
-              }}
+          <svg
+            class="w-4 h-4 shrink-0"
+            style={{ color: 'var(--text-muted)' }}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
             />
-            {query.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setQuery('');
-                  setAnswerText('');
-                }}
-                class="text-xs p-1 rounded-full hover:opacity-75 shrink-0"
-                style={{ color: 'var(--text-muted)' }}
-                title="Clear query"
-              >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            )}
-          </div>
+          </svg>
+          <input
+            ref={inputRef}
+            type="text"
+            inputMode="search"
+            enterKeyHint="search"
+            value={query}
+            placeholder="Search verses (e.g. John 3:16, Psalm 23), topics, or questions..."
+            class="w-full bg-transparent text-sm font-medium outline-none leading-normal"
+            style={{
+              color: 'var(--text-main)',
+            }}
+            onInput={(e) => {
+              setQuery((e.target as HTMLInputElement).value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                (e.target as HTMLInputElement).blur();
+                if (isQuestion && isAiEnabled && engine.answers.available && isOnline && !isSynthesizing) {
+                  void handleSynthesize();
+                }
+              }
+            }}
+          />
+          {query.length > 0 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setQuery('');
+                setAnswerText('');
+                inputRef.current?.focus();
+              }}
+              class="text-xs p-1 rounded-full hover:opacity-75 shrink-0"
+              style={{ color: 'var(--text-muted)' }}
+              title="Clear query"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 

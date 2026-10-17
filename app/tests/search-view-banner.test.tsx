@@ -52,7 +52,7 @@ describe('SearchView Onboarding & Offline Storage Banner', () => {
       renderSearchView({ offlineTextStatus: 'not_downloaded', hasSeenOnboarding: false });
 
       expect(
-        screen.getByText(/Save Scripture text \(~2 MB\) to read and search offline\./i),
+        screen.getByText(/Save scripture for offline searches/i),
       ).toBeTruthy();
       expect(screen.getByRole('button', { name: /Set Up →/i })).toBeTruthy();
       expect(screen.getByTitle('Dismiss banner')).toBeTruthy();
@@ -84,14 +84,12 @@ describe('SearchView Onboarding & Offline Storage Banner', () => {
       renderSearchView({ offlineTextStatus: 'not_downloaded', hasSeenOnboarding: true });
 
       // Prominent banner elements should NOT exist
-      expect(
-        screen.queryByText(/Save Scripture text \(~2 MB\) to read and search offline\./i),
-      ).toBeNull();
+      expect(screen.queryByRole('button', { name: /^Set Up →$/ })).toBeNull();
       expect(screen.queryByTitle('Dismiss banner')).toBeNull();
 
       // Discreet reminder button should exist
       expect(
-        screen.getByText(/Scripture text not saved for offline usage · Tap to set up →/i),
+        screen.getByText(/Save scripture for offline searches · Tap to set up →/i),
       ).toBeTruthy();
     });
 
@@ -101,7 +99,7 @@ describe('SearchView Onboarding & Offline Storage Banner', () => {
         hasSeenOnboarding: true,
       });
 
-      fireEvent.click(screen.getByText(/Scripture text not saved for offline usage/i));
+      fireEvent.click(screen.getByText(/Save scripture for offline searches · Tap to set up →/i));
       expect(props.onOpenStorage).toHaveBeenCalledTimes(1);
     });
   });
@@ -111,10 +109,7 @@ describe('SearchView Onboarding & Offline Storage Banner', () => {
       renderSearchView({ offlineTextStatus: 'ready', hasSeenOnboarding: false });
 
       expect(
-        screen.queryByText(/Save Scripture text \(~2 MB\) to read and search offline\./i),
-      ).toBeNull();
-      expect(
-        screen.queryByText(/Scripture text not saved for offline usage/i),
+        screen.queryByText(/Save scripture for offline searches/i),
       ).toBeNull();
     });
 
@@ -122,10 +117,7 @@ describe('SearchView Onboarding & Offline Storage Banner', () => {
       renderSearchView({ offlineTextStatus: 'ready', hasSeenOnboarding: true });
 
       expect(
-        screen.queryByText(/Save Scripture text \(~2 MB\) to read and search offline\./i),
-      ).toBeNull();
-      expect(
-        screen.queryByText(/Scripture text not saved for offline usage/i),
+        screen.queryByText(/Save scripture for offline searches/i),
       ).toBeNull();
     });
   });

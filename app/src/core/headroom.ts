@@ -58,9 +58,21 @@ export function computeHeadroomState(
   };
 }
 
+function getScrollTop(event?: Event): number {
+  const target = event?.target;
+  if (
+    target instanceof HTMLElement &&
+    target !== document.documentElement &&
+    target !== document.body &&
+    target.scrollHeight > target.clientHeight
+  ) {
+    return target.scrollTop;
+  }
+  return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+}
+
 /**
- * Hook to manage scroll-driven header visibility (Headroom pattern).
- * Uses event capturing on window to detect scrolling in any nested scrollable container.
+ * Hook to manage scroll-driven bar visibility (Headroom pattern).
  */
 export function useHeadroom(options: HeadroomOptions = {}): [boolean, (visible: boolean) => void] {
   const [isVisible, setIsVisible] = useState<boolean>(true);
@@ -71,14 +83,7 @@ export function useHeadroom(options: HeadroomOptions = {}): [boolean, (visible: 
 
   useEffect(() => {
     const handleScroll = (event: Event) => {
-      const target = event.target as HTMLElement | Document | null;
-      if (!target) return;
-
-      const scrollTop =
-        target instanceof HTMLElement
-          ? target.scrollTop
-          : window.scrollY || document.documentElement.scrollTop || document.body.scrollTop;
-
+      const scrollTop = getScrollTop(event);
       const next = computeHeadroomState(
         scrollTop,
         lastScrollTopRef.current,
@@ -88,16 +93,13 @@ export function useHeadroom(options: HeadroomOptions = {}): [boolean, (visible: 
 
       lastScrollTopRef.current = next.newLastScrollTop;
       if (next.isVisible !== isVisibleRef.current) {
+        isVisibleRef.current = next.isVisible;
         setIsVisible(next.isVisible);
       }
     };
 
-    // Attach on both document and window with capture to guarantee capture across all browsers
-    document.addEventListener('scroll', handleScroll, { capture: true, passive: true });
     window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
-
     return () => {
-      document.removeEventListener('scroll', handleScroll, { capture: true });
       window.removeEventListener('scroll', handleScroll, { capture: true });
     };
   }, [options.threshold, options.deltaThreshold]);

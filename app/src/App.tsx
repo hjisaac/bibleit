@@ -26,11 +26,11 @@ export function App(): JSX.Element {
     return 'search';
   });
 
-  const [isHeaderVisible, setIsHeaderVisible] = useHeadroom({ threshold: 50, deltaThreshold: 8 });
+  const [isBarVisible, setIsBarVisible] = useHeadroom({ threshold: 50, deltaThreshold: 8 });
 
   const handleTabChange = (tab: ViewTab) => {
     setActiveTab(tab);
-    setIsHeaderVisible(true);
+    setIsBarVisible(true);
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('bibleit_active_tab', tab);
     }
@@ -324,20 +324,12 @@ export function App(): JSX.Element {
         borderColor: 'var(--border-subtle)',
       }}
     >
-      <div
-        class={`transition-[margin,transform,opacity] duration-300 ease-in-out shrink-0 z-20 ${
-          isHeaderVisible
-            ? 'mt-0 translate-y-0 opacity-100'
-            : '-mt-[57px] -translate-y-full opacity-0 pointer-events-none'
-        }`}
-      >
-        <Header
-          isOnline={isOnline}
-          isAiEnabled={isAiEnabled}
-          onOpenHelp={() => setIsHelpOpen(true)}
-          onOpenAccount={() => showToast('Offline profile (Guest mode)')}
-        />
-      </div>
+      <Header
+        isOnline={isOnline}
+        isAiEnabled={isAiEnabled}
+        onOpenHelp={() => setIsHelpOpen(true)}
+        onOpenAccount={() => showToast('Offline profile (Guest mode)')}
+      />
 
       <main class="flex-1 flex flex-col overflow-hidden">
         <div class={activeTab === 'search' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
@@ -403,7 +395,7 @@ export function App(): JSX.Element {
         )}
       </main>
 
-      <Navbar activeTab={activeTab} onTabChange={handleTabChange} />
+      <Navbar activeTab={activeTab} onTabChange={handleTabChange} isVisible={isBarVisible} />
 
       {/* Book, Chapter & Verse Selection Modal */}
       <BookSelectorModal
@@ -419,7 +411,7 @@ export function App(): JSX.Element {
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div class="absolute bottom-16 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full shadow-lg text-xs font-semibold text-white bg-stone-900 border border-stone-700 animate-fadeIn">
+        <div class="fixed bottom-16 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-full shadow-lg text-xs font-semibold text-white bg-stone-900 border border-stone-700 animate-fadeIn">
           {toastMessage}
         </div>
       )}
