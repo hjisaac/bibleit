@@ -1,13 +1,15 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type { SearchEngine } from '../core/ports';
-import type { ScoredPassage } from '../core/types';
+import type { AudioNarrator, SearchEngine } from '../core/ports';
+import type { NarrationState, NarrationWordBoundary, ScoredPassage } from '../core/types';
 import { BIBLE_BOOKS_BY_ID, findBookByPrefix } from '../core/bible-books';
 import { resolveVerseText } from '../adapters/book-store';
 import type { SavedVerse } from './SavedView';
 
 interface SearchViewProps {
   engine: SearchEngine;
+  narrator?: AudioNarrator;
+  narrationState?: NarrationState;
   isOnline: boolean;
   isAiEnabled: boolean;
   isInspectorMode: boolean;
@@ -27,6 +29,29 @@ interface SearchViewProps {
     text: string;
   }) => void;
   onToast: (message: string) => void;
+}
+
+function renderHighlightedText(
+  text: string,
+  boundary: NarrationWordBoundary | null | undefined,
+): JSX.Element | string {
+  if (!boundary || boundary.charLength <= 0 || boundary.charIndex >= text.length) {
+    return text;
+  }
+  const start = Math.max(0, boundary.charIndex);
+  const end = Math.min(text.length, start + boundary.charLength);
+  return (
+    <>
+      {text.slice(0, start)}
+      <mark
+        class="rounded px-0.5 font-medium transition-colors"
+        style={{ backgroundColor: 'var(--badge-sem-bg)', color: 'var(--badge-sem-text)' }}
+      >
+        {text.slice(start, end)}
+      </mark>
+      {text.slice(end)}
+    </>
+  );
 }
 
 function formatCitation(bookId: string, start: [number, number], end: [number, number]): string {
@@ -56,6 +81,8 @@ function isQuestionQuery(text: string): boolean {
 
 export function SearchView({
   engine,
+  narrator,
+  narrationState,
   isOnline,
   isAiEnabled,
   isInspectorMode,
@@ -83,6 +110,7 @@ export function SearchView({
 
   const handleApplySuggestion = (text: string) => {
     setQuery(text);
+
     setAnswerText('');
     const el = inputRef.current;
     if (el) {
@@ -266,7 +294,7 @@ export function SearchView({
       <div class="relative mb-2 shrink-0">
         <div
           onClick={() => inputRef.current?.focus()}
-          class="flex items-center rounded-2xl border px-3 py-2.5 transition-all focus-within:ring-2 focus-within:ring-amber-500/30 shadow-sm cursor-text"
+          class="relative flex items-center rounded-2xl border px-3 py-2.5 transition-all focus-within:ring-2 focus-within:ring-amber-500/30 shadow-sm cursor-text"
           style={{
             backgroundColor: 'var(--bg-surface-elevated)',
             borderColor: 'var(--border-subtle)',
@@ -278,8 +306,8 @@ export function SearchView({
             inputMode="search"
             enterKeyHint="search"
             value={query}
-            placeholder="🔍  Search verses, topics, or questions..."
-            class="w-full bg-transparent text-sm font-medium outline-none leading-normal"
+            placeholder="Search verses, topics, or questions..."
+            class="peer w-full bg-transparent text-sm font-medium outline-none leading-normal placeholder:pl-6 focus:placeholder:pl-6"
             style={{
               color: 'var(--text-main)',
             }}
@@ -295,6 +323,21 @@ export function SearchView({
               }
             }}
           />
+          {/* Crisp SVG icon that natively fades out when user types, giving 100% width */}
+          <svg
+            class="w-4 h-4 shrink-0 absolute left-3 pointer-events-none transition-opacity duration-150 peer-placeholder-shown:opacity-100 opacity-0"
+            style={{ color: 'var(--text-muted)' }}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
           {query.length > 0 && (
             <button
               type="button"
@@ -304,7 +347,7 @@ export function SearchView({
                 setAnswerText('');
                 inputRef.current?.focus();
               }}
-              class="text-xs p-1 rounded-full hover:opacity-75 shrink-0"
+              class="text-xs p-1 rounded-full hover:opacity-75 shrink-0 ml-1.5"
               style={{ color: 'var(--text-muted)' }}
               title="Clear query"
             >
@@ -595,11 +638,18 @@ export function SearchView({
             ) ?? false;
 
           const surrounding = surroundingVerses[p.chunk.id];
+          const segmentId = `chunk-${p.chunk.id}`;
+          const isCardActive =
+            narrationState?.status !== 'idle' &&
+            narrationState?.activeSegment?.id === segmentId;
+          const isCardPlaying = isCardActive && narrationState?.status === 'playing';
 
           return (
             <article
               key={p.chunk.id}
-              class="p-4 rounded-2xl border transition-all hover:shadow-sm"
+              class={`p-4 rounded-2xl border transition-all hover:shadow-sm ${
+                isCardActive ? 'ring-2 ring-amber-500/50' : ''
+              }`}
               style={{
                 backgroundColor: 'var(--bg-surface)',
                 borderColor: 'var(--border-subtle)',
@@ -645,6 +695,51 @@ export function SearchView({
                 </div>
 
                 <div class="flex items-center gap-1.5">
+                  {narrator?.supported && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isCardActive) {
+                          if (isCardPlaying) {
+                            narrator.pause();
+                          } else {
+                            narrator.resume();
+                          }
+                          return;
+                        }
+                        narrator.play([
+                          {
+                            id: segmentId,
+                            citation: refString,
+                            text: p.chunk.text,
+                            book: p.chunk.book,
+                            chapter: p.chunk.start[0],
+                            verse: p.chunk.start[1],
+                          },
+                        ]);
+                      }}
+                      title={isCardPlaying ? 'Pause narration' : 'Listen to passage'}
+                      aria-label={isCardPlaying ? `Pause ${refString}` : `Listen to ${refString}`}
+                      class="p-1 rounded hover:opacity-75 transition-opacity"
+                      style={{ color: isCardActive ? 'var(--text-main)' : 'var(--text-muted)' }}
+                    >
+                      {isCardPlaying ? (
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z" />
+                        </svg>
+                      ) : (
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  )}
+
                   {onSaveVerse && (
                     <button
                       type="button"
@@ -723,8 +818,11 @@ export function SearchView({
                 <sup class="text-xs opacity-60 font-sans mr-1 font-semibold">
                   {verseLabel}
                 </sup>
-                {p.chunk.text}
+                {isCardActive
+                  ? renderHighlightedText(p.chunk.text, narrationState?.wordBoundary)
+                  : p.chunk.text}
               </p>
+
 
               {/* Inline Context Accordion */}
               {isExpanded && (

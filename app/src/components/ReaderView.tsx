@@ -2,6 +2,8 @@ import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 
 import { BIBLE_BOOKS_BY_ID } from '../core/bible-books';
+import type { AudioNarrator } from '../core/ports';
+import type { NarrationSegment, NarrationState, NarrationWordBoundary } from '../core/types';
 import { loadBook, type ChapterVerse } from '../adapters/book-store';
 
 interface ReaderViewProps {
@@ -9,6 +11,8 @@ interface ReaderViewProps {
   chapter: number;
   targetVerse?: number;
   scrollKey?: number;
+  narrator?: AudioNarrator;
+  narrationState?: NarrationState;
   onOpenSelector: () => void;
   onSaveVerse: (verse: {
     book: string;
@@ -21,11 +25,36 @@ interface ReaderViewProps {
   onToast: (msg: string) => void;
 }
 
+function renderHighlightedText(
+  text: string,
+  boundary: NarrationWordBoundary | null | undefined,
+): JSX.Element | string {
+  if (!boundary || boundary.charLength <= 0 || boundary.charIndex >= text.length) {
+    return text;
+  }
+  const start = Math.max(0, boundary.charIndex);
+  const end = Math.min(text.length, start + boundary.charLength);
+  return (
+    <>
+      {text.slice(0, start)}
+      <mark
+        class="rounded px-0.5 font-medium transition-colors"
+        style={{ backgroundColor: 'var(--badge-sem-bg)', color: 'var(--badge-sem-text)' }}
+      >
+        {text.slice(start, end)}
+      </mark>
+      {text.slice(end)}
+    </>
+  );
+}
+
 export function ReaderView({
   book,
   chapter,
   targetVerse,
   scrollKey,
+  narrator,
+  narrationState,
   onOpenSelector,
   onSaveVerse,
   onToast,
@@ -41,6 +70,13 @@ export function ReaderView({
 
   const bookMeta = BIBLE_BOOKS_BY_ID[book];
   const bookTitle = bookMeta ? bookMeta.name : book;
+
+  const isChapterActive =
+    narrationState?.status !== 'idle' &&
+    narrationState?.activeSegment?.book === book &&
+    narrationState?.activeSegment?.chapter === chapter &&
+    narrationState?.activeSegment?.id.startsWith(`${book}:${chapter}:`);
+  const activeSpokenVerse = isChapterActive ? narrationState?.activeSegment?.verse : undefined;
 
   useEffect(() => {
     let isCancelled = false;
@@ -91,6 +127,15 @@ export function ReaderView({
 
     return () => clearTimeout(timer);
   }, [targetVerse, verses, scrollKey, book, chapter]);
+
+  useEffect(() => {
+    if (activeSpokenVerse === undefined) return;
+    const el = document.getElementById(`verse-${activeSpokenVerse}`);
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [activeSpokenVerse]);
+
 
   const triggerHaptic = (pattern: number | number[] = 40) => {
     try {
@@ -173,6 +218,46 @@ export function ReaderView({
     setShowActions(false);
   };
 
+  const buildChapterSegments = (): NarrationSegment[] =>
+    verses.map((v) => ({
+      id: `${book}:${chapter}:${v.num}`,
+      citation: `${bookTitle} ${chapter}:${v.num}`,
+      text: v.text,
+      book,
+      chapter,
+      verse: v.num,
+    }));
+
+  const handleListenChapter = () => {
+    if (!narrator || !narrator.supported) {
+      onToast('Speech synthesis is not supported on this device');
+      return;
+    }
+    if (isChapterActive) {
+      if (narrationState?.status === 'playing') {
+        narrator.pause();
+      } else {
+        narrator.resume();
+      }
+      return;
+    }
+    const segments = buildChapterSegments();
+    const startIdx = selectedVerse
+      ? Math.max(0, verses.findIndex((v) => v.num === selectedVerse.num))
+      : 0;
+    narrator.play(segments, startIdx);
+  };
+
+  const handleListenFromVerse = (e?: Event) => {
+    e?.stopPropagation();
+    if (!selectedVerse || !narrator || !narrator.supported) return;
+    triggerHaptic(20);
+    const segments = buildChapterSegments();
+    const startIdx = Math.max(0, verses.findIndex((v) => v.num === selectedVerse.num));
+    narrator.play(segments, startIdx);
+    setShowActions(false);
+  };
+
   const clearLongPressTimer = () => {
     if (longPressTimerRef.current !== null) {
       clearTimeout(longPressTimerRef.current);
@@ -194,7 +279,7 @@ export function ReaderView({
     if (touch) {
       touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
     }
-    // Long-press activates the two action buttons on the selected verse
+    // Long-press activates the action buttons on the selected verse
     longPressTimerRef.current = setTimeout(() => {
       setSelectedVerse(verse);
       setShowActions(true);
@@ -222,7 +307,7 @@ export function ReaderView({
   return (
     <section id="reader-scroll-container" class="flex-1 flex flex-col overflow-y-auto overscroll-y-contain">
       {/* Chapter Text */}
-      <div class="p-5 sm:p-8 pb-24 sm:pb-24 font-serif text-[18px] sm:text-[19px] leading-[1.85] space-y-4 max-w-2xl mx-auto w-full" style={{ color: 'var(--text-main)' }}>
+      <div class="p-5 sm:p-8 pb-32 sm:pb-32 font-serif text-[18px] sm:text-[19px] leading-[1.85] space-y-4 max-w-2xl mx-auto w-full" style={{ color: 'var(--text-main)' }}>
         <div class="flex flex-col items-center mb-6">
           <button
             type="button"
@@ -246,6 +331,40 @@ export function ReaderView({
           <span class="text-[11px] font-sans mt-0.5 tracking-wide font-normal" style={{ color: 'var(--text-subtle)' }}>
             Tap to change book & chapter
           </span>
+
+          {narrator?.supported && !isLoading && !loadError && verses.length > 0 && (
+            <button
+              type="button"
+              onClick={handleListenChapter}
+              class="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full border text-xs font-sans font-medium transition-all hover:opacity-85 active:scale-95"
+              style={{
+                borderColor: isChapterActive ? 'var(--accent)' : 'var(--border-subtle)',
+                backgroundColor: isChapterActive ? 'var(--bg-surface-elevated)' : 'var(--bg-surface)',
+                color: 'var(--text-main)',
+              }}
+            >
+              {isChapterActive && narrationState?.status === 'playing' ? (
+                <>
+                  <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z" />
+                  </svg>
+                  <span>Pause</span>
+                </>
+              ) : (
+                <>
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+                    />
+                  </svg>
+                  <span>{isChapterActive && narrationState?.status === 'paused' ? 'Resume' : 'Listen'}</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
 
         {isLoading && (
@@ -269,6 +388,13 @@ export function ReaderView({
         {!isLoading && !loadError && verses.map((v) => {
           const isTarget = targetVerse === v.num;
           const isSelected = selectedVerse?.num === v.num;
+          const isSpeaking = activeSpokenVerse === v.num;
+          const hasStrongBorder =
+            activeSpokenVerse !== undefined
+              ? isSpeaking
+              : selectedVerse !== null
+              ? isSelected
+              : isTarget;
           const hasActions = isSelected && showActions;
 
           return (
@@ -287,8 +413,8 @@ export function ReaderView({
                 onTouchEnd={handleTouchEnd}
                 onTouchCancel={handleTouchEnd}
                 class={`cursor-pointer transition-all p-2 rounded-xl scroll-mt-16 select-none ${
-                  isTarget ? 'ring-2 ring-amber-500/40' : ''
-                } ${isSelected ? 'ring-2 ring-stone-500/40' : ''}`}
+                  hasStrongBorder ? 'ring-2 ring-amber-500/50' : ''
+                }`}
                 style={{
                   backgroundColor: isTarget ? 'var(--highlight-verse)' : 'transparent',
                   WebkitTouchCallout: 'none',
@@ -297,15 +423,31 @@ export function ReaderView({
                 <sup class="text-xs opacity-50 font-sans mr-1 font-normal">
                   {v.num}
                 </sup>
-                {v.text}
+                {isSpeaking
+                  ? renderHighlightedText(v.text, narrationState?.wordBoundary)
+                  : v.text}
               </p>
 
-              {/* Two buttons revealed directly below the verse on long-press with clear margin */}
+              {/* Action buttons revealed directly below the verse on long-press */}
               {hasActions && (
                 <div
                   class="mt-2 mb-1 flex items-center justify-end gap-2 px-1 animate-fadeIn"
                   onClick={(e) => e.stopPropagation()}
                 >
+                  {narrator?.supported && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleListenFromVerse(e)}
+                      class="px-3 py-1 rounded-lg border text-xs font-sans font-medium transition-all hover:opacity-85 active:scale-95"
+                      style={{
+                        borderColor: 'var(--border-subtle)',
+                        backgroundColor: 'var(--bg-surface-elevated)',
+                        color: 'var(--text-main)',
+                      }}
+                    >
+                      Listen from here
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={(e) => handleCopy(e)}
@@ -339,3 +481,4 @@ export function ReaderView({
     </section>
   );
 }
+

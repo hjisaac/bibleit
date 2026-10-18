@@ -5,6 +5,7 @@
 import type {
   AnswerProvider,
   ArtifactStore,
+  AudioNarrator,
   LexicalIndex,
   QueryEmbedder,
   Ranker,
@@ -91,8 +92,14 @@ export function buildLocalEngine(p: Ports): SearchEngine {
  *   return new RemoteEngine('https://api.bibleit.example/search');
  */
 import { MockSearchEngine } from './adapters/mock-search-engine';
+import { WebSpeechNarrator } from './adapters/web-speech-narrator';
 
 export function createDefaultEngine(): SearchEngine {
   // Use mock engine until offline artifacts and adapters are completed.
   return new MockSearchEngine();
 }
+
+export function createDefaultNarrator(): AudioNarrator {
+  return new WebSpeechNarrator();
+}
+

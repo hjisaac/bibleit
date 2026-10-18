@@ -71,3 +71,35 @@ export interface Manifest {
     count: number;
   };
 }
+
+// ---------------------------------------------------------------------------
+// Audio narration types — shared across Web Speech (Tier 1) and CDN (Tier 2).
+// ---------------------------------------------------------------------------
+
+export type PlaybackStatus = 'idle' | 'playing' | 'paused';
+
+export interface NarrationSegment {
+  /** Stable identifier, e.g. "JHN:3:16" for chapter verses or "chunk-42" for search passages. */
+  id: string;
+  /** Human-readable reference shown in the mini-player, e.g. "John 3:16". */
+  citation: string;
+  text: string;
+  book: string;
+  chapter: number;
+  verse?: number;
+}
+
+export interface NarrationWordBoundary {
+  charIndex: number;
+  charLength: number;
+}
+
+export interface NarrationState {
+  status: PlaybackStatus;
+  queue: readonly NarrationSegment[];
+  currentIndex: number;
+  activeSegment: NarrationSegment | null;
+  wordBoundary: NarrationWordBoundary | null;
+  rate: number;
+}
+

@@ -1,6 +1,6 @@
 import type { JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { createDefaultEngine } from './composition';
+import { createDefaultEngine, createDefaultNarrator } from './composition';
 import { Header, type Theme } from './components/Header';
 import { Navbar, type ViewTab } from './components/Navbar';
 import { SearchView } from './components/SearchView';
@@ -9,11 +9,25 @@ import { SavedView, type SavedVerse } from './components/SavedView';
 import { SettingsView, type PackageStatus } from './components/SettingsView';
 import { BookSelectorModal } from './components/BookSelectorModal';
 import { HelpModal } from './components/HelpModal';
+import { FeedbackModal } from './components/FeedbackModal';
+import { AudioPlayerBar } from './components/AudioPlayerBar';
 import { clearBookCache, downloadAllBooks, getCachedBooksCount } from './adapters/book-store';
 import { useHeadroom } from './core/headroom';
+import type { NarrationState } from './core/types';
 
 export function App(): JSX.Element {
   const engine = useMemo(() => createDefaultEngine(), []);
+  const narrator = useMemo(() => createDefaultNarrator(), []);
+  const [narrationState, setNarrationState] = useState<NarrationState>(() => narrator.getState());
+
+  useEffect(() => {
+    const unsubscribe = narrator.subscribe(setNarrationState);
+    return () => {
+      unsubscribe();
+      narrator.stop();
+    };
+  }, [narrator]);
+
 
   const [theme, setTheme] = useState<Theme>('paper');
   const [activeTab, setActiveTab] = useState<ViewTab>(() => {
@@ -40,6 +54,7 @@ export function App(): JSX.Element {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
 
   const [textPackageStatus, setTextPackageStatus] = useState<PackageStatus>('not_downloaded');
   const [aiPackageStatus, setAiPackageStatus] = useState<PackageStatus>('not_downloaded');
@@ -335,6 +350,8 @@ export function App(): JSX.Element {
         <div class={activeTab === 'search' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
           <SearchView
             engine={engine}
+            narrator={narrator}
+            narrationState={narrationState}
             isOnline={isOnline}
             isAiEnabled={isAiEnabled}
             isInspectorMode={isInspectorMode}
@@ -356,6 +373,8 @@ export function App(): JSX.Element {
             chapter={readerLocation.chapter}
             targetVerse={readerLocation.targetVerse}
             scrollKey={readerLocation.scrollKey}
+            narrator={narrator}
+            narrationState={narrationState}
             onOpenSelector={() => setIsSelectorOpen(true)}
             onSaveVerse={handleSaveVerse}
             onToast={showToast}
@@ -390,11 +409,20 @@ export function App(): JSX.Element {
             onDownloadText={handleDownloadText}
             onDownloadAi={handleDownloadAi}
             onClearStorage={handleClearStorage}
+            onOpenFeedback={() => setIsFeedbackOpen(true)}
           />
         )}
       </main>
 
+      <AudioPlayerBar
+        narrator={narrator}
+        state={narrationState}
+        isNavbarVisible={isBarVisible}
+        onNavigateToSegment={handleOpenReader}
+      />
+
       <Navbar activeTab={activeTab} onTabChange={handleTabChange} isVisible={isBarVisible} />
+
 
       {/* Book, Chapter & Verse Selection Modal */}
       <BookSelectorModal
@@ -406,11 +434,32 @@ export function App(): JSX.Element {
       />
 
       {/* Quick Help & Shortcuts Modal */}
-      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+      <HelpModal
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
+        onOpenFeedback={() => setIsFeedbackOpen(true)}
+      />
+
+      {/* Feedback & Bug Report Modal */}
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+        onToast={showToast}
+      />
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div class="fixed bottom-16 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-full shadow-lg text-xs font-semibold text-white bg-stone-900 border border-stone-700 animate-fadeIn">
+        <div
+          class={`fixed left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-full shadow-lg text-xs font-semibold text-white bg-stone-900 border border-stone-700 animate-fadeIn transition-all duration-300 ${
+            narrationState.status !== 'idle'
+              ? isBarVisible
+                ? 'bottom-32'
+                : 'bottom-20'
+              : isBarVisible
+                ? 'bottom-20'
+                : 'bottom-6'
+          }`}
+        >
           {toastMessage}
         </div>
       )}
