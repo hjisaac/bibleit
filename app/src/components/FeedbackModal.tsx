@@ -188,13 +188,13 @@ export function FeedbackModal({
 
           {/* Optional Contact Fields */}
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <div class="space-y-1">
+            <div class="space-y-1.5">
               <label
                 for="feedback-name"
-                class="block text-[11px] font-medium"
-                style={{ color: 'var(--text-muted)' }}
+                class="block text-xs font-semibold"
+                style={{ color: 'var(--text-main)' }}
               >
-                Name (optional)
+                Name <span class="font-normal opacity-70">(optional)</span>
               </label>
               <input
                 id="feedback-name"
@@ -210,13 +210,13 @@ export function FeedbackModal({
                 }}
               />
             </div>
-            <div class="space-y-1">
+            <div class="space-y-1.5">
               <label
                 for="feedback-email"
-                class="block text-[11px] font-medium"
-                style={{ color: 'var(--text-muted)' }}
+                class="block text-xs font-semibold"
+                style={{ color: 'var(--text-main)' }}
               >
-                Email (optional, for follow-up)
+                Email <span class="font-normal opacity-70">(optional, for follow-up)</span>
               </label>
               <input
                 id="feedback-email"
