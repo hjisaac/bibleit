@@ -8,6 +8,8 @@
 import type {
   Chunk,
   Manifest,
+  NarrationSegment,
+  NarrationState,
   RefRange,
   RetrievalResult,
   ScoredPassage,
@@ -111,3 +113,23 @@ export interface AnswerProvider {
   /** Streamed answer chunks; implementations must cite passages by reference. */
   answer(query: string, context: RetrievalResult): AsyncIterable<string>;
 }
+
+/**
+ * Voice narration over ordered scripture segments (search passages or full chapters).
+ * Tier 1: WebSpeechNarrator (offline browser SpeechSynthesis + word boundaries).
+ * Tier 2: CdnAudioNarrator (streamed/cached human narration).
+ */
+export interface AudioNarrator {
+  readonly supported: boolean;
+  getState(): NarrationState;
+  subscribe(listener: (state: NarrationState) => void): () => void;
+  play(segments: NarrationSegment[], startIndex?: number): void;
+  pause(): void;
+  resume(): void;
+  stop(): void;
+  next(): void;
+  prev(): void;
+  seekToIndex(index: number): void;
+  setRate(rate: number): void;
+}
+

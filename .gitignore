@@ -187,6 +187,7 @@ activemq-data/
 
 # Environments
 .env
+.env.*
 .envrc
 .venv
 env/
@@ -260,3 +261,7 @@ __marimo__/
 node_modules/
 app/dist/
 app/dev-dist/
+app/.env
+app/.env.*
+app/.env.local
+!app/.env.example

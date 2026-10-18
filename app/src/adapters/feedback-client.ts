@@ -1,0 +1,38 @@
+export type FeedbackCategory = 'bug' | 'feature' | 'scripture' | 'general';
+
+export interface FeedbackSubmission {
+  readonly category: FeedbackCategory;
+  readonly message: string;
+  readonly name?: string;
+  readonly email?: string;
+}
+
+const FEEDBACK_ENDPOINT = 'https://formsubmit.co/ajax/hjisaach@gmail.com';
+
+export async function submitFeedback(submission: FeedbackSubmission): Promise<void> {
+
+  const formData = new FormData();
+  formData.append('_subject', `[bibleit] ${submission.category.toUpperCase()}: ${submission.message.slice(0, 60)}`);
+  formData.append('_captcha', 'false');
+  formData.append('_template', 'table');
+  formData.append('category', submission.category);
+  formData.append('message', submission.message.trim());
+
+  if (submission.name?.trim()) {
+    formData.append('name', submission.name.trim());
+  }
+  if (submission.email?.trim()) {
+    formData.append('email', submission.email.trim());
+  }
+
+  const response = await fetch(FEEDBACK_ENDPOINT, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+    body: formData,
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok || (data && (data.success === false || data.success === 'false'))) {
+    throw new Error(data?.message || `HTTP ${response.status}`);
+  }
+}
