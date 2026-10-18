@@ -5,6 +5,7 @@ import { BIBLE_BOOKS_BY_ID } from '../core/bible-books';
 import type { AudioNarrator } from '../core/ports';
 import type { NarrationSegment, NarrationState, NarrationWordBoundary } from '../core/types';
 import { loadBook, type ChapterVerse } from '../adapters/book-store';
+import type { SavedVerse } from './SavedView';
 
 interface ReaderViewProps {
   book: string;
@@ -13,6 +14,7 @@ interface ReaderViewProps {
   scrollKey?: number;
   narrator?: AudioNarrator;
   narrationState?: NarrationState;
+  savedVerses?: SavedVerse[];
   onOpenSelector: () => void;
   onSaveVerse: (verse: {
     book: string;
@@ -55,6 +57,7 @@ export function ReaderView({
   scrollKey,
   narrator,
   narrationState,
+  savedVerses,
   onOpenSelector,
   onSaveVerse,
   onToast,
@@ -67,6 +70,7 @@ export function ReaderView({
   const targetVerseRef = useRef<HTMLParagraphElement | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const isLongPressTriggeredRef = useRef<boolean>(false);
 
   const bookMeta = BIBLE_BOOKS_BY_ID[book];
   const bookTitle = bookMeta ? bookMeta.name : book;
@@ -137,20 +141,13 @@ export function ReaderView({
   }, [activeSpokenVerse]);
 
 
-  const triggerHaptic = (pattern: number | number[] = 40) => {
+  const triggerHaptic = (pattern: number | number[] = 20) => {
     try {
       if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-        const ok = navigator.vibrate(pattern);
-        if (ok) {
-          console.log('[Haptic] Vibrate triggered successfully with pattern:', pattern);
-        } else {
-          console.warn('[Haptic] navigator.vibrate returned false (gesture expired, blocked by OS, or inactive window)');
-        }
-      } else {
-        console.warn('[Haptic] navigator.vibrate is not supported on this browser or platform');
+        navigator.vibrate(pattern);
       }
-    } catch (err) {
-      console.warn('[Haptic] Exception during vibration:', err);
+    } catch {
+      // Silently ignore vibration restrictions
     }
   };
 
@@ -187,7 +184,7 @@ export function ReaderView({
     e?.stopPropagation();
     if (!selectedVerse) return;
 
-    triggerHaptic(15);
+    triggerHaptic(20);
     const citation = `${bookTitle} ${chapter}:${selectedVerse.num}`;
     const textToCopy = `${citation} - ${selectedVerse.text}`;
 
@@ -204,7 +201,7 @@ export function ReaderView({
     e?.stopPropagation();
     if (!selectedVerse) return;
 
-    triggerHaptic(25);
+    triggerHaptic(20);
     const citation = `${bookTitle} ${chapter}:${selectedVerse.num}`;
     onSaveVerse({
       book,
@@ -265,35 +262,43 @@ export function ReaderView({
     }
   };
 
-  const handleVerseClick = (v: ChapterVerse) => {
-    // If clicking a new verse or clicking the same verse, select and highlight it with border
-    if (selectedVerse?.num !== v.num) {
+  const handleVerseClick = (v: ChapterVerse, e?: JSX.TargetedMouseEvent<HTMLParagraphElement>) => {
+    if (isLongPressTriggeredRef.current) {
+      isLongPressTriggeredRef.current = false;
+      return;
+    }
+    e?.stopPropagation();
+    // Toggle selection: tap to select/focus; tap again to deselect
+    if (selectedVerse?.num === v.num && !showActions) {
+      setSelectedVerse(null);
+    } else {
       setSelectedVerse(v);
       setShowActions(false);
     }
   };
 
-  const handleTouchStart = (verse: ChapterVerse, e: TouchEvent) => {
+  const handleTouchStart = (verse: ChapterVerse, e: JSX.TargetedTouchEvent<HTMLParagraphElement>) => {
     clearLongPressTimer();
+    isLongPressTriggeredRef.current = false;
     const touch = e.touches[0];
     if (touch) {
       touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
     }
-    // Long-press activates the action buttons on the selected verse
     longPressTimerRef.current = setTimeout(() => {
+      isLongPressTriggeredRef.current = true;
       setSelectedVerse(verse);
       setShowActions(true);
-      triggerHaptic(40);
-    }, 450);
+      triggerHaptic(20);
+    }, 400);
   };
 
-  const handleTouchMove = (e: TouchEvent) => {
+  const handleTouchMove = (e: JSX.TargetedTouchEvent<HTMLParagraphElement>) => {
     if (!touchStartPosRef.current) return;
     const touch = e.touches[0];
     if (touch) {
       const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
       const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
-      if (dx > 16 || dy > 16) {
+      if (dx > 12 || dy > 12) {
         clearLongPressTimer();
       }
     }
@@ -304,8 +309,31 @@ export function ReaderView({
     touchStartPosRef.current = null;
   };
 
+  const handleMouseDown = (verse: ChapterVerse, e: JSX.TargetedMouseEvent<HTMLParagraphElement>) => {
+    if (e.button !== 0) return;
+    clearLongPressTimer();
+    isLongPressTriggeredRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressTriggeredRef.current = true;
+      setSelectedVerse(verse);
+      setShowActions(true);
+      triggerHaptic(20);
+    }, 450);
+  };
+
+  const handleMouseUp = () => {
+    clearLongPressTimer();
+  };
+
   return (
-    <section id="reader-scroll-container" class="flex-1 flex flex-col overflow-y-auto overscroll-y-contain">
+    <section
+      id="reader-scroll-container"
+      class="flex-1 flex flex-col overflow-y-auto overscroll-y-contain"
+      onClick={() => {
+        setSelectedVerse(null);
+        setShowActions(false);
+      }}
+    >
       {/* Chapter Text */}
       <div class="p-5 sm:p-8 pb-32 sm:pb-32 font-serif text-[18px] sm:text-[19px] leading-[1.85] space-y-4 max-w-2xl mx-auto w-full" style={{ color: 'var(--text-main)' }}>
         <div class="flex flex-col items-center mb-6">
@@ -389,34 +417,53 @@ export function ReaderView({
           const isTarget = targetVerse === v.num;
           const isSelected = selectedVerse?.num === v.num;
           const isSpeaking = activeSpokenVerse === v.num;
-          const hasStrongBorder =
-            activeSpokenVerse !== undefined
-              ? isSpeaking
-              : selectedVerse !== null
-              ? isSelected
-              : isTarget;
+          const isSaved = savedVerses?.some(
+            (sv) => sv.book === book && sv.chapter === chapter && sv.verse === v.num,
+          );
           const hasActions = isSelected && showActions;
+          // Spoken verse and any tapped/focused verse show yellow border in parallel
+          const hasYellowBorder = isSpeaking || isSelected;
 
           return (
             <div key={v.num} class="transition-all">
               <p
                 id={`verse-${v.num}`}
                 ref={isTarget ? targetVerseRef : undefined}
-                onClick={() => handleVerseClick(v)}
+                tabIndex={0}
+                onClick={(e) => handleVerseClick(v, e)}
+                onFocus={() => {
+                  if (selectedVerse?.num !== v.num) {
+                    setSelectedVerse(v);
+                    setShowActions(false);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedVerse(v);
+                    setShowActions(true);
+                    triggerHaptic(20);
+                  }
+                }}
                 onContextMenu={(e) => {
                   e.preventDefault();
+                  isLongPressTriggeredRef.current = true;
                   setSelectedVerse(v);
                   setShowActions(true);
+                  triggerHaptic(20);
                 }}
-                onTouchStart={(e) => handleTouchStart(v, e as unknown as TouchEvent)}
-                onTouchMove={(e) => handleTouchMove(e as unknown as TouchEvent)}
+                onTouchStart={(e) => handleTouchStart(v, e)}
+                onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 onTouchCancel={handleTouchEnd}
-                class={`cursor-pointer transition-all p-2 rounded-xl scroll-mt-16 select-none ${
-                  hasStrongBorder ? 'ring-2 ring-amber-500/50' : ''
+                onMouseDown={(e) => handleMouseDown(v, e)}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                class={`cursor-pointer transition-all p-2 rounded-xl scroll-mt-16 select-none outline-none ${
+                  hasYellowBorder ? 'ring-2 ring-amber-500/50' : ''
                 }`}
                 style={{
-                  backgroundColor: isTarget ? 'var(--highlight-verse)' : 'transparent',
+                  backgroundColor: isTarget && !isSaved ? 'var(--highlight-verse)' : 'transparent',
                   WebkitTouchCallout: 'none',
                 }}
               >
@@ -463,14 +510,28 @@ export function ReaderView({
                   <button
                     type="button"
                     onClick={(e) => handleSave(e)}
-                    class="px-3 py-1 rounded-lg border text-xs font-sans font-medium transition-all hover:opacity-85 active:scale-95"
+                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-sans font-medium transition-all hover:opacity-85 active:scale-95"
                     style={{
-                      borderColor: 'var(--border-subtle)',
-                      backgroundColor: 'var(--bg-surface-elevated)',
-                      color: 'var(--text-main)',
+                      borderColor: isSaved ? '#D97706' : 'var(--border-subtle)',
+                      backgroundColor: isSaved ? 'rgba(217, 119, 6, 0.12)' : 'var(--bg-surface-elevated)',
+                      color: isSaved ? '#D97706' : 'var(--text-main)',
                     }}
+                    title={isSaved ? 'Remove from bookmarks' : 'Save to bookmarks'}
                   >
-                    Save
+                    <svg
+                      class="w-3.5 h-3.5"
+                      fill={isSaved ? 'currentColor' : 'none'}
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                      />
+                    </svg>
+                    <span>{isSaved ? 'Unsave' : 'Save'}</span>
                   </button>
                 </div>
               )}

@@ -29,7 +29,26 @@ export function App(): JSX.Element {
   }, [narrator]);
 
 
-  const [theme, setTheme] = useState<Theme>('paper');
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('bibleit_theme') as Theme | null;
+      if (saved && ['paper', 'sepia', 'obsidian'].includes(saved)) {
+        return saved;
+      }
+    }
+    return 'paper';
+  });
+
+  const handleThemeChange = (nextTheme: Theme) => {
+    setTheme(nextTheme);
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('bibleit_theme', nextTheme);
+      } catch {
+        // Ignore quota errors
+      }
+    }
+  };
   const [activeTab, setActiveTab] = useState<ViewTab>(() => {
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem('bibleit_active_tab') as ViewTab | null;
@@ -375,6 +394,7 @@ export function App(): JSX.Element {
             scrollKey={readerLocation.scrollKey}
             narrator={narrator}
             narrationState={narrationState}
+            savedVerses={savedVerses}
             onOpenSelector={() => setIsSelectorOpen(true)}
             onSaveVerse={handleSaveVerse}
             onToast={showToast}
@@ -393,7 +413,7 @@ export function App(): JSX.Element {
         {activeTab === 'settings' && (
           <SettingsView
             currentTheme={theme}
-            onThemeChange={setTheme}
+            onThemeChange={handleThemeChange}
             isAiEnabled={isAiEnabled}
             onToggleAi={handleToggleAi}
             isInspectorMode={isInspectorMode}

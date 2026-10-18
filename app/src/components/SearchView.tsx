@@ -4,6 +4,7 @@ import type { AudioNarrator, SearchEngine } from '../core/ports';
 import type { NarrationState, NarrationWordBoundary, ScoredPassage } from '../core/types';
 import { BIBLE_BOOKS_BY_ID, findBookByPrefix } from '../core/bible-books';
 import { resolveVerseText } from '../adapters/book-store';
+import { getRandomStarterTopic, POPULAR_TOPICS, SEARCH_SUGGESTIONS, STARTER_TOPICS, type StarterTopic } from '../core/starter-topics';
 import type { SavedVerse } from './SavedView';
 
 interface SearchViewProps {
@@ -79,6 +80,63 @@ function isQuestionQuery(text: string): boolean {
   return questionWords.some((word) => lower.startsWith(`${word} `) || lower.startsWith(`${word}'`));
 }
 
+const SEARCH_STORAGE_KEY = 'bibleit_last_search';
+const SEARCH_HISTORY_KEY = 'bibleit_search_history';
+const MAX_HISTORY_ITEMS = 6;
+
+function loadSearchHistory(): string[] {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(SEARCH_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSearchHistory(history: string[]): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+interface StoredSearch {
+  query: string;
+  passages: ScoredPassage[];
+  answerText: string;
+}
+
+function getInitialSearchState(): StoredSearch {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(SEARCH_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as StoredSearch;
+        if (parsed && typeof parsed.query === 'string') {
+          return {
+            query: parsed.query,
+            passages: Array.isArray(parsed.passages) ? parsed.passages : [],
+            answerText: typeof parsed.answerText === 'string' ? parsed.answerText : '',
+          };
+        }
+      }
+    } catch {
+      // Storage unavailable or invalid JSON
+    }
+  }
+  const topic = getRandomStarterTopic();
+  return {
+    query: topic.query,
+    passages: topic.passages,
+    answerText: topic.answerText,
+  };
+}
+
 export function SearchView({
   engine,
   narrator,
@@ -96,26 +154,72 @@ export function SearchView({
   onSaveVerse,
   onToast,
 }: SearchViewProps): JSX.Element {
-  const [query, setQuery] = useState('');
-  const [passages, setPassages] = useState<ScoredPassage[]>([]);
+  const [initialSearch] = useState(getInitialSearchState);
+  const [query, setQuery] = useState(initialSearch.query);
+  const [passages, setPassages] = useState<ScoredPassage[]>(initialSearch.passages);
   const [latencyMs, setLatencyMs] = useState(38);
   const [expandedCardId, setExpandedCardId] = useState<number | null>(null);
   const [surroundingVerses, setSurroundingVerses] = useState<
     Record<number, { prev?: string; next?: string }>
   >({});
 
-  const [answerText, setAnswerText] = useState<string>('');
+  const [answerText, setAnswerText] = useState<string>(initialSearch.answerText);
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
+  const [isSynthesisCollapsed, setIsSynthesisCollapsed] = useState<boolean>(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>(loadSearchHistory);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleApplySuggestion = (text: string) => {
-    setQuery(text);
+  const isFirstMountRef = useRef(true);
+  const skipRetrieveQueryRef = useRef<string | null>(null);
+  const isFirstMountAnswerRef = useRef(true);
+  const skipAnswerResetQueryRef = useRef<string | null>(null);
 
-    setAnswerText('');
+  const addQueryToHistory = (rawQuery: string) => {
+    const trimmed = rawQuery.trim();
+    if (trimmed.length < 2) return;
+    setSearchHistory((prev) => {
+      const filtered = prev.filter((item) => item.toLowerCase() !== trimmed.toLowerCase());
+      const next = [trimmed, ...filtered].slice(0, MAX_HISTORY_ITEMS);
+      saveSearchHistory(next);
+      return next;
+    });
+  };
+
+  const handleClearHistory = () => {
+    setSearchHistory([]);
+    saveSearchHistory([]);
+  };
+
+  const handleApplyTopic = (topic: StarterTopic) => {
+    addQueryToHistory(topic.query);
+    skipRetrieveQueryRef.current = topic.query;
+    skipAnswerResetQueryRef.current = topic.query;
+    setQuery(topic.query);
+    setPassages(topic.passages);
+    setAnswerText(topic.answerText);
+    setIsSynthesisCollapsed(false);
     const el = inputRef.current;
     if (el) {
       el.focus();
-      el.setSelectionRange(text.length, text.length);
+      el.setSelectionRange(topic.query.length, topic.query.length);
+    }
+  };
+
+  const handleSelectQuery = (text: string) => {
+    addQueryToHistory(text);
+    const matchedStarter = STARTER_TOPICS.find(
+      (t) => t.query.toLowerCase() === text.trim().toLowerCase(),
+    );
+    if (matchedStarter) {
+      handleApplyTopic(matchedStarter);
+    } else {
+      setQuery(text);
+      setAnswerText('');
+      const el = inputRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(text.length, text.length);
+      }
     }
   };
 
@@ -126,6 +230,27 @@ export function SearchView({
   const matchedBook = isExactBookQuery ? findBookByPrefix(trimmedLower) : undefined;
 
   useEffect(() => {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(
+        SEARCH_STORAGE_KEY,
+        JSON.stringify({ query, passages, answerText }),
+      );
+    } catch {
+      // Ignore storage errors
+    }
+  }, [query, passages, answerText]);
+
+  useEffect(() => {
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      return;
+    }
+    if (skipRetrieveQueryRef.current === query) {
+      skipRetrieveQueryRef.current = null;
+      return;
+    }
+
     let isCancelled = false;
     const startTime = performance.now();
 
@@ -142,6 +267,14 @@ export function SearchView({
   }, [engine, query]);
 
   useEffect(() => {
+    if (isFirstMountAnswerRef.current) {
+      isFirstMountAnswerRef.current = false;
+      return;
+    }
+    if (skipAnswerResetQueryRef.current === query) {
+      skipAnswerResetQueryRef.current = null;
+      return;
+    }
     setAnswerText('');
     setIsSynthesizing(false);
   }, [query]);
@@ -189,6 +322,7 @@ export function SearchView({
     if (!trimmed || isSynthesizing) return;
     setIsSynthesizing(true);
     setAnswerText('');
+    setIsSynthesisCollapsed(false);
 
     try {
       let currentPassages = passages;
@@ -330,11 +464,15 @@ export function SearchView({
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
+                addQueryToHistory(query);
                 (e.target as HTMLInputElement).blur();
                 if (isQuestion && isAiEnabled && engine.answers.available && isOnline && !isSynthesizing) {
                   void handleSynthesize();
                 }
               }
+            }}
+            onBlur={() => {
+              addQueryToHistory(query);
             }}
           />
           {query.length > 0 && (
@@ -422,48 +560,29 @@ export function SearchView({
         </div>
       )}
 
-      {/* Mixed Suggestion Chips */}
-      <div class="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2 text-xs shrink-0 no-scrollbar">
-        <span class="text-[10px] shrink-0 font-medium tracking-wide uppercase" style={{ color: 'var(--text-subtle)' }}>
-          Try:
-        </span>
-        <button
-          type="button"
-          onClick={() => handleApplySuggestion('Philippians 4:7')}
-          class="shrink-0 px-2 py-0.5 rounded-md border text-[11px] transition-opacity hover:opacity-80"
-          style={{
-            borderColor: 'var(--border-subtle)',
-            backgroundColor: 'var(--bg-surface-elevated)',
-            color: 'var(--text-muted)',
-          }}
-        >
-          Philippians 4:7
-        </button>
-        <button
-          type="button"
-          onClick={() => handleApplySuggestion('peace that surpasses')}
-          class="shrink-0 px-2 py-0.5 rounded-md border text-[11px] transition-opacity hover:opacity-80"
-          style={{
-            borderColor: 'var(--border-subtle)',
-            backgroundColor: 'var(--bg-surface-elevated)',
-            color: 'var(--text-muted)',
-          }}
-        >
-          peace that surpasses
-        </button>
-        <button
-          type="button"
-          onClick={() => handleApplySuggestion('What did Jesus teach about worry and peace?')}
-          class="shrink-0 px-2 py-0.5 rounded-md border text-[11px] transition-opacity hover:opacity-80"
-          style={{
-            borderColor: 'var(--border-subtle)',
-            backgroundColor: 'var(--bg-surface-elevated)',
-            color: 'var(--text-muted)',
-          }}
-        >
-          What did Jesus teach about worry?
-        </button>
-      </div>
+      {/* Mixed Suggestion Chips (Shown when a search is active) */}
+      {query.trim().length > 0 && (
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2 text-xs shrink-0 no-scrollbar">
+          <span class="text-[10px] shrink-0 font-medium tracking-wide uppercase" style={{ color: 'var(--text-subtle)' }}>
+            Try:
+          </span>
+          {STARTER_TOPICS.map((topic) => (
+            <button
+              key={topic.id}
+              type="button"
+              onClick={() => handleApplyTopic(topic)}
+              class="shrink-0 px-2 py-0.5 rounded-md border text-[11px] transition-opacity hover:opacity-80"
+              style={{
+                borderColor: 'var(--border-subtle)',
+                backgroundColor: 'var(--bg-surface-elevated)',
+                color: 'var(--text-muted)',
+              }}
+            >
+              {topic.query}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Technical Diagnostics Bar (Shown only in Inspector Mode when a query has run) */}
       {isInspectorMode && query.trim().length > 0 && (
@@ -484,35 +603,129 @@ export function SearchView({
 
       {/* Empty Guidance State */}
       {query.trim().length === 0 && (
-        <div class="py-16 flex flex-col items-center justify-center text-center animate-fadeIn">
-          <div
-            class="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 border shadow-sm"
-            style={{
-              backgroundColor: 'var(--bg-surface-elevated)',
-              borderColor: 'var(--border-subtle)',
-            }}
-          >
-            <svg
-              class="w-6 h-6"
-              style={{ color: 'var(--text-muted)' }}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.75"
-                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-              />
-            </svg>
+        <div class="py-4 flex flex-col gap-6 animate-fadeIn">
+          {/* Recent Searches */}
+          {searchHistory.length > 0 && (
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-[11px] font-semibold tracking-wider uppercase" style={{ color: 'var(--text-subtle)' }}>
+                  Recent Searches
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearHistory}
+                  class="text-[11px] transition-opacity hover:opacity-75"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  Clear
+                </button>
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                {searchHistory.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => handleSelectQuery(item)}
+                    class="px-2.5 py-1 rounded-lg border text-xs flex items-center gap-1.5 transition-all hover:opacity-80"
+                    style={{
+                      borderColor: 'var(--border-subtle)',
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                      color: 'var(--text-main)',
+                    }}
+                  >
+                    <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--text-muted)' }}>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{item}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Suggestions */}
+          <div>
+            <div class="mb-2">
+              <span class="text-[11px] font-semibold tracking-wider uppercase" style={{ color: 'var(--text-subtle)' }}>
+                Suggestions
+              </span>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              {SEARCH_SUGGESTIONS.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => handleSelectQuery(suggestion)}
+                  class="px-2.5 py-1 rounded-lg border text-xs transition-all hover:opacity-80"
+                  style={{
+                    borderColor: 'var(--border-subtle)',
+                    backgroundColor: 'var(--bg-surface-elevated)',
+                    color: 'var(--text-main)',
+                  }}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
           </div>
-          <p class="font-serif text-lg font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
-            Search Scripture
-          </p>
-          <p class="text-xs max-w-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-            Search by book & verse reference (e.g. <i>John 3:16</i>), topic, or phrase. Switch to the <b>Reader</b> tab to browse full chapters.
-          </p>
+
+          {/* Popular Topics */}
+          <div>
+            <div class="mb-2">
+              <span class="text-[11px] font-semibold tracking-wider uppercase" style={{ color: 'var(--text-subtle)' }}>
+                Popular Topics
+              </span>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              {POPULAR_TOPICS.map((topic) => (
+                <button
+                  key={topic}
+                  type="button"
+                  onClick={() => handleSelectQuery(topic)}
+                  class="px-2.5 py-1 rounded-lg border text-xs transition-all hover:opacity-80"
+                  style={{
+                    borderColor: 'var(--border-subtle)',
+                    backgroundColor: 'var(--bg-surface-elevated)',
+                    color: 'var(--text-main)',
+                  }}
+                >
+                  {topic}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Guidance Footer */}
+          <div class="pt-6 border-t flex flex-col items-center justify-center text-center" style={{ borderColor: 'var(--border-subtle)' }}>
+            <div
+              class="w-10 h-10 rounded-2xl flex items-center justify-center mb-2.5 border shadow-sm"
+              style={{
+                backgroundColor: 'var(--bg-surface-elevated)',
+                borderColor: 'var(--border-subtle)',
+              }}
+            >
+              <svg
+                class="w-5 h-5"
+                style={{ color: 'var(--text-muted)' }}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.75"
+                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                />
+              </svg>
+            </div>
+            <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
+              Search Scripture
+            </p>
+            <p class="text-xs max-w-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+              Search by book & verse reference (e.g. <i>John 3:16</i>), topic, or question. Switch to the <b>Reader</b> tab to browse full chapters.
+            </p>
+          </div>
         </div>
       )}
 
@@ -529,86 +742,170 @@ export function SearchView({
       )}
 
       {/* Synthesized Answer Card */}
-      {(answerText.length > 0 || isSynthesizing) && (
-        <div
-          class="mb-4 p-4 rounded-2xl border transition-all animate-fadeIn"
-          style={{
-            backgroundColor: 'var(--bg-surface-elevated)',
-            borderColor: 'var(--accent)',
-          }}
-        >
-          <div class="flex items-center justify-between mb-2.5">
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-semibold flex items-center gap-1.5" style={{ color: 'var(--accent)' }}>
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M13 10V3L4 14h7v7l9-11h-7z"
-                  />
-                </svg>
-                <span>Scripture Synthesis</span>
-              </span>
-              <span
-                class="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                style={{
-                  backgroundColor: 'var(--badge-sem-bg)',
-                  color: 'var(--badge-sem-text)',
-                }}
-              >
-                Grounded Context
-              </span>
+      {(answerText.length > 0 || isSynthesizing) && (() => {
+        const isSynthesisActive =
+          narrationState?.status !== 'idle' &&
+          narrationState?.activeSegment?.id === 'synthesis:overview';
+        const isSynthesisPlaying = isSynthesisActive && narrationState?.status === 'playing';
+
+        const handleToggleSynthesisNarration = () => {
+          if (!narrator || !narrator.supported || !answerText) return;
+          if (isSynthesisActive) {
+            if (isSynthesisPlaying) {
+              narrator.pause();
+            } else {
+              narrator.resume();
+            }
+            return;
+          }
+          const firstPassage = passages[0];
+          narrator.play([
+            {
+              id: 'synthesis:overview',
+              citation: 'Scripture Synthesis',
+              text: answerText,
+              book: firstPassage?.chunk.book ?? 'GEN',
+              chapter: firstPassage?.chunk.start[0] ?? 1,
+              verse: firstPassage?.chunk.start[1] ?? 1,
+            },
+          ]);
+        };
+
+        return (
+          <div
+            class={`mb-4 p-4 rounded-2xl border transition-all animate-fadeIn ${
+              isSynthesisActive ? 'ring-2 ring-amber-500/50' : ''
+            }`}
+            style={{
+              backgroundColor: 'var(--bg-surface-elevated)',
+              borderColor: 'var(--accent)',
+            }}
+          >
+            <div
+              class={`flex items-center justify-between ${
+                isSynthesisCollapsed ? 'mb-0 cursor-pointer' : 'mb-2.5'
+              }`}
+              onClick={isSynthesisCollapsed ? () => setIsSynthesisCollapsed(false) : undefined}
+            >
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-semibold flex items-center gap-1.5" style={{ color: 'var(--accent)' }}>
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                  </svg>
+                  <span>Scripture Synthesis</span>
+                </span>
+                <span
+                  class="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                  style={{
+                    backgroundColor: 'var(--badge-sem-bg)',
+                    color: 'var(--badge-sem-text)',
+                  }}
+                >
+                  Grounded Context
+                </span>
+              </div>
+
+              <div class="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                {narrator?.supported && answerText.length > 0 && !isSynthesizing && (
+                  <button
+                    type="button"
+                    onClick={handleToggleSynthesisNarration}
+                    title={isSynthesisPlaying ? 'Pause narration' : 'Listen to synthesis'}
+                    aria-label={
+                      isSynthesisPlaying ? 'Pause Scripture Synthesis' : 'Listen to Scripture Synthesis'
+                    }
+                    class="p-1 rounded hover:opacity-75 transition-opacity"
+                    style={{ color: isSynthesisActive ? 'var(--text-main)' : 'var(--text-muted)' }}
+                  >
+                    {isSynthesisPlaying ? (
+                      <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z" />
+                      </svg>
+                    ) : (
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                )}
+
+                {answerText.length > 0 && !isSynthesizing && (
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(answerText)}
+                    class="p-1 rounded hover:opacity-75 transition-opacity"
+                    style={{ color: 'var(--text-muted)' }}
+                    title="Copy answer"
+                    aria-label="Copy Scripture Synthesis"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
 
-            {answerText.length > 0 && !isSynthesizing && (
-              <button
-                type="button"
-                onClick={() => copyToClipboard(answerText)}
-                class="text-xs flex items-center gap-1 hover:opacity-75 transition-opacity"
-                style={{ color: 'var(--text-muted)' }}
-                title="Copy answer"
+            {!isSynthesisCollapsed && (
+              <div
+                class="text-sm leading-relaxed whitespace-pre-wrap font-serif max-h-72 overflow-y-auto pr-1"
+                style={{ color: 'var(--text-main)' }}
               >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-                <span>Copy</span>
-              </button>
+                {isSynthesisActive
+                  ? renderHighlightedText(answerText, narrationState?.wordBoundary)
+                  : answerText}
+                {isSynthesizing && (
+                  <span class="inline-block w-1.5 h-4 ml-1 bg-amber-500 animate-pulse align-middle" />
+                )}
+              </div>
             )}
-          </div>
 
-          <div
-            class="text-sm leading-relaxed whitespace-pre-wrap font-serif max-h-72 overflow-y-auto pr-1"
-            style={{ color: 'var(--text-main)' }}
-          >
-            {answerText}
-            {isSynthesizing && (
-              <span class="inline-block w-1.5 h-4 ml-1 bg-amber-500 animate-pulse align-middle" />
-            )}
-          </div>
-
-          <div
-            class="mt-3 pt-2.5 border-t flex items-center justify-between text-[11px]"
-            style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-subtle)' }}
-          >
-            <span>Verified with cited passages below</span>
-            <button
-              type="button"
-              onClick={() => {
-                setAnswerText('');
-              }}
-              class="hover:underline"
+            {/* Card Footer Actions aligned with passage cards */}
+            <div
+              class="mt-3 flex items-center justify-between pt-2 border-t text-xs"
+              style={{ borderColor: 'var(--border-subtle)' }}
             >
-              Dismiss
-            </button>
+              {answerText.length > 0 && !isSynthesizing ? (
+                <button
+                  type="button"
+                  onClick={() => setIsSynthesisCollapsed(!isSynthesisCollapsed)}
+                  class="font-medium flex items-center gap-1 hover:underline"
+                  style={{ color: 'var(--text-muted)' }}
+                  title={isSynthesisCollapsed ? 'Expand overview' : 'Collapse overview'}
+                  aria-label={
+                    isSynthesisCollapsed
+                      ? 'Expand Scripture Synthesis'
+                      : 'Collapse Scripture Synthesis'
+                  }
+                >
+                  <span>{isSynthesisCollapsed ? '+ Expand overview' : '– Collapse overview'}</span>
+                </button>
+              ) : (
+                <span />
+              )}
+
+              <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
+                Verified with cited passages below
+              </span>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Results Stream */}
       <div class="flex flex-col space-y-3 pb-4">
