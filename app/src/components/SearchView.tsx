@@ -300,6 +300,20 @@ export function SearchView({
             borderColor: 'var(--border-subtle)',
           }}
         >
+          <svg
+            class="w-4 h-4 shrink-0 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-opacity duration-150"
+            style={{ color: 'var(--text-muted)' }}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
           <input
             ref={inputRef}
             type="text"
@@ -307,7 +321,7 @@ export function SearchView({
             enterKeyHint="search"
             value={query}
             placeholder="Search verses, topics, or questions..."
-            class="peer w-full bg-transparent text-sm font-medium outline-none leading-normal placeholder:pl-6 focus:placeholder:pl-6"
+            class="w-full bg-transparent text-sm font-medium outline-none leading-normal pl-7 pr-2"
             style={{
               color: 'var(--text-main)',
             }}
@@ -323,21 +337,6 @@ export function SearchView({
               }
             }}
           />
-          {/* Crisp SVG icon that natively fades out when user types, giving 100% width */}
-          <svg
-            class="w-4 h-4 shrink-0 absolute left-3 pointer-events-none transition-opacity duration-150 peer-placeholder-shown:opacity-100 opacity-0"
-            style={{ color: 'var(--text-muted)' }}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
           {query.length > 0 && (
             <button
               type="button"
