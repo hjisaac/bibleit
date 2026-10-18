@@ -132,7 +132,7 @@ export function FeedbackModal({
         </div>
 
         {/* Scrollable Form Body */}
-        <div class="flex-1 overflow-y-auto overscroll-contain space-y-3.5 pr-1">
+        <div class="flex-1 overflow-y-auto overscroll-contain space-y-3.5 px-1 py-0.5">
           {/* Category Select */}
           <div class="space-y-1.5">
             <label
