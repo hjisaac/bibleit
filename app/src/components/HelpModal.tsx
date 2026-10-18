@@ -237,10 +237,20 @@ export function HelpModal({ isOpen, onClose, onOpenFeedback }: HelpModalProps): 
                 onClose();
                 onOpenFeedback();
               }}
-              class="px-4 py-1.5 rounded-xl text-xs font-semibold text-white flex items-center gap-1.5 transition-opacity hover:opacity-90"
-              style={{ backgroundColor: 'var(--accent)' }}
+              class="px-3.5 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition-opacity hover:opacity-85"
+              style={{
+                backgroundColor: 'var(--bg-surface-elevated)',
+                borderColor: 'var(--border-subtle)',
+                color: 'var(--text-main)',
+              }}
             >
-              <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                class="w-3.5 h-3.5 shrink-0"
+                style={{ color: 'var(--text-muted)' }}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
