@@ -7,14 +7,9 @@ export interface FeedbackSubmission {
   readonly email?: string;
 }
 
-export async function submitFeedback(submission: FeedbackSubmission): Promise<void> {
-  const destinationEmail = import.meta.env.VITE_FEEDBACK_EMAIL;
-  if (!destinationEmail) {
-    throw new Error('Missing VITE_FEEDBACK_EMAIL in environment');
-  }
+const FEEDBACK_ENDPOINT = 'https://formsubmit.co/ajax/hjisaach@gmail.com';
 
-  const endpoint =
-    import.meta.env.VITE_FEEDBACK_ENDPOINT || `https://formsubmit.co/ajax/${encodeURIComponent(destinationEmail)}`;
+export async function submitFeedback(submission: FeedbackSubmission): Promise<void> {
 
   const formData = new FormData();
   formData.append('_subject', `[bibleit] ${submission.category.toUpperCase()}: ${submission.message.slice(0, 60)}`);
@@ -30,7 +25,7 @@ export async function submitFeedback(submission: FeedbackSubmission): Promise<vo
     formData.append('email', submission.email.trim());
   }
 
-  const response = await fetch(endpoint, {
+  const response = await fetch(FEEDBACK_ENDPOINT, {
     method: 'POST',
     headers: { Accept: 'application/json' },
     body: formData,
