@@ -44,6 +44,7 @@ export function FeedbackModal({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isServerError, setIsServerError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
@@ -53,6 +54,7 @@ export function FeedbackModal({
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     setErrorMsg(null);
+    setIsServerError(false);
 
     if (!message.trim()) {
       setErrorMsg('Please enter a message before sending.');
@@ -67,18 +69,13 @@ export function FeedbackModal({
         name,
         email,
       });
-    } catch (err) {
-      if (import.meta.env.DEV) {
-        console.error('Feedback delivery issue:', err);
-      }
-      if (typeof window !== 'undefined' && window.Sentry?.captureException) {
-        window.Sentry.captureException(err);
-      }
-    } finally {
-      setIsSubmitting(false);
       setMessage('');
       onClose();
       onToast('Thank you! Your feedback has been sent.');
+    } catch {
+      setIsServerError(true);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -237,9 +234,33 @@ export function FeedbackModal({
             </div>
           </div>
 
-          {errorMsg && (
+          {errorMsg && !isServerError && (
             <div class="p-2.5 rounded-xl border text-xs bg-red-500/10 border-red-500/25 text-red-600 dark:text-red-400">
               {errorMsg}
+            </div>
+          )}
+
+          {isServerError && (
+            <div class="p-3 rounded-xl border text-xs bg-red-500/10 border-red-500/25 text-red-600 dark:text-red-400 space-y-1.5 leading-relaxed">
+              <p class="font-semibold">Sorry, an issue occurred with the server.</p>
+              <p class="text-[11px] opacity-90">
+                You can email us directly at{' '}
+                <a
+                  href={`mailto:${import.meta.env.VITE_FEEDBACK_EMAIL || 'hjisaach@gmail.com'}`}
+                  class="underline font-semibold hover:opacity-80"
+                >
+                  {import.meta.env.VITE_FEEDBACK_EMAIL || 'hjisaach@gmail.com'}
+                </a>{' '}
+                or create an issue on{' '}
+                <a
+                  href="https://github.com/hjisaac/bibleit/issues"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="underline font-semibold hover:opacity-80"
+                >
+                  GitHub
+                </a>.
+              </p>
             </div>
           )}
         </div>

@@ -72,6 +72,23 @@ describe('FeedbackModal & Entry Points', () => {
     expect(submitBtn.disabled).toBe(true);
   });
 
+  it('displays friendly fallback contact options when server fails', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('Network error'));
+
+    render(<FeedbackModal isOpen={true} onClose={vi.fn()} onToast={vi.fn()} />);
+
+    fireEvent.input(screen.getByLabelText(/Details/i), {
+      target: { value: 'Something went wrong.' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send Feedback' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Sorry, an issue occurred with the server\./i)).toBeTruthy();
+      expect(screen.getByRole('link', { name: /GitHub/i })).toBeTruthy();
+    });
+  });
+
   it('opens FeedbackModal from HelpModal footer button', () => {
     const onClose = vi.fn();
     const onOpenFeedback = vi.fn();
