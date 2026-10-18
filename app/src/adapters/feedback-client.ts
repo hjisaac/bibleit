@@ -5,24 +5,6 @@ export interface FeedbackSubmission {
   readonly message: string;
   readonly name?: string;
   readonly email?: string;
-  readonly attachment?: {
-    readonly filename: string;
-    readonly data: Uint8Array;
-    readonly contentType: string;
-  };
-}
-
-export async function fileToAttachment(file: File): Promise<{
-  filename: string;
-  data: Uint8Array;
-  contentType: string;
-}> {
-  const buffer = await file.arrayBuffer();
-  return {
-    filename: file.name || 'screenshot.png',
-    data: new Uint8Array(buffer),
-    contentType: file.type || 'image/png',
-  };
 }
 
 // In-memory crash ring buffer: captures unhandled runtime crashes to attach to bug reports
@@ -55,10 +37,7 @@ export function getRecentCrashes(): readonly CrashRecord[] {
   return crashBuffer;
 }
 
-function createFormData(
-  submission: FeedbackSubmission,
-  includeAttachment: boolean,
-): FormData {
+function createFormData(submission: FeedbackSubmission): FormData {
   const formData = new FormData();
   formData.append('_subject', `[bibleit] ${submission.category.toUpperCase()}: ${submission.message.slice(0, 60)}`);
   formData.append('_captcha', 'false');
@@ -70,9 +49,6 @@ function createFormData(
     detailedMessage +=
       '\n\n--- Diagnostics (Recent Errors) ---\n' +
       crashBuffer.map((c) => `[${c.time}] ${c.message}${c.stack ? `\n${c.stack}` : ''}`).join('\n\n');
-  }
-  if (!includeAttachment && submission.attachment) {
-    detailedMessage += `\n\n[Attachment: ${submission.attachment.filename} (${(submission.attachment.data.length / 1024).toFixed(0)} KB omitted in text retry)]`;
   }
   formData.append('message', detailedMessage);
 
@@ -86,13 +62,6 @@ function createFormData(
   if (typeof window !== 'undefined') {
     formData.append('page_url', window.location.href);
     formData.append('user_agent', navigator.userAgent);
-  }
-
-  if (includeAttachment && submission.attachment) {
-    const blob = new Blob([submission.attachment.data.buffer as ArrayBuffer], {
-      type: submission.attachment.contentType,
-    });
-    formData.append('attachment', blob, submission.attachment.filename);
   }
 
   return formData;
@@ -116,24 +85,6 @@ function logFeedbackIssue(error: unknown, context?: Record<string, unknown>): vo
   }
 }
 
-interface DeliveryOptions {
-  readonly includeAttachment: boolean;
-}
-
-async function postFeedbackPayload(
-  endpoint: string,
-  submission: FeedbackSubmission,
-  options: DeliveryOptions,
-): Promise<Response> {
-  return fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-    },
-    body: createFormData(submission, options.includeAttachment),
-  });
-}
-
 export async function submitFeedback(submission: FeedbackSubmission): Promise<void> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     return;
@@ -148,15 +99,14 @@ export async function submitFeedback(submission: FeedbackSubmission): Promise<vo
   const endpoint =
     import.meta.env.VITE_FEEDBACK_ENDPOINT || `https://formsubmit.co/ajax/${encodeURIComponent(destinationEmail)}`;
 
-  const hasAttachment = Boolean(submission.attachment);
-
   try {
-    let response = await postFeedbackPayload(endpoint, submission, { includeAttachment: hasAttachment });
-
-    // If attachment caused rejection, retry with text details only
-    if (!response.ok && hasAttachment) {
-      response = await postFeedbackPayload(endpoint, submission, { includeAttachment: false });
-    }
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+      },
+      body: createFormData(submission),
+    });
 
     const data = await response.json().catch(() => null);
     if (!response.ok || (data && (data.success === false || data.success === 'false'))) {
@@ -164,18 +114,6 @@ export async function submitFeedback(submission: FeedbackSubmission): Promise<vo
       logFeedbackIssue(new Error(`Feedback submission rejected: ${errorMsg}`), { category: submission.category });
     }
   } catch (networkError) {
-    // If initial attempt with attachment threw network error, attempt text-only fallback
-    if (hasAttachment) {
-      try {
-        const fallbackResponse = await postFeedbackPayload(endpoint, submission, { includeAttachment: false });
-        if (!fallbackResponse.ok) {
-          logFeedbackIssue(new Error(`Fallback text-only submission failed (HTTP ${fallbackResponse.status})`));
-        }
-      } catch (fallbackError) {
-        logFeedbackIssue(fallbackError, { phase: 'text_fallback', category: submission.category });
-      }
-    } else {
-      logFeedbackIssue(networkError, { category: submission.category });
-    }
+    logFeedbackIssue(networkError, { category: submission.category });
   }
 }

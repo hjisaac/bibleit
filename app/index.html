@@ -13,6 +13,18 @@
       href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <script>
+      window.sentryOnLoad = function () {
+        Sentry.init({
+          dsn: 'https://713738049e7f12b88a06ac38f2575b39@o4504842263920640.ingest.us.sentry.io/4512254026973184',
+        });
+      };
+    </script>
+    <script
+      src="https://js.sentry-cdn.com/713738049e7f12b88a06ac38f2575b39.min.js"
+      crossorigin="anonymous"
+      data-lazy="no"
+    ></script>
   </head>
   <body class="theme-paper antialiased">
     <div id="app"></div>

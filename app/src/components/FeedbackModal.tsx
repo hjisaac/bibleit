@@ -1,7 +1,6 @@
 import type { JSX } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import {
-  fileToAttachment,
   submitFeedback,
   type FeedbackCategory,
 } from '../adapters/feedback-client';
@@ -35,8 +34,6 @@ const CATEGORIES: Array<{ id: FeedbackCategory; label: string; placeholder: stri
   },
 ];
 
-const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
-
 export function FeedbackModal({
   isOpen,
   onClose,
@@ -46,63 +43,12 @@ export function FeedbackModal({
   const [message, setMessage] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [attachedFile, setAttachedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (!attachedFile) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(attachedFile);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [attachedFile]);
 
   if (!isOpen) return null;
 
   const activeCategory = CATEGORIES.find((c) => c.id === category) ?? CATEGORIES[0]!;
-
-  const handleSelectFile = (file: File | null | undefined) => {
-    setErrorMsg(null);
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      setErrorMsg('Please select an image file (PNG, JPG, WebP, or GIF).');
-      return;
-    }
-    if (file.size > MAX_FILE_BYTES) {
-      setErrorMsg('Image must be smaller than 5 MB.');
-      return;
-    }
-    setAttachedFile(file);
-  };
-
-  const handlePaste = (e: ClipboardEvent) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (item && item.type.startsWith('image/')) {
-        const file = item.getAsFile();
-        if (file) {
-          handleSelectFile(file);
-          break;
-        }
-      }
-    }
-  };
-
-  const handleRemoveFile = () => {
-    setAttachedFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
@@ -115,13 +61,11 @@ export function FeedbackModal({
 
     setIsSubmitting(true);
     try {
-      const attachment = attachedFile ? await fileToAttachment(attachedFile) : undefined;
       await submitFeedback({
         category,
         message,
         name,
         email,
-        attachment,
       });
     } catch (err) {
       if (import.meta.env.DEV) {
@@ -133,7 +77,6 @@ export function FeedbackModal({
     } finally {
       setIsSubmitting(false);
       setMessage('');
-      setAttachedFile(null);
       onClose();
       onToast('Thank you! Your feedback has been sent.');
     }
@@ -150,7 +93,6 @@ export function FeedbackModal({
           onClose();
         }
       }}
-      onPaste={(e) => handlePaste(e as unknown as ClipboardEvent)}
     >
       <form
         onSubmit={handleSubmit}
@@ -170,7 +112,7 @@ export function FeedbackModal({
           <div>
             <h2 class="font-serif text-lg font-semibold">Send Feedback & Report Bug</h2>
             <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Report an issue, attach a screenshot, or suggest an improvement
+              Report an issue or suggest an improvement
             </p>
           </div>
           <button
@@ -245,91 +187,6 @@ export function FeedbackModal({
                 color: 'var(--text-main)',
               }}
             />
-          </div>
-
-          {/* Picture / Screenshot Attachment */}
-          <div class="space-y-1.5">
-            <div class="flex items-center justify-between">
-              <label class="block text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
-                Screenshot or Picture <span class="font-normal opacity-70">(optional)</span>
-              </label>
-              <span class="text-[10px]" style={{ color: 'var(--text-subtle)' }}>
-                PNG, JPG, WebP up to 5 MB · Or paste image
-              </span>
-            </div>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              aria-label="Attach screenshot"
-              class="hidden"
-              onChange={(e) => {
-                const file = (e.target as HTMLInputElement).files?.[0];
-                handleSelectFile(file);
-              }}
-            />
-
-            {!attachedFile ? (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                class="w-full py-2.5 px-3 rounded-xl border border-dashed flex items-center justify-center gap-2 text-xs transition-opacity hover:opacity-80"
-                style={{
-                  borderColor: 'var(--border-subtle)',
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                  color: 'var(--text-muted)',
-                }}
-              >
-                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="1.8"
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
-                <span>Attach a screenshot or photo</span>
-              </button>
-            ) : (
-              <div
-                class="p-2.5 rounded-xl border flex items-center justify-between gap-3"
-                style={{
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                  borderColor: 'var(--border-subtle)',
-                }}
-              >
-                <div class="flex items-center gap-2.5 min-w-0">
-                  {previewUrl && (
-                    <img
-                      src={previewUrl}
-                      alt="Attachment preview"
-                      class="w-10 h-10 rounded-lg object-cover border shrink-0"
-                      style={{ borderColor: 'var(--border-subtle)' }}
-                    />
-                  )}
-                  <div class="min-w-0">
-                    <p
-                      class="text-xs font-medium truncate"
-                      style={{ color: 'var(--text-main)' }}
-                    >
-                      {attachedFile.name}
-                    </p>
-                    <p class="text-[10px]" style={{ color: 'var(--text-subtle)' }}>
-                      {(attachedFile.size / 1024).toFixed(0)} KB
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleRemoveFile}
-                  class="px-2 py-1 rounded-lg text-xs font-medium text-red-600 dark:text-red-400 hover:opacity-75 shrink-0"
-                  title="Remove image"
-                >
-                  Remove
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Optional Contact Fields */}

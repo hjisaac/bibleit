@@ -20,7 +20,7 @@ describe('FeedbackModal & Entry Points', () => {
     }
   });
 
-  it('submits feedback message, category, and image attachment to contact service endpoint', async () => {
+  it('submits feedback message, category, and contact info to contact service endpoint', async () => {
     const onClose = vi.fn();
     const onToast = vi.fn();
 
@@ -42,17 +42,6 @@ describe('FeedbackModal & Entry Points', () => {
       target: { value: 'isaac@example.com' },
     });
 
-    // Attach a PNG image
-    const fileInput = screen.getByLabelText('Attach screenshot') as HTMLInputElement;
-    const pngBytes = new Uint8Array([137, 80, 78, 71]);
-    const imageFile = new File([pngBytes], 'bug-screen.png', { type: 'image/png' });
-    Object.defineProperty(imageFile, 'arrayBuffer', {
-      value: async () => pngBytes.buffer,
-    });
-
-    fireEvent.change(fileInput, { target: { files: [imageFile] } });
-    expect(screen.getByText('bug-screen.png')).toBeTruthy();
-
     // Submit form
     fireEvent.click(screen.getByRole('button', { name: 'Send Feedback' }));
 
@@ -67,26 +56,20 @@ describe('FeedbackModal & Entry Points', () => {
 
     const formData = init.body as FormData;
     expect(formData.get('category')).toBe('feature');
-    expect(formData.get('message')).toBe('Please add cross-reference footnotes.');
+    expect(String(formData.get('message'))).toBe('Please add cross-reference footnotes.');
     expect(formData.get('name')).toBe('Isaac');
     expect(formData.get('email')).toBe('isaac@example.com');
-    expect(formData.get('attachment')).toBeDefined();
 
-    expect(onClose).toHaveBeenCalledTimes(1);
-    expect(onToast).toHaveBeenCalledWith('Thank you! Your feedback has been sent.');
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onToast).toHaveBeenCalledWith('Thank you! Your feedback has been sent.');
+    });
   });
 
-  it('rejects non-image attachments with a helpful validation message', () => {
+  it('disables submit button when message is empty', () => {
     render(<FeedbackModal isOpen={true} onClose={vi.fn()} onToast={vi.fn()} />);
-
-    const fileInput = screen.getByLabelText('Attach screenshot') as HTMLInputElement;
-    const badFile = new File(['hello'], 'notes.txt', { type: 'text/plain' });
-
-    fireEvent.change(fileInput, { target: { files: [badFile] } });
-
-    expect(
-      screen.getByText(/Please select an image file \(PNG, JPG, WebP, or GIF\)\./i),
-    ).toBeTruthy();
+    const submitBtn = screen.getByRole('button', { name: 'Send Feedback' }) as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(true);
   });
 
   it('opens FeedbackModal from HelpModal footer button', () => {
