@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/preact';
+import { useState } from 'preact/hooks';
 import { ReaderView } from '../src/components/ReaderView';
+import type { SavedVerse } from '../src/components/SavedView';
 import type { AudioNarrator } from '../src/core/ports';
 import type { NarrationState } from '../src/core/types';
 
@@ -179,11 +181,132 @@ describe('ReaderView - Parallel Border & Saved Verse Behavior', () => {
 
     const verse6 = screen.getByText(/Do not be anxious/i).closest('p')!;
 
-    // Long press on unsaved verse
-    fireEvent.contextMenu(verse6);
+    // Long press on unsaved verse via mouse/touch events
+    fireEvent.mouseDown(verse6, { button: 0, clientX: 100, clientY: 100 });
+    // Advance timer past 400ms
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Save/i })).toBeTruthy();
+    });
 
     const saveButton = screen.getByRole('button', { name: /Save/i });
     expect(saveButton).toBeTruthy();
     expect(saveButton.textContent).toContain('Save');
   });
+
+  it('immediately applies border on the very first click without needing a second click', async () => {
+    render(
+      <ReaderView
+        book="PHP"
+        chapter={4}
+        narrator={mockNarrator}
+        savedVerses={[]}
+        onOpenSelector={vi.fn()}
+        onSaveVerse={vi.fn()}
+        onToast={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Do not be anxious/i)).toBeTruthy();
+    });
+
+    const verse6 = screen.getByText(/Do not be anxious/i).closest('p')!;
+    expect(verse6.className).not.toContain('ring-2 ring-amber-500/50');
+
+    // First tap / click
+    fireEvent.click(verse6);
+
+    // Border MUST be present on first click!
+    expect(verse6.className).toContain('ring-2 ring-amber-500/50');
+  });
+
+  it('keeps action buttons open when user releases after long-press', async () => {
+    render(
+      <ReaderView
+        book="PHP"
+        chapter={4}
+        narrator={mockNarrator}
+        savedVerses={[]}
+        onOpenSelector={vi.fn()}
+        onSaveVerse={vi.fn()}
+        onToast={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Do not be anxious/i)).toBeTruthy();
+    });
+
+    const verse6 = screen.getByText(/Do not be anxious/i).closest('p')!;
+
+    // Mouse down initiates long press
+    fireEvent.mouseDown(verse6, { button: 0, clientX: 50, clientY: 50 });
+
+    // After 400ms, buttons appear
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Save/i })).toBeTruthy();
+    });
+
+    // Mouse up and synthetic click when user lifts finger / mouse
+    fireEvent.mouseUp(verse6);
+    fireEvent.click(verse6);
+
+    // Buttons MUST STILL be visible (not dismissed by release click)
+    expect(screen.getByRole('button', { name: /Save/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Copy/i })).toBeTruthy();
+  });
+
+  it('toggles button label between "Save" and "Unsave" on the same verse across saving and unsaving', async () => {
+    function StatefulReader() {
+      const [saved, setSaved] = useState<SavedVerse[]>([]);
+      return (
+        <ReaderView
+          book="PHP"
+          chapter={4}
+          narrator={mockNarrator}
+          savedVerses={saved}
+          onOpenSelector={vi.fn()}
+          onSaveVerse={(v) => {
+            setSaved((prev) =>
+              prev.some((sv) => sv.book === v.book && sv.chapter === v.chapter && sv.verse === v.verse)
+                ? prev.filter((sv) => !(sv.book === v.book && sv.chapter === v.chapter && sv.verse === v.verse))
+                : [...prev, { id: '1', ...v, savedAt: Date.now() }],
+            );
+          }}
+          onToast={vi.fn()}
+        />
+      );
+    }
+
+    render(<StatefulReader />);
+    await waitFor(() => {
+      expect(screen.getByText(/Do not be anxious/i)).toBeTruthy();
+    });
+
+    const verse6 = screen.getByText(/Do not be anxious/i).closest('p')!;
+
+    // 1. Initial long-press on unsaved verse: button should be "Save"
+    fireEvent.contextMenu(verse6);
+    const saveBtn1 = screen.getByRole('button', { name: 'Save' });
+    expect(saveBtn1.textContent).toBe('Save');
+
+    // 2. Click "Save": saves the verse and closes action bar
+    fireEvent.click(saveBtn1);
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+
+    // 3. Long-press the SAME verse again: button must now be "Unsave"
+    fireEvent.contextMenu(verse6);
+    const unsaveBtn = screen.getByRole('button', { name: 'Unsave' });
+    expect(unsaveBtn.textContent).toBe('Unsave');
+
+    // 4. Click "Unsave": removes the verse from saved
+    fireEvent.click(unsaveBtn);
+    expect(screen.queryByRole('button', { name: 'Unsave' })).toBeNull();
+
+    // 5. Long-press the SAME verse a third time: button must toggle back to "Save"
+    fireEvent.contextMenu(verse6);
+    const saveBtn2 = screen.getByRole('button', { name: 'Save' });
+    expect(saveBtn2.textContent).toBe('Save');
+  });
 });
+

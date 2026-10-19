@@ -71,6 +71,7 @@ export function ReaderView({
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const isLongPressTriggeredRef = useRef<boolean>(false);
+  const suppressClickUntilRef = useRef<number>(0);
 
   const bookMeta = BIBLE_BOOKS_BY_ID[book];
   const bookTitle = bookMeta ? bookMeta.name : book;
@@ -123,7 +124,7 @@ export function ReaderView({
           return;
         }
       }
-      const el = document.getElementById(`verse-${targetVerse}`);
+      const el = targetVerseRef.current ?? document.getElementById(`verse-${targetVerse}`);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
@@ -262,13 +263,45 @@ export function ReaderView({
     }
   };
 
+  const triggerLongPress = (verse: ChapterVerse) => {
+    clearLongPressTimer();
+    isLongPressTriggeredRef.current = true;
+    suppressClickUntilRef.current = Date.now() + 600;
+    setSelectedVerse(verse);
+    setShowActions(true);
+    triggerHaptic(20);
+  };
+
+  const startLongPress = (verse: ChapterVerse, clientX: number, clientY: number) => {
+    clearLongPressTimer();
+    isLongPressTriggeredRef.current = false;
+    touchStartPosRef.current = { x: clientX, y: clientY };
+    longPressTimerRef.current = setTimeout(() => {
+      triggerLongPress(verse);
+    }, 400);
+  };
+
+  const checkMoveCancel = (clientX: number, clientY: number) => {
+    if (!touchStartPosRef.current) return;
+    const dx = Math.abs(clientX - touchStartPosRef.current.x);
+    const dy = Math.abs(clientY - touchStartPosRef.current.y);
+    if (dx > 10 || dy > 10) {
+      clearLongPressTimer();
+    }
+  };
+
+  const endLongPress = () => {
+    clearLongPressTimer();
+    touchStartPosRef.current = null;
+  };
+
   const handleVerseClick = (v: ChapterVerse, e?: JSX.TargetedMouseEvent<HTMLParagraphElement>) => {
-    if (isLongPressTriggeredRef.current) {
+    e?.stopPropagation();
+    if (Date.now() < suppressClickUntilRef.current || isLongPressTriggeredRef.current) {
       isLongPressTriggeredRef.current = false;
       return;
     }
-    e?.stopPropagation();
-    // Toggle selection: tap to select/focus; tap again to deselect
+    // Toggle selection: tap to select; tap again to deselect
     if (selectedVerse?.num === v.num && !showActions) {
       setSelectedVerse(null);
     } else {
@@ -277,59 +310,14 @@ export function ReaderView({
     }
   };
 
-  const handleTouchStart = (verse: ChapterVerse, e: JSX.TargetedTouchEvent<HTMLParagraphElement>) => {
-    clearLongPressTimer();
-    isLongPressTriggeredRef.current = false;
-    const touch = e.touches[0];
-    if (touch) {
-      touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
-    }
-    longPressTimerRef.current = setTimeout(() => {
-      isLongPressTriggeredRef.current = true;
-      setSelectedVerse(verse);
-      setShowActions(true);
-      triggerHaptic(20);
-    }, 400);
-  };
-
-  const handleTouchMove = (e: JSX.TargetedTouchEvent<HTMLParagraphElement>) => {
-    if (!touchStartPosRef.current) return;
-    const touch = e.touches[0];
-    if (touch) {
-      const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
-      const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
-      if (dx > 12 || dy > 12) {
-        clearLongPressTimer();
-      }
-    }
-  };
-
-  const handleTouchEnd = () => {
-    clearLongPressTimer();
-    touchStartPosRef.current = null;
-  };
-
-  const handleMouseDown = (verse: ChapterVerse, e: JSX.TargetedMouseEvent<HTMLParagraphElement>) => {
-    if (e.button !== 0) return;
-    clearLongPressTimer();
-    isLongPressTriggeredRef.current = false;
-    longPressTimerRef.current = setTimeout(() => {
-      isLongPressTriggeredRef.current = true;
-      setSelectedVerse(verse);
-      setShowActions(true);
-      triggerHaptic(20);
-    }, 450);
-  };
-
-  const handleMouseUp = () => {
-    clearLongPressTimer();
-  };
-
   return (
     <section
       id="reader-scroll-container"
       class="flex-1 flex flex-col overflow-y-auto overscroll-y-contain"
       onClick={() => {
+        if (Date.now() < suppressClickUntilRef.current) {
+          return;
+        }
         setSelectedVerse(null);
         setShowActions(false);
       }}
@@ -431,40 +419,43 @@ export function ReaderView({
                 ref={isTarget ? targetVerseRef : undefined}
                 tabIndex={0}
                 onClick={(e) => handleVerseClick(v, e)}
-                onFocus={() => {
-                  if (selectedVerse?.num !== v.num) {
-                    setSelectedVerse(v);
-                    setShowActions(false);
-                  }
+                onTouchStart={(e) => {
+                  const t = e.touches[0];
+                  if (t) startLongPress(v, t.clientX, t.clientY);
                 }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setSelectedVerse(v);
-                    setShowActions(true);
-                    triggerHaptic(20);
-                  }
+                onTouchMove={(e) => {
+                  const t = e.touches[0];
+                  if (t) checkMoveCancel(t.clientX, t.clientY);
                 }}
+                onTouchEnd={endLongPress}
+                onTouchCancel={endLongPress}
+                onMouseDown={(e) => {
+                  if (e.button === 0) startLongPress(v, e.clientX, e.clientY);
+                }}
+                onMouseMove={(e) => checkMoveCancel(e.clientX, e.clientY)}
+                onMouseUp={endLongPress}
+                onMouseLeave={endLongPress}
                 onContextMenu={(e) => {
                   e.preventDefault();
-                  isLongPressTriggeredRef.current = true;
-                  setSelectedVerse(v);
-                  setShowActions(true);
-                  triggerHaptic(20);
+                  triggerLongPress(v);
                 }}
-                onTouchStart={(e) => handleTouchStart(v, e)}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-                onTouchCancel={handleTouchEnd}
-                onMouseDown={(e) => handleMouseDown(v, e)}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    setSelectedVerse(v);
+                    setShowActions(false);
+                  } else if (e.key === ' ') {
+                    e.preventDefault();
+                    triggerLongPress(v);
+                  }
+                }}
                 class={`cursor-pointer transition-all p-2 rounded-xl scroll-mt-16 select-none outline-none ${
                   hasYellowBorder ? 'ring-2 ring-amber-500/50' : ''
                 }`}
                 style={{
                   backgroundColor: isTarget && !isSaved ? 'var(--highlight-verse)' : 'transparent',
                   WebkitTouchCallout: 'none',
+                  userSelect: 'none',
                 }}
               >
                 <sup class="text-xs opacity-50 font-sans mr-1 font-normal">
@@ -510,28 +501,15 @@ export function ReaderView({
                   <button
                     type="button"
                     onClick={(e) => handleSave(e)}
-                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-sans font-medium transition-all hover:opacity-85 active:scale-95"
+                    class="px-3 py-1 rounded-lg border text-xs font-sans font-medium transition-all hover:opacity-85 active:scale-95"
                     style={{
-                      borderColor: isSaved ? '#D97706' : 'var(--border-subtle)',
-                      backgroundColor: isSaved ? 'rgba(217, 119, 6, 0.12)' : 'var(--bg-surface-elevated)',
-                      color: isSaved ? '#D97706' : 'var(--text-main)',
+                      borderColor: 'var(--border-subtle)',
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                      color: 'var(--text-main)',
                     }}
                     title={isSaved ? 'Remove from bookmarks' : 'Save to bookmarks'}
                   >
-                    <svg
-                      class="w-3.5 h-3.5"
-                      fill={isSaved ? 'currentColor' : 'none'}
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-                      />
-                    </svg>
-                    <span>{isSaved ? 'Unsave' : 'Save'}</span>
+                    {isSaved ? 'Unsave' : 'Save'}
                   </button>
                 </div>
               )}
