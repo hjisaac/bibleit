@@ -89,4 +89,46 @@ test.describe('Reader View Interactions', () => {
     await expect(unsaveButton).toBeVisible();
     await expect(page.getByRole('button', { name: 'Copy' })).toBeVisible();
   });
+
+  test('Toggles button label between "Save" and "Unsave" dynamically on the same verse', async ({ page }) => {
+    const verse4 = page.locator('#verse-4');
+    await expect(verse4).toBeVisible();
+
+    // 1. Long-press unsaved verse 4
+    await verse4.dispatchEvent('contextmenu');
+
+    // Button should initially be "Save"
+    const saveButton = page.getByRole('button', { name: 'Save', exact: true });
+    await expect(saveButton).toBeVisible();
+    await expect(saveButton).toHaveText('Save');
+
+    // 2. Click "Save"
+    await saveButton.click();
+
+    // Action bar closes after saving
+    await expect(saveButton).not.toBeVisible();
+
+    // 3. Long-press the SAME verse 4 again
+    await verse4.dispatchEvent('contextmenu');
+
+    // Button MUST now toggle to "Unsave"!
+    const unsaveButton = page.getByRole('button', { name: 'Unsave', exact: true });
+    await expect(unsaveButton).toBeVisible();
+    await expect(unsaveButton).toHaveText('Unsave');
+
+    // 4. Click "Unsave"
+    await unsaveButton.click();
+
+    // Action bar closes after unsaving
+    await expect(unsaveButton).not.toBeVisible();
+
+    // 5. Long-press the SAME verse 4 a third time
+    await verse4.dispatchEvent('contextmenu');
+
+    // Button MUST now toggle back to "Save"!
+    const saveButtonAgain = page.getByRole('button', { name: 'Save', exact: true });
+    await expect(saveButtonAgain).toBeVisible();
+    await expect(saveButtonAgain).toHaveText('Save');
+  });
 });
+
