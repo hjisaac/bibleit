@@ -26,6 +26,10 @@ test: test-app test-ingest
 test-app:
     pnpm --prefix app test
 
+# Run frontend end-to-end tests (Playwright)
+test-e2e:
+    pnpm --prefix app test:e2e
+
 # Run python ingest pipeline test suite
 test-ingest:
     cd ingest && uv run pytest -q

@@ -261,6 +261,8 @@ __marimo__/
 node_modules/
 app/dist/
 app/dev-dist/
+app/test-results/
+app/playwright-report/
 app/.env
 app/.env.*
 app/.env.local

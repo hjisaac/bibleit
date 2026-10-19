@@ -8,13 +8,15 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "minisearch": "^7.2.0",
     "preact": "^10.19.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.42.0",
     "@preact/preset-vite": "^2.8.2",
     "@testing-library/preact": "^3.2.3",
     "autoprefixer": "^10.4.18",
