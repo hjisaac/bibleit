@@ -31,17 +31,14 @@ def save_pericopes(pericopes: Sequence[Pericope], path: Path) -> None:
 def load_pericopes(path: Path) -> list[Pericope]:
     """Loads cached pericopes from JSON."""
     data = json.loads(path.read_text())
-    pericopes = []
-    for p in data["pericopes"]:
-        start = tuple(p["start"]) if "start" in p else (int(p["chapter"]), int(p["verse"]))
-        pericopes.append(
-            Pericope(
-                book=p["book"],
-                start=start,
-                heading=p["heading"],
-            )
+    return [
+        Pericope(
+            book=p["book"],
+            start=(p["start"][0], p["start"][1]),
+            heading=p["heading"],
         )
-    return pericopes
+        for p in data["pericopes"]
+    ]
 
 
 def save_book_order(path: Path) -> None:

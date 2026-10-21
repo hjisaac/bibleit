@@ -24,27 +24,14 @@ def format_rank_label(rank: int) -> str:
     return f"{prefix}Rank {rank}"
 
 
-def format_passage(chunk: Passage, corpus: BookCorpus | Any = None) -> tuple[str, str]:
+def format_passage(chunk: Passage, corpus: BookCorpus) -> tuple[str, str]:
     """Returns (citation_header, text_body) for a passage."""
     s_ch, s_v = chunk.start
     e_ch, e_v = chunk.end
-    if s_ch == e_ch:
-        citation = f"{chunk.book} {s_ch}:{s_v}–{e_v}" if s_v != e_v else f"{chunk.book} {s_ch}:{s_v}"
-    else:
-        citation = f"{chunk.book} {s_ch}:{s_v}–{e_ch}:{e_v}"
-
-    heading_title = ""
-    if chunk.headings:
-        first_h = chunk.headings[0]
-        heading_title = first_h[2] if isinstance(first_h, (list, tuple)) and len(first_h) >= 3 else str(first_h)
-    heading_part = f" — {heading_title}" if heading_title else ""
-    header = f"[{citation}]{heading_part}"
-
-    text = ""
-    if isinstance(corpus, BookCorpus):
-        text = " ".join(v.text for v in corpus.get_range(chunk.book, chunk.start, chunk.end))
-    elif hasattr(corpus, "get_range"):
-        text = " ".join(v.text for v in corpus.get_range(chunk.book, chunk.start, chunk.end))
+    span = f"{s_ch}:{s_v}–{e_ch}:{e_v}" if s_ch != e_ch else (f"{s_ch}:{s_v}–{e_v}" if s_v != e_v else f"{s_ch}:{s_v}")
+    heading_part = f" — {chunk.headings[0][2]}" if chunk.headings else ""
+    header = f"[{chunk.book} {span}]{heading_part}"
+    text = " ".join(v.text for v in corpus.get_range(chunk.book, chunk.start, chunk.end))
     return header, text
 
 

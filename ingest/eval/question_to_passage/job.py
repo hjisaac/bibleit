@@ -102,39 +102,15 @@ class EvalJobQuestionToPassage(EvalJobBase):
 
         chunk_embeddings = np.load(emb_run_dir / "embeddings.npy")
         raw_meta = json.loads((emb_run_dir / "chunks.json").read_text(encoding="utf-8"))
-        chunks: list[Passage] = []
-        for item in raw_meta:
-            book = item["book"]
-            if "start" in item:
-                ch_s, v_s = item["start"]
-                ch_e, v_e = item["end"]
-            elif "start_addr" in item:
-                ch_s, v_s = item["start_addr"]
-                ch_e, v_e = item["end_addr"]
-            else:
-                ch_s, v_s = item["chapter"], item["verse"]
-                ch_e, v_e = ch_s, v_s + item["verse_count"] - 1
-
-            headings = []
-            headings_raw = item.get("headings", [])
-            if headings_raw and isinstance(headings_raw[0], (list, tuple)):
-                for ch, v, h in headings_raw:
-                    headings.append((int(ch), int(v), str(h)))
-            elif "sections" in item:
-                for s in item["sections"]:
-                    headings.append((int(s["chapter"]), int(s["verse"]), str(s["heading"])))
-            elif headings_raw and isinstance(headings_raw[0], str):
-                for h in headings_raw:
-                    headings.append((int(ch_s), int(v_s), str(h)))
-
-            chunks.append(
-                Passage(
-                    book=book,
-                    start=(ch_s, v_s),
-                    end=(ch_e, v_e),
-                    headings=tuple(headings),
-                )
+        chunks = [
+            Passage(
+                book=item["book"],
+                start=(item["start"][0], item["start"][1]),
+                end=(item["end"][0], item["end"][1]),
+                headings=tuple((int(ch), int(v), str(h)) for ch, v, h in item.get("headings", [])),
             )
+            for item in raw_meta
+        ]
 
         assert len(chunks) == chunk_embeddings.shape[0], (
             f"chunks count ({len(chunks)}) != embedding rows ({chunk_embeddings.shape[0]})"
