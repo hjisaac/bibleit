@@ -1,13 +1,17 @@
-import json
 import logging
-from pathlib import Path
 from typing import Any
 
 from datalens import AnalysisConfig, run_analysis
 
-from bibleit_ingest.artifacts import write_inspection_samples, write_lock_file
+from bibleit_ingest.artifacts import (
+    extract_chunk_criteria,
+    format_chunk_slug,
+    save_chunks_artifact,
+    write_inspection_samples,
+    write_lock_file,
+)
 from bibleit_ingest.chunking import get_chunker
-from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, OLD_TESTAMENT_BOOKS, REPO
+from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, OLD_TESTAMENT_BOOKS
 from bibleit_ingest.embedding import Embedder
 from bibleit_ingest.pericopes import get_or_prepare_corpus
 from bibleit_ingest.renderers import get_renderer
@@ -20,25 +24,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
     path_config_keys = ("web_path", "bsb_dir")
 
     def _make_slug(self) -> str:
-        f = self.config.get("floor", 5)
-        c = self.config.get("ceiling", 30)
-        o = self.config.get("overlap", 1)
-        ovh_flag = ""
-        if o > 0 and "include_overlap_heading" in self.config:
-            ovh_flag = "_ovh1" if self.config.get("include_overlap_heading") else "_ovh0"
-        strat_map = {
-            "text_only": "text",
-            "heading_and_text": "heading",
-            "book_and_heading": "book_heading",
-            "address_and_heading": "addr_heading",
-        }
-        strat_key = str(self.config.get("render_strategy", "heading_and_text"))
-        strat = strat_map.get(strat_key, strat_key[:8])
-        if self.config.get("strategy") == "pericope":
-            return f"peri_c{c}_o{o}{ovh_flag}_{strat}"
-        if self.config.get("strategy") == "token_window":
-            return f"tok_c{c}_o{o}{ovh_flag}_{strat}"
-        return f"f{f}_c{c}_o{o}{ovh_flag}_{strat}"
+        return format_chunk_slug(self.config)
 
     def on_prepare(self) -> dict:
         corpus, pericopes = get_or_prepare_corpus(self.web_path, self.bsb_dir)
@@ -164,28 +150,12 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
             for name, path in plot_paths.items():
                 self.tracker.track_artifact(path, name=name, type="plot")
 
-        # Save chunk definitions artifact
-        chunks_meta = [
-            {
-                "book": c.book,
-                "start": list(c.start),
-                "end": list(c.end),
-                "headings": [list(h) for h in c.headings],
-            }
-            for c in result["chunks"]
-        ]
-        chunks_path = self.run_dir / "chunks.json"
-        chunks_path.write_text(json.dumps(chunks_meta, indent=2), encoding="utf-8")
+        save_chunks_artifact(self.run_dir / "chunks.json", result["chunks"])
 
         lock_data = {
             "stage": "chunking",
             "parameters": {
-                "floor": int(self.config.get("floor", 1)),
-                "ceiling": int(self.config["ceiling"]),
-                "overlap": int(self.config.get("overlap", 1)),
-                "include_overlap_heading": bool(self.config.get("include_overlap_heading", True)),
-                "strategy": self.config.get("strategy", "adaptive"),
-                "render_strategy": self.config.get("render_strategy", "heading_and_text"),
+                **extract_chunk_criteria(self.config),
                 "tokenizer_model": self.config.get("tokenizer_model", "nomic-ai/nomic-embed-text-v1.5"),
             },
             "output": {

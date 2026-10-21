@@ -48,7 +48,8 @@ class AnalysisJobBase(AbstractJob):
         metrics = result.get("metrics", {})
         logger.info("Metrics:\n%s", json.dumps(metrics, indent=2))
 
-        summary = {k: v for k, v in result.items() if k not in ("chunks", "texts", "records")}
+        excluded = ("chunks", "texts", "records", "embeddings", "analysis_result", "renderer")
+        summary = {k: v for k, v in result.items() if k not in excluded}
         payload = {"run_conditions": self.config, **summary}
         target_dir = getattr(self, "run_dir", Path(self.config.get("log_dir", "outputs")))
         target_dir.mkdir(parents=True, exist_ok=True)

@@ -392,19 +392,8 @@ class TokenWindowChunker(Chunker):
 
     def _count_tokens(self, text: str) -> int:
         if self.tokenizer is not None:
-            try:
-                if hasattr(self.tokenizer, "encode"):
-                    res = self.tokenizer.encode(text)
-                    if hasattr(res, "ids"):
-                        return len(res.ids)
-                    return len(res)
-                if callable(self.tokenizer):
-                    res = self.tokenizer(text)
-                    if hasattr(res, "ids"):
-                        return len(res.ids)
-                    return len(res)
-            except Exception:
-                pass
+            encoded = self.tokenizer.encode(text)
+            return len(encoded.ids) if hasattr(encoded, "ids") else len(encoded)
         return max(1, int(len(text.split()) * 1.3))
 
     def chunk(

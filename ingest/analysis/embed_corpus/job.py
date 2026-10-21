@@ -1,4 +1,3 @@
-import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -8,13 +7,19 @@ from codetiming import Timer
 from tqdm import tqdm
 
 from analysis.job import AnalysisJobBase
-from bibleit_ingest.artifacts import read_lock_file, resolve_matching_artifacts, write_lock_file
-from bibleit_ingest.chunking import get_chunker
+from bibleit_ingest.artifacts import (
+    extract_chunk_criteria,
+    format_chunk_slug,
+    load_chunks_artifact,
+    read_lock_file,
+    resolve_matching_artifacts,
+    save_chunks_artifact,
+    write_lock_file,
+)
 from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, REPO
 from bibleit_ingest.embedding import Embedder
 from bibleit_ingest.pericopes import get_or_prepare_corpus
 from bibleit_ingest.renderers import get_renderer
-from bibleit_ingest.types import Passage
 
 logger = logging.getLogger(__name__)
 
@@ -51,20 +56,13 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
     path_config_keys = ("web_path", "bsb_dir")
 
     def _make_slug(self) -> str:
-        f = self.config.get("floor", 5)
-        c = self.config.get("ceiling", 30)
         model = str(self.config.get("embedding_model", "nomic"))
         model_short = "nomic" if "nomic" in model else model.split("/")[-1]
-        return f"f{f}_c{c}_{model_short}"
+        return f"{format_chunk_slug(self.config)}_{model_short}"
 
     def on_prepare(self) -> dict:
-        corpus, pericopes = get_or_prepare_corpus(self.web_path, self.bsb_dir)
-
-        # 1. Resolve chunks: check explicit dir, or auto-match upstream chunk lock, or generate
-        floor = self.config.get("floor")
-        ceiling = int(self.config["ceiling"])
-        overlap = int(self.config.get("overlap", 0))
-        render_strategy = self.config.get("render_strategy", "heading_and_text")
+        corpus, _ = get_or_prepare_corpus(self.web_path, self.bsb_dir)
+        render_strategy = str(self.config.get("render_strategy", "heading_and_text"))
 
         # chunk_dir_override: Optional path supplied in config to bypass search and use an explicit chunk artifact.
         chunk_dir_override = self.config.get("chunk_run_dir")
@@ -75,23 +73,10 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
         else:
             chunk_run_dir = None
 
-        if "strategy" not in self.config:
-            raise KeyError("Missing required 'strategy' parameter in embed_corpus configuration")
-        strategy_name = str(self.config["strategy"])
-
         # chunk_outputs: Directory holding upstream chunk runs to search across.
         # chunk_criteria: Hyperparameter filters that upstream config.lock.yaml must match exactly.
         chunk_outputs = REPO / "ingest" / "analysis" / "chunking_strategy" / "outputs"
-        chunk_criteria: dict[str, Any] = {
-            "strategy": strategy_name,
-            "ceiling": ceiling,
-            "overlap": overlap,
-            "render_strategy": render_strategy,
-        }
-        if strategy_name == "adaptive" and floor is not None:
-            chunk_criteria["floor"] = int(floor)
-        if "include_overlap_heading" in self.config:
-            chunk_criteria["include_overlap_heading"] = bool(self.config["include_overlap_heading"])
+        chunk_criteria = extract_chunk_criteria(self.config)
 
         if not chunk_run_dir:
             chunk_run_dir = resolve_matching_artifacts(chunk_outputs, chunk_criteria)
@@ -104,16 +89,7 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
         upstream_lock_meta: dict[str, Any] = {}
         if (chunk_run_dir / "config.lock.yaml").exists():
             upstream_lock_meta = read_lock_file(chunk_run_dir / "config.lock.yaml")
-        raw_meta = json.loads((chunk_run_dir / "chunks.json").read_text(encoding="utf-8"))
-        chunks = [
-            Passage(
-                book=item["book"],
-                start=(item["start"][0], item["start"][1]),
-                end=(item["end"][0], item["end"][1]),
-                headings=tuple((int(ch), int(v), str(h)) for ch, v, h in item.get("headings", [])),
-            )
-            for item in raw_meta
-        ]
+        chunks = load_chunks_artifact(chunk_run_dir / "chunks.json")
 
         # 2. Prepare Embedder
         embedding_model = str(self.config["embedding_model"])
@@ -156,8 +132,6 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
         matrix = np.array(vectors)
         health_metrics = _compute_vector_health(matrix)
 
-        # Note: Deployment quantization metrics (Int8 fidelity, size) commented out for now.
-
         return {
             "chunks": chunks,
             "embeddings": matrix,
@@ -168,40 +142,16 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
     def on_finalize(self, prepared: dict, result: dict[str, Any]) -> None:
         super().on_finalize(prepared, result)
 
-        # 1. Save embeddings matrix
-        npy_path = self.run_dir / "embeddings.npy"
-        np.save(npy_path, result["embeddings"])
+        np.save(self.run_dir / "embeddings.npy", result["embeddings"])
+        save_chunks_artifact(self.run_dir / "chunks.json", result["chunks"])
 
-        # 2. Save chunks metadata
-        chunks_meta = [
-            {
-                "book": c.book,
-                "start": list(c.start),
-                "end": list(c.end),
-                "headings": [list(h) for h in c.headings],
-            }
-            for c in result["chunks"]
-        ]
-        chunks_path = self.run_dir / "chunks.json"
-        chunks_path.write_text(json.dumps(chunks_meta, indent=2), encoding="utf-8")
-
-        # 3. Save read-only lock file
         matrix = result["embeddings"]
-        params = {
-            "strategy": str(self.config["strategy"]),
-            "ceiling": int(self.config["ceiling"]),
-            "overlap": int(self.config.get("overlap", 0)),
-            "render_strategy": self.config.get("render_strategy", "heading_and_text"),
-            "embedding_model": str(self.config["embedding_model"]),
-        }
-        if str(self.config["strategy"]) == "adaptive" and "floor" in self.config:
-            params["floor"] = int(self.config["floor"])
-        if "include_overlap_heading" in self.config:
-            params["include_overlap_heading"] = bool(self.config["include_overlap_heading"])
-
         lock_data = {
             "stage": "embedding",
-            "parameters": params,
+            "parameters": {
+                **extract_chunk_criteria(self.config),
+                "embedding_model": str(self.config["embedding_model"]),
+            },
             "output": {
                 "shape": list(matrix.shape),
                 "dtype": str(matrix.dtype),

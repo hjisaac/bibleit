@@ -8,6 +8,7 @@ k:
   - 4
   - 5
 
+strategy: "adaptive"
 floor: 5
 ceiling: 30
 overlap: 0
@@ -22,4 +23,5 @@ render_strategy:
 eval_data_path: ingest/data/eval/question_to_passage.json
 web_path: ingest/data/translations/web/en/web.json
 embedding_model: nomic-ai/nomic-embed-text-v1.5
-threads: 2
+threads: 4
+track: true

@@ -73,6 +73,7 @@ def trigger_retrieval_eval(
             matches = index.search(query_vec, k)
 
             target_rank = None
+            matched_target_idx = relevant_indices[0]
             match_records = []
             rel_set = set(relevant_indices)
             for rank, m in enumerate(matches, 1):
@@ -80,6 +81,7 @@ def trigger_retrieval_eval(
                 match_records.append({"rank": rank, "chunk_idx": int(m.key), "score": score})
                 if int(m.key) in rel_set and target_rank is None:
                     target_rank = rank
+                    matched_target_idx = int(m.key)
 
             qrels_dict[q["id"]] = {str(idx): rel["relevance"] for idx in relevant_indices}
             run_dict[q["id"]] = {str(m.key): float(1 - m.distance) for m in matches}
@@ -88,13 +90,13 @@ def trigger_retrieval_eval(
                 "id": q["id"],
                 "query": q["query"],
                 "target_address": address,
-                "target_chunk_idx": relevant_indices[0],
+                "target_chunk_idx": matched_target_idx,
                 "relevant_chunks": relevant_indices,
                 "target_rank": target_rank,
                 "matches": match_records,
             })
 
-    metrics = evaluate_retrieval(qrels_dict, run_dict, ["mrr", f"recall@{k}", f"ndcg@{k}"])
+    metrics = evaluate_retrieval(qrels_dict, run_dict, ["mrr", f"hit_rate@{k}", f"recall@{k}", f"ndcg@{k}"])
     return {
         "total_queries": len(eval_data["queries"]),
         "resolvable": len(qrels_dict),

@@ -1,5 +1,15 @@
 from pathlib import Path
-from bibleit_ingest.artifacts import read_lock_file, resolve_matching_artifacts, write_lock_file
+import pytest
+from bibleit_ingest.artifacts import (
+    extract_chunk_criteria,
+    format_chunk_slug,
+    load_chunks_artifact,
+    read_lock_file,
+    resolve_matching_artifacts,
+    save_chunks_artifact,
+    write_lock_file,
+)
+from bibleit_ingest.types import Passage
 
 
 def test_write_and_read_lock_file(tmp_path: Path) -> None:
@@ -74,4 +84,40 @@ def test_resolve_matching_artifacts(tmp_path: Path) -> None:
 
     # Criterion key not present in lock file
     assert resolve_matching_artifacts(tmp_path, {"nonexistent_key": "val"}) is None
+
+
+def test_format_chunk_slug_and_extract_criteria() -> None:
+    tok_cfg = {
+        "strategy": "token_window",
+        "ceiling": 256,
+        "overlap": 1,
+        "include_overlap_heading": True,
+        "render_strategy": "book_and_heading",
+    }
+    assert format_chunk_slug(tok_cfg) == "tok_c256_o1_ovh1_book_heading"
+    assert extract_chunk_criteria(tok_cfg) == {
+        "strategy": "token_window",
+        "ceiling": 256,
+        "overlap": 1,
+        "include_overlap_heading": True,
+        "render_strategy": "book_and_heading",
+    }
+
+    # When overlap is 0, include_overlap_heading is omitted from slug and criteria
+    tok_no_ovh = {**tok_cfg, "overlap": 0}
+    assert format_chunk_slug(tok_no_ovh) == "tok_c256_o0_book_heading"
+    assert "include_overlap_heading" not in extract_chunk_criteria(tok_no_ovh)
+
+    with pytest.raises(KeyError):
+        extract_chunk_criteria({"ceiling": 256})
+
+
+def test_save_and_load_chunks_artifact(tmp_path: Path) -> None:
+    chunks = [
+        Passage(book="GEN", start=(1, 1), end=(1, 5), headings=((1, 1, "Creation"),)),
+        Passage(book="PHP", start=(4, 4), end=(4, 7), headings=((4, 4, "Rejoice"),)),
+    ]
+    path = save_chunks_artifact(tmp_path / "chunks.json", chunks)
+    loaded = load_chunks_artifact(path)
+    assert loaded == chunks
 

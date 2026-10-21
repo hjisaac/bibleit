@@ -1,13 +1,90 @@
 import json
 import logging
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 from omegaconf import OmegaConf
 
+from .types import Passage
+
 logger = logging.getLogger(__name__)
 
 LOCK_FILENAME = "config.lock.yaml"
+
+_RENDER_STRATEGY_SHORT = {
+    "text_only": "text",
+    "heading_and_text": "heading",
+    "book_and_heading": "book_heading",
+    "address_and_heading": "addr_heading",
+}
+
+
+def format_chunk_slug(config: Mapping[str, Any]) -> str:
+    """Formats a concise, deterministic slug describing chunking parameters."""
+    f = config.get("floor", 5)
+    c = config.get("ceiling", 30)
+    o = config.get("overlap", 0)
+    ovh_flag = ""
+    if o > 0 and "include_overlap_heading" in config and config["include_overlap_heading"] is not None:
+        ovh_flag = "_ovh1" if config.get("include_overlap_heading") else "_ovh0"
+    strat_key = str(config.get("render_strategy", "heading_and_text"))
+    strat = _RENDER_STRATEGY_SHORT.get(strat_key, strat_key[:8])
+    strategy = config.get("strategy", "adaptive")
+    if strategy == "pericope":
+        return f"peri_c{c}_o{o}{ovh_flag}_{strat}"
+    if strategy == "token_window":
+        return f"tok_c{c}_o{o}{ovh_flag}_{strat}"
+    return f"f{f}_c{c}_o{o}{ovh_flag}_{strat}"
+
+
+def extract_chunk_criteria(config: Mapping[str, Any]) -> dict[str, Any]:
+    """Extracts canonical chunking parameters for lock files and upstream artifact matching."""
+    if "strategy" not in config:
+        raise KeyError("Missing required 'strategy' parameter in configuration")
+    strategy = str(config["strategy"])
+    overlap = int(config.get("overlap", 0))
+    criteria: dict[str, Any] = {
+        "strategy": strategy,
+        "ceiling": int(config["ceiling"]),
+        "overlap": overlap,
+        "render_strategy": str(config.get("render_strategy", "heading_and_text")),
+    }
+    if strategy == "adaptive" and config.get("floor") is not None:
+        criteria["floor"] = int(config["floor"])
+    if overlap > 0 and "include_overlap_heading" in config and config["include_overlap_heading"] is not None:
+        criteria["include_overlap_heading"] = bool(config["include_overlap_heading"])
+    return criteria
+
+
+def save_chunks_artifact(path: Path, chunks: Sequence[Passage]) -> Path:
+    """Serializes Passage chunks to chunks.json using canonical Scripture coordinates."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    chunks_meta = [
+        {
+            "book": c.book,
+            "start": list(c.start),
+            "end": list(c.end),
+            "headings": [list(h) for h in c.headings],
+        }
+        for c in chunks
+    ]
+    path.write_text(json.dumps(chunks_meta, indent=2), encoding="utf-8")
+    return path
+
+
+def load_chunks_artifact(path: Path) -> list[Passage]:
+    """Deserializes chunks.json into a list of Passage domain objects."""
+    raw_meta = json.loads(path.read_text(encoding="utf-8"))
+    return [
+        Passage(
+            book=item["book"],
+            start=(item["start"][0], item["start"][1]),
+            end=(item["end"][0], item["end"][1]),
+            headings=tuple((int(ch), int(v), str(h)) for ch, v, h in item.get("headings", [])),
+        )
+        for item in raw_meta
+    ]
 
 
 def write_lock_file(path: Path, data: dict[str, Any]) -> Path:
