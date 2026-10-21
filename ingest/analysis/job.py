@@ -1,5 +1,7 @@
 import json
 import logging
+import os
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -65,6 +67,5 @@ class AnalysisJobBase(AbstractJob):
             src_log = log_dir / f"{self.run_id}.log"
             dst_log = self.run_dir / "run.log"
             if src_log.exists():
-                import shutil
                 self.run_dir.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(src_log), str(dst_log))
