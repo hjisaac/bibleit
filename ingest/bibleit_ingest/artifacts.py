@@ -87,12 +87,22 @@ def load_chunks_artifact(path: Path) -> list[Passage]:
     ]
 
 
+def _sanitize_primitives(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        return {str(k): _sanitize_primitives(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_primitives(v) for v in obj]
+    if hasattr(obj, "item"):
+        return obj.item()
+    return obj
+
+
 def write_lock_file(path: Path, data: dict[str, Any]) -> Path:
     """Writes a read-only (chmod 444) YAML lock file capturing artifact generation metadata."""
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         path.chmod(0o644)  # temporarily unprotect if overwriting
-    content = OmegaConf.to_yaml(OmegaConf.create(data))
+    content = OmegaConf.to_yaml(OmegaConf.create(_sanitize_primitives(data)))
     path.write_text(content, encoding="utf-8")
     path.chmod(0o444)  # mark read-only to prevent accidental edits
     return path

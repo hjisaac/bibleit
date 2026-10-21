@@ -170,3 +170,16 @@ def test_format_passage_citation() -> None:
     hdr2, txt2 = format_passage(p_cross_chapter, corpus)
     assert hdr2 == "[GEN 1:1–2:1]"
     assert "Thus the heavens were finished," in txt2
+
+
+def test_evaluate_retrieval_returns_native_floats() -> None:
+    from rag_core.metrics import evaluate_retrieval
+
+    qrels = {"q1": {"c1": 1}}
+    run = {"q1": {"c1": 0.9, "c2": 0.1}}
+    metrics = evaluate_retrieval(qrels, run, ["mrr", "hit_rate@1", "recall@1", "ndcg@1"])
+    assert isinstance(metrics, dict)
+    for k, v in metrics.items():
+        assert type(v) is float  # verify native Python float, not np.float64
+    assert metrics["hit_rate@1"] == 1.0
+    assert metrics["mrr"] == 1.0
