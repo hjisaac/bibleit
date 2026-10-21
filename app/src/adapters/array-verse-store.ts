@@ -5,15 +5,9 @@ import type { VerseCorpusData, VerseStore } from '../core/types';
  * Lookups by (book, chapter, verse) are pure O(1) array index dereferences.
  */
 export class ArrayVerseStore implements VerseStore {
-  private data: VerseCorpusData = {};
+  private data: VerseCorpusData;
 
-  constructor(initialData?: VerseCorpusData) {
-    if (initialData) {
-      this.init(initialData);
-    }
-  }
-
-  init(data: VerseCorpusData): void {
+  constructor(data: VerseCorpusData = {}) {
     this.data = data;
   }
 
@@ -27,7 +21,7 @@ export class ArrayVerseStore implements VerseStore {
   }
 
   has(book: string, chapter: number, verse: number): boolean {
-    return Boolean(this.get(book, chapter, verse));
+    return !!this.get(book, chapter, verse);
   }
 
   chapterCount(book: string): number {

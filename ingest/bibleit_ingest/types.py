@@ -1,9 +1,8 @@
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Iterable, Sequence
 
 Coordinate = tuple[int, int]  # (chapter, verse)
 VerseAddress = tuple[str, int, int]  # (book, chapter, verse)
-HeadingItem = tuple[int, int, str]  # (chapter, verse, heading_text)
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,10 +36,6 @@ class Pericope:
         return self.start[1]
 
     @property
-    def coordinate(self) -> Coordinate:
-        return self.start
-
-    @property
     def address(self) -> VerseAddress:
         return (self.book, self.start[0], self.start[1])
 
@@ -50,7 +45,7 @@ class Passage:
     book: str
     start: Coordinate
     end: Coordinate
-    headings: tuple[HeadingItem, ...] = ()
+    headings: tuple[tuple[int, int, str], ...] = ()
 
     @property
     def chapter(self) -> int:
@@ -83,7 +78,7 @@ class Passage:
     def from_verses(
         cls,
         verses: Sequence[Verse],
-        headings: Sequence[HeadingItem] = (),
+        headings: Sequence[tuple[int, int, str]] = (),
     ) -> "Passage":
         if not verses:
             raise ValueError("Passage cannot be empty")
@@ -125,11 +120,16 @@ class BookCorpus:
                 b_dict.setdefault(v.chapter, {})[v.verse] = v
             self._index[book_id] = b_dict
 
+    @classmethod
+    def from_verses(cls, verses: Iterable[Verse]) -> "BookCorpus":
+        """Builds a BookCorpus directly from an iterable stream of Verses."""
+        books: dict[str, list[Verse]] = {}
+        for v in verses:
+            books.setdefault(v.book, []).append(v)
+        return cls(books)
+
     def get_verse(self, book: str, chapter: int, verse: int) -> Verse | None:
         return self._index.get(book, {}).get(chapter, {}).get(verse)
-
-    def get(self, book: str, chapter: int, verse: int) -> Verse | None:
-        return self.get_verse(book, chapter, verse)
 
     def get_book(self, book: str) -> list[Verse]:
         return self._books.get(book, [])

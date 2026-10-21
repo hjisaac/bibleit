@@ -13,4 +13,4 @@ def test_get_or_prepare_corpus() -> None:
     assert pericopes[0].chapter == 1
     assert pericopes[0].verse == 1
     assert ("GEN", 1, 1) in corpus
-    assert corpus.get("GEN", 1, 1) is not None
+    assert corpus.get_verse("GEN", 1, 1) is not None

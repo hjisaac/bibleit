@@ -36,6 +36,13 @@ def test_web_corpus_walker(tmp_path: Path) -> None:
     # lazy_walk yields as an iterator
     assert list(walker.lazy_walk()) == results
 
+    from bibleit_ingest.types import BookCorpus
+
+    corpus = BookCorpus.from_verses(walker.lazy_walk())
+    assert isinstance(corpus, BookCorpus)
+    assert corpus.get_verse("GEN", 1, 1) is not None
+    assert corpus.get_verse("GEN", 1, 1).text == "In the beginning"
+
 
 def test_bsb_book_and_corpus_walker(tmp_path: Path) -> None:
     gen_file = tmp_path / "GEN.usj"

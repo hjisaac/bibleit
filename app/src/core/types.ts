@@ -32,7 +32,6 @@ export interface Chunk extends RawChunk {
 export type VerseCorpusData = Record<string, string[][]>;
 
 export interface VerseStore {
-  init(data: VerseCorpusData): void;
   get(book: string, chapter: number, verse: number): string | undefined;
   getRange(book: string, start: [number, number], end: [number, number]): string;
   has(book: string, chapter: number, verse: number): boolean;

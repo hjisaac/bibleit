@@ -55,13 +55,12 @@ export function buildLocalEngine(p: Ports): SearchEngine {
       );
     }
 
-    const verseStore = p.verseStore ?? new ArrayVerseStore();
     const [versesData, rawChunks, emb] = await Promise.all([
       p.store.verses(),
       p.store.chunks(),
       p.store.embeddings(),
     ]);
-    verseStore.init(versesData);
+    const verseStore = p.verseStore ?? new ArrayVerseStore(versesData);
 
     const chunks: Chunk[] = rawChunks.map((c) => ({
       ...c,

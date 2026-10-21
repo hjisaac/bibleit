@@ -252,7 +252,7 @@ def test_coordinate_dataclasses() -> None:
     assert v.address == ("GEN", 1, 1)
 
     p = Pericope(book="GEN", start=(1, 1), heading="Creation")
-    assert p.coordinate == (1, 1)
+    assert p.start == (1, 1)
     assert p.chapter == 1
     assert p.verse == 1
 

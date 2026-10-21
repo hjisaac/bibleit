@@ -5,7 +5,7 @@ from typing import Any, Iterator
 
 from rag_core.walkers import BaseWalker
 from .constants import USFM_ORDER
-from .types import BookCorpus, Pericope, Verse, VerseAddress
+from .types import Pericope, Verse, VerseAddress
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,13 +33,6 @@ class WebCorpusWalker(BaseWalker[Verse]):
                         verse=int(v["verse"]),
                         text=v["text"],
                     )
-
-    def load_corpus(self) -> BookCorpus:
-        """Loads the entire translation into an O(1) BookCorpus."""
-        books: dict[str, list[Verse]] = {}
-        for verse in self.lazy_walk():
-            books.setdefault(verse.book, []).append(verse)
-        return BookCorpus(books)
 
 
 class BsbBookWalker(BaseWalker[VerseEvent]):

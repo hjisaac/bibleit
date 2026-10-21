@@ -60,8 +60,7 @@ def get_or_prepare_corpus(
     bsb_dir: Path | None = None,
     bsb_pericopes_path: Path | None = BSB_PERICOPES_PATH,
 ) -> tuple[BookCorpus, list[Pericope]]:
-    """Loads the target BookCorpus and BSB pericopes."""
-    corpus = WebCorpusWalker(web_path).load_corpus()
+    corpus = BookCorpus.from_verses(WebCorpusWalker(web_path).lazy_walk())
 
     if bsb_pericopes_path and bsb_pericopes_path.exists():
         pericopes = load_pericopes(bsb_pericopes_path)

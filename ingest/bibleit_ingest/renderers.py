@@ -45,7 +45,8 @@ class PassageRenderer(BaseChunkRenderer[Passage], ABC):
         sorted_headings = sorted(passage.headings, key=lambda h: (h[0], h[1]))
         sections: list[tuple[str | None, tuple[int, int], tuple[int, int], str]] = []
 
-        # Check for unheaded lead-in verses before first heading
+        # Verses preceding the first explicit heading (lead-in overlap verses or
+        # verses starting before a pericope break) form an unheaded initial section.
         first_h_coord = (sorted_headings[0][0], sorted_headings[0][1])
         lead_verses = [v for v in verses if v.coordinate < first_h_coord]
         if lead_verses:

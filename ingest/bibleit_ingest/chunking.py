@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Sequence
 
 from .constants import USFM_ORDER
-from .types import BookCorpus, HeadingItem, Passage, Pericope, Verse, VerseAddress
+from .types import BookCorpus, Passage, Pericope, Verse, VerseAddress
 
 
 class Chunker(ABC):
@@ -40,9 +40,9 @@ def build_passage_headings(
     fresh_verses: Sequence[Verse],
     lead_in_verses: Sequence[Verse] = (),
     include_overlap_heading: bool = True,
-) -> tuple[HeadingItem, ...]:
+) -> tuple[tuple[int, int, str], ...]:
     """Recuperates canonical pericope headings covering the chunk's verses via coordinate lookup."""
-    headings: list[HeadingItem] = []
+    headings: list[tuple[int, int, str]] = []
     seen: set[tuple[int, int, str]] = set()
 
     if include_overlap_heading and lead_in_verses:
@@ -234,7 +234,7 @@ class AdaptiveWindowChunker(Chunker):
         self,
         book: str,
         verses: Sequence[Verse],
-        headings: list[HeadingItem],
+        headings: list[tuple[int, int, str]],
     ) -> list[Passage]:
         step = self.ceiling - self.overlap if self.overlap > 0 else self.ceiling
         passages: list[Passage] = []
