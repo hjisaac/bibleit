@@ -1,7 +1,7 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { AudioNarrator, SearchEngine } from '../core/ports';
-import type { NarrationState, NarrationWordBoundary, ScoredPassage } from '../core/types';
+import { getChunkKey, type NarrationState, type NarrationWordBoundary, type ScoredPassage } from '../core/types';
 import { BIBLE_BOOKS_BY_ID, findBookByPrefix } from '../core/bible-books';
 import { resolveVerseText } from '../adapters/book-store';
 import { getRandomStarterTopic, POPULAR_TOPICS, SEARCH_SUGGESTIONS, STARTER_TOPICS, type StarterTopic } from '../core/starter-topics';
@@ -158,9 +158,9 @@ export function SearchView({
   const [query, setQuery] = useState(initialSearch.query);
   const [passages, setPassages] = useState<ScoredPassage[]>(initialSearch.passages);
   const [latencyMs, setLatencyMs] = useState(38);
-  const [expandedCardId, setExpandedCardId] = useState<number | null>(null);
+  const [expandedCardKey, setExpandedCardKey] = useState<string | null>(null);
   const [surroundingVerses, setSurroundingVerses] = useState<
-    Record<number, { prev?: string; next?: string }>
+    Record<string, { prev?: string; next?: string }>
   >({});
 
   const [answerText, setAnswerText] = useState<string>(initialSearch.answerText);
@@ -280,9 +280,9 @@ export function SearchView({
   }, [query]);
 
   useEffect(() => {
-    if (expandedCardId === null) return;
-    const passage = passages.find((p) => p.chunk.id === expandedCardId);
-    if (!passage || surroundingVerses[expandedCardId]) return;
+    if (expandedCardKey === null) return;
+    const passage = passages.find((p) => getChunkKey(p.chunk) === expandedCardKey);
+    if (!passage || surroundingVerses[expandedCardKey]) return;
 
     let isSubscribed = true;
     const book = passage.chunk.book;
@@ -298,7 +298,7 @@ export function SearchView({
       if (isSubscribed) {
         setSurroundingVerses((curr) => ({
           ...curr,
-          [expandedCardId]: { prev, next },
+          [expandedCardKey]: { prev, next },
         }));
       }
     });
@@ -306,10 +306,10 @@ export function SearchView({
     return () => {
       isSubscribed = false;
     };
-  }, [expandedCardId, passages, surroundingVerses]);
+  }, [expandedCardKey, passages, surroundingVerses]);
 
-  const toggleContext = (id: number) => {
-    setExpandedCardId((prev) => (prev === id ? null : id));
+  const toggleContext = (key: string) => {
+    setExpandedCardKey((prev) => (prev === key ? null : key));
   };
 
   const copyToClipboard = (text: string) => {
@@ -910,7 +910,8 @@ export function SearchView({
       {/* Results Stream */}
       <div class="flex flex-col space-y-3 pb-4">
         {passages.map((p) => {
-          const isExpanded = expandedCardId === p.chunk.id;
+          const chunkKey = getChunkKey(p.chunk);
+          const isExpanded = expandedCardKey === chunkKey;
           const refString = formatCitation(p.chunk.book, p.chunk.start, p.chunk.end);
           const isSameChapter = p.chunk.start[0] === p.chunk.end[0];
           const isSameVerse = isSameChapter && p.chunk.start[1] === p.chunk.end[1];
@@ -933,8 +934,8 @@ export function SearchView({
                 v.verse === p.chunk.start[1],
             ) ?? false;
 
-          const surrounding = surroundingVerses[p.chunk.id];
-          const segmentId = `chunk-${p.chunk.id}`;
+          const surrounding = surroundingVerses[chunkKey];
+          const segmentId = `chunk-${chunkKey}`;
           const isCardActive =
             narrationState?.status !== 'idle' &&
             narrationState?.activeSegment?.id === segmentId;
@@ -942,7 +943,7 @@ export function SearchView({
 
           return (
             <article
-              key={p.chunk.id}
+              key={chunkKey}
               class={`p-4 rounded-2xl border transition-all hover:shadow-sm ${
                 isCardActive ? 'ring-2 ring-amber-500/50' : ''
               }`}
@@ -1164,7 +1165,7 @@ export function SearchView({
               >
                 <button
                   type="button"
-                  onClick={() => toggleContext(p.chunk.id)}
+                  onClick={() => toggleContext(chunkKey)}
                   class="font-medium flex items-center gap-1 hover:underline"
                   style={{ color: 'var(--text-muted)' }}
                 >

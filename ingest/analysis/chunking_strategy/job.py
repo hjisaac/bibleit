@@ -167,13 +167,12 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         # Save chunk definitions artifact
         chunks_meta = [
             {
-                "id": idx,
                 "book": c.book,
                 "start": list(c.start),
                 "end": list(c.end),
                 "headings": [list(h) for h in c.headings],
             }
-            for idx, c in enumerate(result["chunks"])
+            for c in result["chunks"]
         ]
         chunks_path = self.run_dir / "chunks.json"
         chunks_path.write_text(json.dumps(chunks_meta, indent=2), encoding="utf-8")
