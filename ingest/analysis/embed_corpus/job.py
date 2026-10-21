@@ -66,6 +66,7 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
         overlap = int(self.config.get("overlap", 0))
         render_strategy = self.config.get("render_strategy", "heading_and_text")
 
+        # chunk_dir_override: Optional path supplied in config to bypass search and use an explicit chunk artifact.
         chunk_dir_override = self.config.get("chunk_run_dir")
         if chunk_dir_override:
             chunk_run_dir = Path(chunk_dir_override)
@@ -77,24 +78,27 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
         if "strategy" not in self.config:
             raise KeyError("Missing required 'strategy' parameter in embed_corpus configuration")
         strategy_name = str(self.config["strategy"])
+
+        # chunk_outputs: Directory holding upstream chunk runs to search across.
+        # chunk_criteria: Hyperparameter filters that upstream config.lock.yaml must match exactly.
+        chunk_outputs = REPO / "ingest" / "analysis" / "chunking_strategy" / "outputs"
+        chunk_criteria: dict[str, Any] = {
+            "strategy": strategy_name,
+            "ceiling": ceiling,
+            "overlap": overlap,
+            "render_strategy": render_strategy,
+        }
+        if strategy_name == "adaptive" and floor is not None:
+            chunk_criteria["floor"] = int(floor)
+        if "include_overlap_heading" in self.config:
+            chunk_criteria["include_overlap_heading"] = bool(self.config["include_overlap_heading"])
+
         if not chunk_run_dir:
-            chunk_outputs = REPO / "ingest" / "analysis" / "chunking_strategy" / "outputs"
-            chunk_criteria = {
-                "strategy": strategy_name,
-                "ceiling": ceiling,
-                "overlap": overlap,
-                "render_strategy": render_strategy,
-            }
-            if strategy_name == "adaptive" and floor is not None:
-                chunk_criteria["floor"] = int(floor)
-            if "include_overlap_heading" in self.config:
-                chunk_criteria["include_overlap_heading"] = bool(self.config["include_overlap_heading"])
             chunk_run_dir = resolve_matching_artifacts(chunk_outputs, chunk_criteria)
 
         if not chunk_run_dir or not (chunk_run_dir / "chunks.json").exists():
-            raise FileNotFoundError(
-                f"No matching chunk artifact found in {chunk_outputs} for criteria: {chunk_criteria}"
-            )
+            target_desc = f"{chunk_run_dir}" if chunk_run_dir else f"{chunk_outputs} for criteria: {chunk_criteria}"
+            raise FileNotFoundError(f"No matching chunk artifact (chunks.json) found in {target_desc}")
 
         logger.info("Found matching upstream chunk artifact at %s", chunk_run_dir)
         upstream_lock_meta: dict[str, Any] = {}

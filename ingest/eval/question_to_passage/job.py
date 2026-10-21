@@ -60,6 +60,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
         corpus, pericopes = get_or_prepare_corpus(self.web_path, BSB_DIR)
 
         # 1. Resolve embedding artifact (explicit override, or auto-match from embed_corpus)
+        # emb_dir_override: Optional path supplied in config to bypass search and use an explicit embedding artifact.
         emb_dir_override = self.config.get("embedding_artifact_dir")
         if emb_dir_override:
             emb_run_dir = Path(emb_dir_override)
@@ -71,19 +72,23 @@ class EvalJobQuestionToPassage(EvalJobBase):
         if "strategy" not in self.config:
             raise KeyError("Missing required 'strategy' parameter in evaluation configuration")
         strategy_name = str(self.config["strategy"])
+
+        # emb_outputs: Directory holding upstream embedding runs to search across.
+        # emb_criteria: Hyperparameter filters that upstream config.lock.yaml must match exactly.
+        emb_outputs = REPO / "ingest" / "analysis" / "embed_corpus" / "outputs"
+        emb_criteria: dict[str, Any] = {
+            "strategy": strategy_name,
+            "ceiling": ceiling,
+            "overlap": overlap,
+            "render_strategy": render_strategy,
+            "embedding_model": str(embedding_model),
+        }
+        if strategy_name == "adaptive" and floor is not None:
+            emb_criteria["floor"] = int(floor)
+        if "include_overlap_heading" in self.config:
+            emb_criteria["include_overlap_heading"] = bool(self.config["include_overlap_heading"])
+
         if not emb_run_dir:
-            emb_outputs = REPO / "ingest" / "analysis" / "embed_corpus" / "outputs"
-            emb_criteria = {
-                "strategy": strategy_name,
-                "ceiling": ceiling,
-                "overlap": overlap,
-                "render_strategy": render_strategy,
-                "embedding_model": str(embedding_model),
-            }
-            if strategy_name == "adaptive" and floor is not None:
-                emb_criteria["floor"] = int(floor)
-            if "include_overlap_heading" in self.config:
-                emb_criteria["include_overlap_heading"] = bool(self.config["include_overlap_heading"])
             emb_run_dir = resolve_matching_artifacts(emb_outputs, emb_criteria)
 
         if (
@@ -91,8 +96,9 @@ class EvalJobQuestionToPassage(EvalJobBase):
             or not (emb_run_dir / "embeddings.npy").exists()
             or not (emb_run_dir / "chunks.json").exists()
         ):
+            target_desc = f"{emb_run_dir}" if emb_run_dir else f"{emb_outputs} for criteria: {emb_criteria}"
             raise FileNotFoundError(
-                f"No matching embedding artifact found in {emb_outputs} for criteria: {emb_criteria}"
+                f"No matching embedding artifact (embeddings.npy / chunks.json) found in {target_desc}"
             )
 
         logger.info("Found matching upstream embedding artifact at %s", emb_run_dir)

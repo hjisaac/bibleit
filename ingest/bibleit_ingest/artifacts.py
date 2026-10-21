@@ -79,18 +79,10 @@ def resolve_matching_artifacts(
     if not stage_outputs_dir.exists():
         return None
 
-    # Cutoff for legacy pre-sweep artifacts
-    min_cutoff = "2026-10-15_112202"
-
     matches: list[Path] = []
-    # Search run subdirectories in stage_outputs_dir
+    # Search run subdirectories in stage_outputs_dir sorted newest first
     candidates = sorted(
-        [
-            d for d in stage_outputs_dir.iterdir()
-            if d.is_dir()
-            and not d.name.startswith(("2026-Oct", "2026-Sep"))
-            and d.name >= min_cutoff
-        ],
+        [d for d in stage_outputs_dir.iterdir() if d.is_dir()],
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )
