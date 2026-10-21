@@ -28,8 +28,10 @@ def test_web_corpus_walker(tmp_path: Path) -> None:
     results = walker.walk()
     assert isinstance(results, list)
     assert len(results) == 2
-    assert results[0] == (("GEN", 1, 1), "In the beginning")
-    assert results[1] == (("GEN", 1, 2), "The earth was formless")
+    assert results[0].address == ("GEN", 1, 1)
+    assert results[0].text == "In the beginning"
+    assert results[1].address == ("GEN", 1, 2)
+    assert results[1].text == "The earth was formless"
 
     # lazy_walk yields as an iterator
     assert list(walker.lazy_walk()) == results
@@ -98,13 +100,11 @@ def test_bsb_pericope_walker(tmp_path: Path) -> None:
     assert pericopes[0].chapter == 1
     assert pericopes[0].verse == 1
     assert pericopes[0].heading == "The Creation"
-    assert pericopes[0].verse_count == 2
     assert pericopes[1].book == "GEN"
     assert pericopes[1].start == (1, 3)
     assert pericopes[1].chapter == 1
     assert pericopes[1].verse == 3
     assert pericopes[1].heading == "Light"
-    assert pericopes[1].verse_count == 1
 
     # lazy_walk yields as an iterator
     assert list(walker.lazy_walk()) == pericopes

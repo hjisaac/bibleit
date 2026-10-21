@@ -79,10 +79,18 @@ def resolve_matching_artifacts(
     if not stage_outputs_dir.exists():
         return None
 
+    # Cutoff for legacy pre-sweep artifacts
+    min_cutoff = "2026-10-15_112202"
+
     matches: list[Path] = []
     # Search run subdirectories in stage_outputs_dir
     candidates = sorted(
-        [d for d in stage_outputs_dir.iterdir() if d.is_dir()],
+        [
+            d for d in stage_outputs_dir.iterdir()
+            if d.is_dir()
+            and not d.name.startswith(("2026-Oct", "2026-Sep"))
+            and d.name >= min_cutoff
+        ],
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )
@@ -94,16 +102,8 @@ def resolve_matching_artifacts(
         try:
             lock_data = read_lock_file(lock_path)
             params = lock_data.get("parameters", lock_data)
-            # Match every key that is defined in both criteria and params
-            common_keys = set(criteria.keys()) & set(params.keys())
-            if not common_keys:
-                continue
-            if all(params[k] == criteria[k] for k in common_keys):
-                # Ensure strategy matches strictly if either specifies it
-                strat_req = criteria.get("strategy")
-                strat_act = params.get("strategy")
-                if (strat_req or strat_act) and strat_req != strat_act:
-                    continue
+            # Require every criterion key to exist and match in artifact params
+            if all(k in params and params[k] == criteria[k] for k in criteria):
                 matches.append(run_dir)
         except Exception as exc:
             logger.debug("Failed reading lock file %s: %s", lock_path, exc)

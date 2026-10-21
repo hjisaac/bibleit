@@ -1,57 +1,65 @@
-from typing import Any
+from typing import Any, Sequence
 
 from datalens import AnalysisConfig, run_analysis
 
-from bibleit_ingest.constants import OLD_TESTAMENT_BOOKS
-from bibleit_ingest.pericopes import PreparedCorpus
+from bibleit_ingest.constants import OLD_TESTAMENT_BOOKS, USFM_ORDER
 from bibleit_ingest.renderers import HeadingAndTextRenderer
-from bibleit_ingest.types import Passage
+from bibleit_ingest.types import BookCorpus, Passage, Pericope
 
 
 def profile_corpus(
-    corpus: PreparedCorpus,
+    corpus: BookCorpus,
+    pericopes: Sequence[Pericope],
     tokenizer: Any,
     token_limit: int = 512,
 ) -> dict[str, Any]:
     # Pass 1: verse-level tokens, words, and subword expansion ratio
     verse_records = []
-    for (book, chapter, verse), text in corpus.ordered_verses:
-        words = len(text.split())
-        tokens = len(tokenizer.encode(text).ids)
-        verse_records.append({
-            "book": book,
-            "testament": "OT" if book in OLD_TESTAMENT_BOOKS else "NT",
-            "word_count": words,
-            "token_count": tokens,
-            "tokens_per_word": round(tokens / max(words, 1), 3),
-        })
+    for b in USFM_ORDER:
+        for v in corpus.get_book(b):
+            words = len(v.text.split())
+            tokens = len(tokenizer.encode(v.text).ids)
+            verse_records.append({
+                "book": v.book,
+                "testament": "OT" if v.book in OLD_TESTAMENT_BOOKS else "NT",
+                "word_count": words,
+                "token_count": tokens,
+                "tokens_per_word": round(tokens / max(words, 1), 3),
+            })
 
     # Pass 2: raw pericope-level verses, words, and tokens (with headings)
-    renderer = HeadingAndTextRenderer(
-        ordered_verses=corpus.ordered_verses,
-        address_index=corpus.address_index,
-    )
+    renderer = HeadingAndTextRenderer(corpus=corpus)
     pericope_records = []
-    for p in corpus.pericopes:
-        start_idx = corpus.address_index[(p.book, p.chapter, p.verse)]
-        end_idx = start_idx + p.verse_count
-        passage = Passage(
-            book=p.book,
-            start_idx=start_idx,
-            end_idx=end_idx,
-            headings=(p.heading,) if p.heading else (),
-        )
-        text = renderer.render(passage)
-        words = len(text.split())
-        tokens = len(tokenizer.encode(text).ids)
-        pericope_records.append({
-            "book": p.book,
-            "testament": "OT" if p.book in OLD_TESTAMENT_BOOKS else "NT",
-            "verse_count": p.verse_count,
-            "word_count": words,
-            "token_count": tokens,
-            "tokens_per_verse": round(tokens / max(p.verse_count, 1), 2),
-        })
+    for b in USFM_ORDER:
+        b_verses = corpus.get_book(b)
+        if not b_verses:
+            continue
+        b_pericopes = [p for p in pericopes if p.book == b]
+        if not b_pericopes:
+            continue
+        for i, p in enumerate(b_pericopes):
+            next_start = b_pericopes[i + 1].start if i + 1 < len(b_pericopes) else (999, 999)
+            p_verses = [v for v in b_verses if p.start <= v.coordinate < next_start]
+            if not p_verses:
+                continue
+            passage = Passage(
+                book=b,
+                start=p_verses[0].coordinate,
+                end=p_verses[-1].coordinate,
+                headings=((p.start[0], p.start[1], p.heading),) if p.heading else (),
+            )
+            text = renderer.render(passage)
+            words = len(text.split())
+            tokens = len(tokenizer.encode(text).ids)
+            v_cnt = len(p_verses)
+            pericope_records.append({
+                "book": p.book,
+                "testament": "OT" if p.book in OLD_TESTAMENT_BOOKS else "NT",
+                "verse_count": v_cnt,
+                "word_count": words,
+                "token_count": tokens,
+                "tokens_per_verse": round(tokens / max(v_cnt, 1), 2),
+            })
 
     # Streaming stats via datalens
     v_cfg = AnalysisConfig(

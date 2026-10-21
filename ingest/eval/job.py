@@ -4,10 +4,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-# Throttle BLAS and OpenMP thread pools so background evaluations do not starve the host OS
-for _var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
-    os.environ.setdefault(_var, "2")
-
 from crucible.core.jobs import AbstractJob
 from crucible.core.trackers.wandb import WBTracker
 
@@ -43,7 +39,10 @@ class EvalJobBase(AbstractJob):
 
     def on_track(self) -> None:
         logger.info("Using config:\n%s", json.dumps(self.config, indent=2, default=str))
-        self.tracker = WBTracker(run_name=getattr(self, "run_name", self.run_id), project=self.project_name, config=self.config)
+        if self.config.get("track", True) and os.environ.get("WANDB_MODE") != "disabled":
+            self.tracker = WBTracker(run_name=getattr(self, "run_name", self.run_id), project=self.project_name, config=self.config)
+        else:
+            self.tracker = None
 
     def on_finalize(self, prepared: dict, result: dict[str, Any]) -> None:
         metrics = result.get("metrics", {})

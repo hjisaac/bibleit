@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 
 from bibleit_ingest.sinks import StaticArtifactSink
-from bibleit_ingest.types import Passage, PreparedCorpus
+from bibleit_ingest.types import BookCorpus, Passage
 from rag_core.embedders import BaseEmbedder
 
 
@@ -27,24 +27,20 @@ class MockEmbedder(BaseEmbedder):
 
 
 def test_static_artifact_sink(tmp_path: Path) -> None:
-    ordered_verses = [
-        (("GEN", 1, 1), "In the beginning"),
-        (("GEN", 1, 2), "The earth was formless"),
-    ]
-    address_index = {("GEN", 1, 1): 0, ("GEN", 1, 2): 1}
-    corpus = PreparedCorpus(
-        pericopes=[],
-        ordered_verses=ordered_verses,
-        address_index=address_index,
-    )
+    corpus = BookCorpus({
+        "GEN": {
+            1: {
+                1: "In the beginning",
+                2: "The earth was formless",
+            }
+        }
+    })
     chunks = [
         Passage(
             book="GEN",
             start=(1, 1),
             end=(1, 2),
-            start_idx=0,
-            end_idx=2,
-            headings=("Creation",),
+            headings=((1, 1, "Creation"),),
         )
     ]
     embeddings = np.array([[0.5, -0.5, 0.25, 1.0]], dtype=np.float32)
@@ -63,7 +59,7 @@ def test_static_artifact_sink(tmp_path: Path) -> None:
     manifest_path = tmp_path / "manifest.json"
     assert manifest_path.exists()
     manifest = json.loads(manifest_path.read_text())
-    assert manifest["schema_version"] == 2
+    assert manifest["schema_version"] == 3
     assert manifest["translation"]["id"] == "web"
     assert manifest["corpus"]["count"] == 2
     assert manifest["embeddings"]["model"] == "test-embedder-v1"
@@ -71,16 +67,16 @@ def test_static_artifact_sink(tmp_path: Path) -> None:
     assert manifest["embeddings"]["count"] == 1
     assert manifest["embeddings"]["quantization"]["type"] == "int8"
 
-    # Verify verses.json.gz
+    # Verify verses.json.gz (dense/sparse array schema)
     verses_path = tmp_path / "verses.json.gz"
     assert verses_path.exists()
     with gzip.open(verses_path, "rt", encoding="utf-8") as f:
         verses_data = json.load(f)
-    assert len(verses_data) == 2
-    assert verses_data[0]["book"] == "GEN"
-    assert verses_data[0]["text"] == "In the beginning"
+    assert "GEN" in verses_data
+    assert verses_data["GEN"][0][0] == "In the beginning"
+    assert verses_data["GEN"][0][1] == "The earth was formless"
 
-    # Verify chunks.json.gz
+    # Verify chunks.json.gz (zero-text coordinate spans)
     chunks_path = tmp_path / "chunks.json.gz"
     assert chunks_path.exists()
     with gzip.open(chunks_path, "rt", encoding="utf-8") as f:
@@ -90,7 +86,7 @@ def test_static_artifact_sink(tmp_path: Path) -> None:
     assert chunks_data[0]["start"] == [1, 1]
     assert chunks_data[0]["end"] == [1, 2]
     assert chunks_data[0]["headings"] == [[1, 1, "Creation"]]
-    assert "In the beginning" in chunks_data[0]["text"]
+    assert "text" not in chunks_data[0]
 
     # Verify binary embeddings and scales
     emb_path = tmp_path / "embeddings.i8.bin"

@@ -16,14 +16,14 @@ class AnalysisJobCorpusProfile(AnalysisJobBase):
     path_config_keys = ("web_path", "bsb_dir")
 
     def on_prepare(self) -> dict:
-        corpus = get_or_prepare_corpus(self.web_path, self.bsb_dir)
+        corpus, pericopes = get_or_prepare_corpus(self.web_path, self.bsb_dir)
         tok_model_name = self.config.get("tokenizer_model", "nomic-ai/nomic-embed-text-v1.5")
         embedder = Embedder(model_name=tok_model_name, cache_dir=str(FASTEMBED_CACHE_DIR))
-        return {"corpus": corpus, "tokenizer": embedder.model.tokenizer}
+        return {"corpus": corpus, "pericopes": pericopes, "tokenizer": embedder.model.tokenizer}
 
     def on_execute(self, prepared: dict) -> dict[str, Any]:
         limit = int(self.config.get("token_limit", 512))
-        return profile_corpus(prepared["corpus"], prepared["tokenizer"], token_limit=limit)
+        return profile_corpus(prepared["corpus"], prepared["pericopes"], prepared["tokenizer"], token_limit=limit)
 
     def on_finalize(self, prepared: dict, result: dict[str, Any]) -> None:
         token_limit = int(self.config.get("token_limit", 512))

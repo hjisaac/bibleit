@@ -27,12 +27,9 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    corpus = get_or_prepare_corpus(WEB_PATH, BSB_DIR)
-    chunker = AdaptiveWindowChunker(
-        ordered_verses=corpus.ordered_verses,
-        address_index=corpus.address_index,
-    )
-    chunks = chunker.chunk(corpus.pericopes)
+    corpus, pericopes = get_or_prepare_corpus(WEB_PATH, BSB_DIR)
+    chunker = AdaptiveWindowChunker(corpus=corpus)
+    chunks = chunker.chunk(pericopes, corpus=corpus)
     logger.info("chunking the whole Bible: %d chunks", len(chunks))
 
     with Timer(
@@ -44,7 +41,7 @@ def main():
         )
 
     # Generator, not a list: text isn't rendered until the embedder asks.
-    renderer = HeadingAndTextRenderer(corpus.ordered_verses, corpus.address_index)
+    renderer = HeadingAndTextRenderer(corpus=corpus)
     texts = (renderer.render(c) for c in chunks)
     embeddings = embedder.embed_documents(texts)
 
@@ -68,11 +65,11 @@ def main():
             embeddings_npy[i] = embedding
             metadata.append(
                 {
+                    "id": i,
                     "book": chunk.book,
-                    "chapter": chunk.chapter,
-                    "verse": chunk.verse,
-                    "headings": list(chunk.headings),
-                    "verse_count": chunk.verse_count,
+                    "start": list(chunk.start),
+                    "end": list(chunk.end),
+                    "headings": [list(h) for h in chunk.headings],
                 }
             )
     embeddings_npy.flush()

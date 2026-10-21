@@ -37,7 +37,10 @@ class AnalysisJobBase(AbstractJob):
 
     def on_track(self) -> None:
         logger.info("Using config:\n%s", json.dumps(self.config, indent=2, default=str))
-        self.tracker = WBTracker(run_name=getattr(self, "run_name", self.run_id), project=self.project_name, config=self.config)
+        if self.config.get("track", True) and os.environ.get("WANDB_MODE") != "disabled":
+            self.tracker = WBTracker(run_name=getattr(self, "run_name", self.run_id), project=self.project_name, config=self.config)
+        else:
+            self.tracker = None
 
     def on_finalize(self, prepared: dict, result: dict[str, Any]) -> None:
         metrics = result.get("metrics", {})

@@ -10,10 +10,11 @@ import type {
   Manifest,
   NarrationSegment,
   NarrationState,
+  RawChunk,
   RefRange,
   RetrievalResult,
   ScoredPassage,
-  Verse,
+  VerseCorpusData,
 } from './types';
 
 /**
@@ -41,8 +42,8 @@ export interface SearchEngine {
 export interface ArtifactStore {
   /** Resolve the manifest (network-or-cache); single source of truth for versions. */
   manifest(): Promise<Manifest>;
-  verses(): Promise<Verse[]>;
-  chunks(): Promise<Chunk[]>;
+  verses(): Promise<VerseCorpusData>;
+  chunks(): Promise<RawChunk[]>;
   /** Raw embedding matrix as stored (quantized); interpretation is VectorIndex's job. */
   embeddings(): Promise<{ data: ArrayBuffer; scales?: ArrayBuffer }>;
   /** Drop local copies (settings → "free up space" / recover from corruption). */

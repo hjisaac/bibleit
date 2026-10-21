@@ -1,69 +1,32 @@
 from dataclasses import dataclass
-from typing import Any, NamedTuple, Sequence
+from typing import Sequence
 
-VerseAddress = tuple[str, int, int]  # (book, chapter, verse)
 Coordinate = tuple[int, int]  # (chapter, verse)
+VerseAddress = tuple[str, int, int]  # (book, chapter, verse)
+HeadingItem = tuple[int, int, str]  # (chapter, verse, heading_text)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Verse:
     book: str
-    start: tuple[int, int]
+    chapter: int
+    verse: int
     text: str
 
-    def __init__(
-        self,
-        book: str,
-        start: tuple[int, int] | Sequence[int] | None = None,
-        text: str = "",
-        chapter: int | None = None,
-        verse: int | None = None,
-    ):
-        if start is None:
-            if chapter is None or verse is None:
-                raise ValueError("Verse requires start=(chapter, verse) or both chapter and verse")
-            start = (chapter, verse)
-        object.__setattr__(self, "book", book)
-        object.__setattr__(self, "start", tuple(start))
-        object.__setattr__(self, "text", text)
-
     @property
-    def chapter(self) -> int:
-        return self.start[0]
-
-    @property
-    def verse(self) -> int:
-        return self.start[1]
+    def coordinate(self) -> Coordinate:
+        return (self.chapter, self.verse)
 
     @property
     def address(self) -> VerseAddress:
-        return (self.book, self.start[0], self.start[1])
+        return (self.book, self.chapter, self.verse)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Pericope:
     book: str
-    start: tuple[int, int]
+    start: Coordinate
     heading: str
-    verse_count: int
-
-    def __init__(
-        self,
-        book: str,
-        start: tuple[int, int] | Sequence[int] | None = None,
-        heading: str = "",
-        verse_count: int = 0,
-        chapter: int | None = None,
-        verse: int | None = None,
-    ):
-        if start is None:
-            if chapter is None or verse is None:
-                raise ValueError("Pericope requires start=(chapter, verse) or both chapter and verse")
-            start = (chapter, verse)
-        object.__setattr__(self, "book", book)
-        object.__setattr__(self, "start", tuple(start))
-        object.__setattr__(self, "heading", heading)
-        object.__setattr__(self, "verse_count", verse_count)
 
     @property
     def chapter(self) -> int:
@@ -74,62 +37,20 @@ class Pericope:
         return self.start[1]
 
     @property
+    def coordinate(self) -> Coordinate:
+        return self.start
+
+    @property
     def address(self) -> VerseAddress:
         return (self.book, self.start[0], self.start[1])
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Passage:
     book: str
-    start: tuple[int, int] = (0, 0)
-    end: tuple[int, int] = (0, 0)
-    start_idx: int = 0
-    end_idx: int = 0
-    sections: tuple[tuple[int, str | None], ...] = ()
-    headings: tuple[str, ...] = ()
-
-    def __init__(
-        self,
-        book: str,
-        start: tuple[int, int] | Sequence[int] | None = None,
-        end: tuple[int, int] | Sequence[int] | None = None,
-        start_idx: int = 0,
-        end_idx: int = 0,
-        sections: tuple[tuple[int, str | None], ...] = (),
-        headings: tuple[str, ...] = (),
-        start_address: VerseAddress | None = None,
-        end_address: VerseAddress | None = None,
-    ):
-        if start is None:
-            if start_address is not None:
-                start = (start_address[1], start_address[2])
-            else:
-                start = (0, 0)
-        if end is None:
-            if end_address is not None:
-                end = (end_address[1], end_address[2])
-            else:
-                end = tuple(start)
-
-        object.__setattr__(self, "book", book)
-        object.__setattr__(self, "start", tuple(start))
-        object.__setattr__(self, "end", tuple(end))
-        object.__setattr__(self, "start_idx", start_idx)
-        object.__setattr__(self, "end_idx", end_idx)
-
-        sec_tuple = tuple(sections)
-        head_tuple = tuple(headings)
-        if not sec_tuple and head_tuple:
-            sec_tuple = tuple((start_idx, h) for h in head_tuple)
-        elif not head_tuple and sec_tuple:
-            head_tuple = tuple(dict.fromkeys(h for _, h in sec_tuple if h))
-
-        object.__setattr__(self, "sections", sec_tuple)
-        object.__setattr__(self, "headings", head_tuple)
-
-    @property
-    def verse_count(self) -> int:
-        return self.end_idx - self.start_idx
+    start: Coordinate
+    end: Coordinate
+    headings: tuple[HeadingItem, ...] = ()
 
     @property
     def chapter(self) -> int:
@@ -147,33 +68,101 @@ class Passage:
     def end_address(self) -> VerseAddress:
         return (self.book, self.end[0], self.end[1])
 
-    def get_headings_meta(self, ordered_verses: Sequence[tuple[VerseAddress, str]] | None = None) -> list[list[Any]]:
-        """Returns [[chapter, verse, heading], ...] for genuine topical section headings."""
-        meta: list[list[Any]] = []
-        seen = set()
-        for sec_idx, sec_heading in self.sections:
-            if not sec_heading or sec_heading == self.book:
-                continue
-            addr = ordered_verses[sec_idx][0] if (ordered_verses and sec_idx < len(ordered_verses)) else None
-            ch = addr[1] if addr else self.start[0]
-            v = addr[2] if addr else self.start[1]
-            key = (ch, v, sec_heading)
-            if key not in seen:
-                seen.add(key)
-                meta.append([ch, v, sec_heading])
-        return meta
+    def __contains__(self, item: Coordinate | Verse | VerseAddress) -> bool:
+        """Determines if a verse or coordinate falls within this passage span."""
+        if isinstance(item, Verse):
+            return item.book == self.book and self.start <= item.coordinate <= self.end
+        if isinstance(item, tuple):
+            if len(item) == 2:
+                return self.start <= item <= self.end
+            if len(item) == 3:
+                return item[0] == self.book and self.start <= (item[1], item[2]) <= self.end
+        return False
+
+    @classmethod
+    def from_verses(
+        cls,
+        verses: Sequence[Verse],
+        headings: Sequence[HeadingItem] = (),
+    ) -> "Passage":
+        if not verses:
+            raise ValueError("Passage cannot be empty")
+        first, last = verses[0], verses[-1]
+        if first.book != last.book:
+            raise ValueError(f"Passage cannot cross books: {first.book} != {last.book}")
+        return cls(
+            book=first.book,
+            start=first.coordinate,
+            end=last.coordinate,
+            headings=tuple(headings),
+        )
 
 
 Chunk = Passage
 
 
-@dataclass(frozen=True)
-class VerseEvent:
-    address: VerseAddress
-    heading: str | None = None
+class BookCorpus:
+    """In-memory book-by-book scripture store supporting O(1) coordinate lookups."""
 
+    def __init__(self, books: dict[str, list[Verse]] | dict[str, dict[int, dict[int, str]]]):
+        if books and isinstance(next(iter(books.values())), dict):
+            # Dict of chapters {ch: {v: text}}
+            converted: dict[str, list[Verse]] = {}
+            for b_id, ch_map in books.items():  # type: ignore
+                v_list = []
+                for ch, v_map in ch_map.items():
+                    for v_num, txt in v_map.items():
+                        v_list.append(Verse(book=b_id, chapter=ch, verse=v_num, text=txt))
+                converted[b_id] = sorted(v_list, key=lambda x: x.coordinate)
+            self._books = converted
+        else:
+            self._books = books  # type: ignore
 
-class PreparedCorpus(NamedTuple):
-    pericopes: list[Pericope]
-    ordered_verses: list[tuple[VerseAddress, str]]
-    address_index: dict[VerseAddress, int]
+        self._index: dict[str, dict[int, dict[int, Verse]]] = {}
+        for book_id, verses in self._books.items():
+            b_dict: dict[int, dict[int, Verse]] = {}
+            for v in verses:
+                b_dict.setdefault(v.chapter, {})[v.verse] = v
+            self._index[book_id] = b_dict
+
+    def get_verse(self, book: str, chapter: int, verse: int) -> Verse | None:
+        return self._index.get(book, {}).get(chapter, {}).get(verse)
+
+    def get(self, book: str, chapter: int, verse: int) -> Verse | None:
+        return self.get_verse(book, chapter, verse)
+
+    def get_book(self, book: str) -> list[Verse]:
+        return self._books.get(book, [])
+
+    def __contains__(self, item: VerseAddress | tuple[str, int, int]) -> bool:
+        if isinstance(item, tuple) and len(item) == 3:
+            return bool(self.get_verse(item[0], item[1], item[2]))
+        return False
+
+    def get_range(self, book: str, start: Coordinate, end: Coordinate) -> list[Verse]:
+        book_verses = self._books.get(book, [])
+        return [v for v in book_verses if start <= v.coordinate <= end]
+
+    @property
+    def books(self) -> dict[str, list[Verse]]:
+        return self._books
+
+    def all_verses(self) -> list[Verse]:
+        return [v for b_verses in self._books.values() for v in b_verses]
+
+    def to_dict(self) -> dict[str, list[list[str]]]:
+        """Serializes corpus to { [book]: string[][] } with sparse verse alignment."""
+        payload: dict[str, list[list[str]]] = {}
+        for book, ch_map in self._index.items():
+            max_ch = max(ch_map.keys()) if ch_map else 0
+            book_arr: list[list[str]] = []
+            for ch in range(1, max_ch + 1):
+                verses_in_ch = ch_map.get(ch, {})
+                max_v = max(verses_in_ch.keys()) if verses_in_ch else 0
+                ch_arr: list[str] = [
+                    verses_in_ch[v].text if v in verses_in_ch else ""
+                    for v in range(1, max_v + 1)
+                ]
+                book_arr.append(ch_arr)
+            payload[book] = book_arr
+        return payload

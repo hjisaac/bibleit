@@ -22,3 +22,4 @@ tag: null
 # Paths relative to REPO
 web_path: "ingest/data/translations/web/en/web.json"
 bsb_dir: "ingest/data/translations/bsb/en"
+track: true

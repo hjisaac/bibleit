@@ -11,6 +11,7 @@ from bibleit_ingest.report import (
     format_rank_label,
     generate_retrieval_report,
 )
+from bibleit_ingest.types import BookCorpus
 
 
 def test_details_block_rendering() -> None:
@@ -148,18 +149,24 @@ def test_missing_renderer_raises() -> None:
 
 
 def test_format_passage_citation() -> None:
-    ordered_verses = [
-        (("GEN", 1, 1), "In the beginning,"),
-        (("GEN", 1, 2), "the earth was formless,"),
-        (("GEN", 2, 1), "Thus the heavens were finished,"),
-    ]
+    corpus = BookCorpus({
+        "GEN": {
+            1: {
+                1: "In the beginning,",
+                2: "the earth was formless,",
+            },
+            2: {
+                1: "Thus the heavens were finished,",
+            },
+        }
+    })
 
-    p_same_chapter = Passage(book="GEN", start=(1, 1), end=(1, 2), start_idx=0, end_idx=2, headings=("Creation",))
-    hdr, txt = format_passage(p_same_chapter, ordered_verses)
+    p_same_chapter = Passage(book="GEN", start=(1, 1), end=(1, 2), headings=((1, 1, "Creation"),))
+    hdr, txt = format_passage(p_same_chapter, corpus)
     assert hdr == "[GEN 1:1–2] — Creation"
     assert txt == "In the beginning, the earth was formless,"
 
-    p_cross_chapter = Passage(book="GEN", start=(1, 1), end=(2, 1), start_idx=0, end_idx=3, headings=())
-    hdr2, txt2 = format_passage(p_cross_chapter, ordered_verses)
+    p_cross_chapter = Passage(book="GEN", start=(1, 1), end=(2, 1), headings=())
+    hdr2, txt2 = format_passage(p_cross_chapter, corpus)
     assert hdr2 == "[GEN 1:1–2:1]"
     assert "Thus the heavens were finished," in txt2

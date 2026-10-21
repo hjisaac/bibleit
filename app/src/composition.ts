@@ -13,7 +13,8 @@ import type {
   SearchEngine,
   VectorIndex,
 } from './core/ports';
-import type { RetrievalResult } from './core/types';
+import { ArrayVerseStore } from './adapters/array-verse-store';
+import type { Chunk, RetrievalResult, VerseStore } from './core/types';
 
 // v1 adapters (each is one file in src/adapters/ — see design/architecture.md
 // for the swap path of every port):
@@ -33,6 +34,7 @@ interface Ports {
   vectors: VectorIndex;
   ranker: Ranker;
   answers: AnswerProvider;
+  verseStore?: VerseStore;
 }
 
 /**
@@ -53,11 +55,19 @@ export function buildLocalEngine(p: Ports): SearchEngine {
       );
     }
 
-    const [, chunks, emb] = await Promise.all([
+    const verseStore = p.verseStore ?? new ArrayVerseStore();
+    const [versesData, rawChunks, emb] = await Promise.all([
       p.store.verses(),
       p.store.chunks(),
       p.store.embeddings(),
     ]);
+    verseStore.init(versesData);
+
+    const chunks: Chunk[] = rawChunks.map((c) => ({
+      ...c,
+      text: verseStore.getRange(c.book, c.start, c.end),
+    }));
+
     await Promise.all([
       p.lexical.build(chunks),
       p.vectors.build(manifest, emb.data, emb.scales),

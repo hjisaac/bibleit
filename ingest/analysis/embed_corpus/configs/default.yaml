@@ -21,3 +21,4 @@ chunk_run_dir: null
 # Corpus path inputs
 web_path: "ingest/data/translations/web/en/web.json"
 bsb_dir: "ingest/data/translations/bsb/en"
+track: true

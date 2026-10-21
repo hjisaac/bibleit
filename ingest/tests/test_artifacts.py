@@ -71,3 +71,24 @@ def test_resolve_matching_artifacts(tmp_path: Path) -> None:
 
     # Non-existent criteria
     assert resolve_matching_artifacts(tmp_path, {"floor": 99}) is None
+
+
+def test_resolve_matching_artifacts_ignores_pre_sweep(tmp_path: Path) -> None:
+    legacy_dir = tmp_path / "2026-Oct-06_21-26-19-859-f82212_f5_c30_o1"
+    write_lock_file(
+        legacy_dir / "config.lock.yaml",
+        {"parameters": {"ceiling": 30, "overlap": 1}},
+    )
+    early_oct15 = tmp_path / "2026-10-15_110420_805C_tok_c256_o0_heading"
+    write_lock_file(
+        early_oct15 / "config.lock.yaml",
+        {"parameters": {"ceiling": 30, "overlap": 1}},
+    )
+    sweep_dir = tmp_path / "2026-10-15_112202_9291_tok_c256_o0_heading"
+    write_lock_file(
+        sweep_dir / "config.lock.yaml",
+        {"parameters": {"ceiling": 30, "overlap": 1}},
+    )
+    matched = resolve_matching_artifacts(tmp_path, {"ceiling": 30, "overlap": 1})
+    assert matched == sweep_dir
+

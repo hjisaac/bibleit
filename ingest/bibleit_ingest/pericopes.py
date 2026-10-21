@@ -2,33 +2,24 @@ import json
 from pathlib import Path
 from typing import Sequence
 
-from .chunking import (
-    index_verses_by_address,
-    load_pericopes,
-)
 from .constants import BSB_DIR, BSB_PERICOPES_PATH, USFM_ORDER
-from .types import Pericope, PreparedCorpus, VerseAddress
-from .walkers import (
-    BsbPericopeWalker,
-    WebCorpusWalker,
-)
+from .types import BookCorpus, Pericope
+from .walkers import BsbPericopeWalker, WebCorpusWalker
 
 
 def derive_bsb_pericopes(bsb_dir: Path) -> list[Pericope]:
-    """Computes pericope spans within BSB's own versification in canonical order."""
+    """Computes pericopes within BSB in canonical order."""
     return BsbPericopeWalker(bsb_dir).walk()
 
 
 def save_pericopes(pericopes: Sequence[Pericope], path: Path) -> None:
-    """Caches derived pericopes so they don't need re-walking every time --
-    regenerable from source, not a hidden dependency."""
+    """Caches derived pericopes to JSON."""
     payload = {
         "pericopes": [
             {
                 "book": p.book,
                 "start": list(p.start),
                 "heading": p.heading,
-                "verse_count": p.verse_count,
             }
             for p in pericopes
         ]
@@ -37,69 +28,49 @@ def save_pericopes(pericopes: Sequence[Pericope], path: Path) -> None:
     path.write_text(json.dumps(payload, indent=2))
 
 
+def load_pericopes(path: Path) -> list[Pericope]:
+    """Loads cached pericopes from JSON."""
+    data = json.loads(path.read_text())
+    pericopes = []
+    for p in data["pericopes"]:
+        start = tuple(p["start"]) if "start" in p else (int(p["chapter"]), int(p["verse"]))
+        pericopes.append(
+            Pericope(
+                book=p["book"],
+                start=start,
+                heading=p["heading"],
+            )
+        )
+    return pericopes
+
+
 def save_book_order(path: Path) -> None:
-    """Saves the canonical 66-book order as its own file -- static, not
-    derived from any translation's data."""
+    """Saves the canonical 66-book order as its own file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"book_order": USFM_ORDER}, indent=2))
 
 
-def project_pericopes(
-    bsb_pericopes: Sequence[Pericope],
-    ordered_verses: Sequence[tuple[VerseAddress, str]],
-) -> tuple[list[Pericope], list[Pericope]]:
-    """Resolves BSB-native pericope boundaries onto target translation verses."""
-    addr_index = {addr: i for i, (addr, _) in enumerate(ordered_verses)}
-    book_ends = {addr[0]: i + 1 for i, (addr, _) in enumerate(ordered_verses)}
-
-    resolved: list[Pericope] = []
-    unresolved: list[Pericope] = []
-
-    for i, p in enumerate(bsb_pericopes):
-        start = addr_index.get((p.book, p.chapter, p.verse))
-        if start is None:
-            unresolved.append(p)
-            continue
-
-        end = book_ends.get(p.book, start)
-        for nxt in bsb_pericopes[i + 1 :]:
-            if nxt.book != p.book:
-                break
-            nxt_start = addr_index.get((nxt.book, nxt.chapter, nxt.verse))
-            if nxt_start is not None:
-                end = nxt_start
-                break
-
-        resolved.append(
-            Pericope(
-                book=p.book,
-                start=p.start,
-                heading=p.heading,
-                verse_count=end - start,
-            )
-        )
-
-    return resolved, unresolved
+def group_pericopes_by_book(pericopes: Sequence[Pericope]) -> dict[str, list[Pericope]]:
+    """Groups a sequence of pericopes into a book-keyed dictionary."""
+    grouped: dict[str, list[Pericope]] = {}
+    for p in pericopes:
+        grouped.setdefault(p.book, []).append(p)
+    return grouped
 
 
 def get_or_prepare_corpus(
     web_path: Path,
     bsb_dir: Path | None = None,
     bsb_pericopes_path: Path | None = BSB_PERICOPES_PATH,
-) -> PreparedCorpus:
-    """Prepares and projects pericopes onto target verses, returning the full corpus context."""
-    ordered_verses = WebCorpusWalker(web_path).walk()
-    address_index = index_verses_by_address(ordered_verses)
+) -> tuple[BookCorpus, list[Pericope]]:
+    """Loads the target BookCorpus and BSB pericopes."""
+    corpus = WebCorpusWalker(web_path).load_corpus()
 
     if bsb_pericopes_path and bsb_pericopes_path.exists():
-        bsb_native = load_pericopes(bsb_pericopes_path)
+        pericopes = load_pericopes(bsb_pericopes_path)
     else:
-        bsb_native = derive_bsb_pericopes(bsb_dir or BSB_DIR)
+        pericopes = derive_bsb_pericopes(bsb_dir or BSB_DIR)
+        if bsb_pericopes_path:
+            save_pericopes(pericopes, bsb_pericopes_path)
 
-    resolved, _ = project_pericopes(bsb_native, ordered_verses)
-    return PreparedCorpus(
-        pericopes=resolved,
-        ordered_verses=ordered_verses,
-        address_index=address_index,
-    )
-
+    return corpus, pericopes
