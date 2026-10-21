@@ -1,7 +1,10 @@
 from enum import StrEnum
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 REPO = Path(__file__).resolve().parent.parent.parent
+load_dotenv(REPO / "ingest/.env")
 
 WEB_PATH = REPO / "ingest/data/translations/web/en/web.json"
 BSB_DIR = REPO / "ingest/data/translations/bsb/en"

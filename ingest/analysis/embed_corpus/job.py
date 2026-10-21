@@ -58,91 +58,62 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
         return f"f{f}_c{c}_{model_short}"
 
     def on_prepare(self) -> dict:
-        corpus = get_or_prepare_corpus(self.web_path, self.bsb_dir)
+        corpus, pericopes = get_or_prepare_corpus(self.web_path, self.bsb_dir)
 
         # 1. Resolve chunks: check explicit dir, or auto-match upstream chunk lock, or generate
-        floor = int(self.config["floor"])
+        floor = self.config.get("floor")
         ceiling = int(self.config["ceiling"])
         overlap = int(self.config.get("overlap", 0))
         render_strategy = self.config.get("render_strategy", "heading_and_text")
 
+        # chunk_dir_override: Optional path supplied in config to bypass search and use an explicit chunk artifact.
         chunk_dir_override = self.config.get("chunk_run_dir")
-        chunk_run_dir = Path(chunk_dir_override) if chunk_dir_override else None
+        if chunk_dir_override:
+            chunk_run_dir = Path(chunk_dir_override)
+            if not chunk_run_dir.exists():
+                raise FileNotFoundError(f"Specified chunk_run_dir does not exist: {chunk_dir_override}")
+        else:
+            chunk_run_dir = None
 
         if "strategy" not in self.config:
             raise KeyError("Missing required 'strategy' parameter in embed_corpus configuration")
         strategy_name = str(self.config["strategy"])
+
+        # chunk_outputs: Directory holding upstream chunk runs to search across.
+        # chunk_criteria: Hyperparameter filters that upstream config.lock.yaml must match exactly.
+        chunk_outputs = REPO / "ingest" / "analysis" / "chunking_strategy" / "outputs"
+        chunk_criteria: dict[str, Any] = {
+            "strategy": strategy_name,
+            "ceiling": ceiling,
+            "overlap": overlap,
+            "render_strategy": render_strategy,
+        }
+        if strategy_name == "adaptive" and floor is not None:
+            chunk_criteria["floor"] = int(floor)
+        if "include_overlap_heading" in self.config:
+            chunk_criteria["include_overlap_heading"] = bool(self.config["include_overlap_heading"])
+
         if not chunk_run_dir:
-            chunk_outputs = REPO / "ingest" / "analysis" / "chunking_strategy" / "outputs"
-            chunk_criteria = {
-                "strategy": strategy_name,
-                "ceiling": ceiling,
-                "overlap": overlap,
-            }
-            if strategy_name == "adaptive":
-                chunk_criteria["floor"] = floor
-            if "include_overlap_heading" in self.config:
-                chunk_criteria["include_overlap_heading"] = bool(self.config["include_overlap_heading"])
             chunk_run_dir = resolve_matching_artifacts(chunk_outputs, chunk_criteria)
 
-        chunks: list[Passage]
+        if not chunk_run_dir or not (chunk_run_dir / "chunks.json").exists():
+            target_desc = f"{chunk_run_dir}" if chunk_run_dir else f"{chunk_outputs} for criteria: {chunk_criteria}"
+            raise FileNotFoundError(f"No matching chunk artifact (chunks.json) found in {target_desc}")
+
+        logger.info("Found matching upstream chunk artifact at %s", chunk_run_dir)
         upstream_lock_meta: dict[str, Any] = {}
-        if chunk_run_dir and (chunk_run_dir / "chunks.json").exists():
-            logger.info("Found matching upstream chunk artifact at %s", chunk_run_dir)
-            if (chunk_run_dir / "config.lock.yaml").exists():
-                upstream_lock_meta = read_lock_file(chunk_run_dir / "config.lock.yaml")
-            raw_meta = json.loads((chunk_run_dir / "chunks.json").read_text(encoding="utf-8"))
-            chunks = []
-            for item in raw_meta:
-                book = item["book"]
-                if "start" in item:
-                    ch_s, v_s = item["start"]
-                    ch_e, v_e = item["end"]
-                elif "start_addr" in item:
-                    ch_s, v_s = item["start_addr"]
-                    ch_e, v_e = item["end_addr"]
-                else:
-                    ch_s, v_s = item["chapter"], item["verse"]
-                    ch_e, v_e = ch_s, v_s + item["verse_count"] - 1
-
-                start_idx = corpus.address_index[(book, ch_s, v_s)]
-                end_idx = start_idx + item["verse_count"]
-
-                sections = []
-                headings_raw = item.get("headings", [])
-                if headings_raw and isinstance(headings_raw[0], (list, tuple)):
-                    for ch, v, h in headings_raw:
-                        sec_idx = corpus.address_index.get((book, ch, v), start_idx)
-                        sections.append((sec_idx, h))
-                elif "sections" in item:
-                    for s in item["sections"]:
-                        sec_idx = corpus.address_index.get((book, s["chapter"], s["verse"]), start_idx)
-                        sections.append((sec_idx, s["heading"]))
-                elif headings_raw and isinstance(headings_raw[0], str):
-                    sections = [(start_idx, h) for h in headings_raw]
-
-                end_addr = corpus.ordered_verses[end_idx - 1][0] if end_idx > start_idx else (book, ch_e, v_e)
-                chunks.append(
-                    Passage(
-                        book=book,
-                        start=(ch_s, v_s),
-                        end=(end_addr[1], end_addr[2]),
-                        start_idx=start_idx,
-                        end_idx=end_idx,
-                        sections=tuple(sections),
-                    )
-                )
-        else:
-            logger.info("No matching chunk artifact found; generating chunks in-line with strategy '%s'.", strategy_name)
-            chunk_cfg = dict(self.config)
-            chunk_cfg.pop("strategy", None)
-            chunker = get_chunker(
-                strategy_name,
-                ordered_verses=corpus.ordered_verses,
-                address_index=corpus.address_index,
-                **chunk_cfg,
+        if (chunk_run_dir / "config.lock.yaml").exists():
+            upstream_lock_meta = read_lock_file(chunk_run_dir / "config.lock.yaml")
+        raw_meta = json.loads((chunk_run_dir / "chunks.json").read_text(encoding="utf-8"))
+        chunks = [
+            Passage(
+                book=item["book"],
+                start=(item["start"][0], item["start"][1]),
+                end=(item["end"][0], item["end"][1]),
+                headings=tuple((int(ch), int(v), str(h)) for ch, v, h in item.get("headings", [])),
             )
-            chunks = chunker.chunk(corpus.pericopes)
+            for item in raw_meta
+        ]
 
         # 2. Prepare Embedder
         embedding_model = str(self.config["embedding_model"])
@@ -155,7 +126,7 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
 
         return {
             "chunks": chunks,
-            "ordered_verses": corpus.ordered_verses,
+            "corpus": corpus,
             "render_strategy": render_strategy,
             "embedder": embedder,
             "upstream_lock": upstream_lock_meta,
@@ -167,7 +138,7 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
         embedder = prepared["embedder"]
         batch_size = int(self.config.get("batch_size", 16))
 
-        renderer = get_renderer(render_strategy, ordered_verses=prepared["ordered_verses"])
+        renderer = get_renderer(render_strategy, corpus=prepared["corpus"])
         texts = [renderer.render(c) for c in chunks]
         total = len(chunks)
 
@@ -202,37 +173,36 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
         np.save(npy_path, result["embeddings"])
 
         # 2. Save chunks metadata
-        ordered_verses = prepared.get("ordered_verses", ())
-        chunks_meta = []
-        for c in result["chunks"]:
-            headings_meta = []
-            for sec_idx, sec_heading in c.sections:
-                if sec_heading:
-                    addr = ordered_verses[sec_idx][0] if ordered_verses and sec_idx < len(ordered_verses) else None
-                    ch = addr[1] if addr else c.chapter
-                    v = addr[2] if addr else c.verse
-                    headings_meta.append([ch, v, sec_heading])
-            chunks_meta.append({
+        chunks_meta = [
+            {
+                "id": idx,
                 "book": c.book,
-                "start": c.start,
-                "end": c.end,
-                "verse_count": c.verse_count,
-                "headings": headings_meta,
-            })
+                "start": list(c.start),
+                "end": list(c.end),
+                "headings": [list(h) for h in c.headings],
+            }
+            for idx, c in enumerate(result["chunks"])
+        ]
         chunks_path = self.run_dir / "chunks.json"
         chunks_path.write_text(json.dumps(chunks_meta, indent=2), encoding="utf-8")
 
         # 3. Save read-only lock file
         matrix = result["embeddings"]
+        params = {
+            "strategy": str(self.config["strategy"]),
+            "ceiling": int(self.config["ceiling"]),
+            "overlap": int(self.config.get("overlap", 0)),
+            "render_strategy": self.config.get("render_strategy", "heading_and_text"),
+            "embedding_model": str(self.config["embedding_model"]),
+        }
+        if str(self.config["strategy"]) == "adaptive" and "floor" in self.config:
+            params["floor"] = int(self.config["floor"])
+        if "include_overlap_heading" in self.config:
+            params["include_overlap_heading"] = bool(self.config["include_overlap_heading"])
+
         lock_data = {
             "stage": "embedding",
-            "parameters": {
-                "floor": int(self.config["floor"]),
-                "ceiling": int(self.config["ceiling"]),
-                "overlap": int(self.config.get("overlap", 0)),
-                "render_strategy": self.config.get("render_strategy", "heading_and_text"),
-                "embedding_model": str(self.config["embedding_model"]),
-            },
+            "parameters": params,
             "output": {
                 "shape": list(matrix.shape),
                 "dtype": str(matrix.dtype),

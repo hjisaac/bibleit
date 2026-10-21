@@ -69,5 +69,9 @@ def test_resolve_matching_artifacts(tmp_path: Path) -> None:
     )
     assert matched1 == run_dir1
 
-    # Non-existent criteria
+    # Non-existent criteria value
     assert resolve_matching_artifacts(tmp_path, {"floor": 99}) is None
+
+    # Criterion key not present in lock file
+    assert resolve_matching_artifacts(tmp_path, {"nonexistent_key": "val"}) is None
+

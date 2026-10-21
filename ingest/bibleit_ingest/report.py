@@ -5,7 +5,7 @@ from typing import Any
 
 import snakemd
 
-from bibleit_ingest.chunking import Passage, VerseAddress
+from bibleit_ingest.types import BookCorpus, Passage, VerseAddress
 
 ChunkRenderer = Callable[[int], tuple[str, str]]
 
@@ -24,18 +24,14 @@ def format_rank_label(rank: int) -> str:
     return f"{prefix}Rank {rank}"
 
 
-def format_passage(chunk: Passage, ordered_verses: Sequence[tuple[VerseAddress, str]]) -> tuple[str, str]:
+def format_passage(chunk: Passage, corpus: BookCorpus) -> tuple[str, str]:
     """Returns (citation_header, text_body) for a passage."""
-    start_v = ordered_verses[chunk.start_idx][0]
-    end_v = ordered_verses[chunk.end_idx - 1][0]
-    if start_v[1] == end_v[1]:
-        citation = f"{chunk.book} {start_v[1]}:{start_v[2]}–{end_v[2]}"
-    else:
-        citation = f"{chunk.book} {start_v[1]}:{start_v[2]}–{end_v[1]}:{end_v[2]}"
-
-    heading_part = f" — {chunk.headings[0]}" if chunk.headings else ""
-    header = f"[{citation}]{heading_part}"
-    text = " ".join(ordered_verses[k][1] for k in range(chunk.start_idx, chunk.end_idx))
+    s_ch, s_v = chunk.start
+    e_ch, e_v = chunk.end
+    span = f"{s_ch}:{s_v}–{e_ch}:{e_v}" if s_ch != e_ch else (f"{s_ch}:{s_v}–{e_v}" if s_v != e_v else f"{s_ch}:{s_v}")
+    heading_part = f" — {chunk.headings[0][2]}" if chunk.headings else ""
+    header = f"[{chunk.book} {span}]{heading_part}"
+    text = " ".join(v.text for v in corpus.get_range(chunk.book, chunk.start, chunk.end))
     return header, text
 
 

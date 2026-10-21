@@ -1,26 +1,38 @@
+from dataclasses import dataclass
 import json
 from pathlib import Path
 from typing import Any, Iterator
 
 from rag_core.walkers import BaseWalker
 from .constants import USFM_ORDER
-from .types import Pericope, VerseAddress, VerseEvent
+from .types import Pericope, Verse, VerseAddress
 
 
-class WebCorpusWalker(BaseWalker[tuple[VerseAddress, str]]):
+@dataclass(frozen=True, slots=True)
+class VerseEvent:
+    address: VerseAddress
+    heading: str | None = None
+
+
+class WebCorpusWalker(BaseWalker[Verse]):
     """Walks verses from a World English Bible JSON export."""
 
     def __init__(self, path: Path):
         self.path = path
 
-    def lazy_walk(self) -> Iterator[tuple[VerseAddress, str]]:
+    def lazy_walk(self) -> Iterator[Verse]:
         doc = json.loads(self.path.read_text())
         for b in doc.get("books", []):
             code = USFM_ORDER[int(b["nr"]) - 1]
             for ch in b.get("chapters", []):
                 chapter = int(ch["chapter"])
                 for v in ch.get("verses", []):
-                    yield ((code, chapter, int(v["verse"])), v["text"])
+                    yield Verse(
+                        book=code,
+                        chapter=chapter,
+                        verse=int(v["verse"]),
+                        text=v["text"],
+                    )
 
 
 class BsbBookWalker(BaseWalker[VerseEvent]):
@@ -68,6 +80,7 @@ class BsbBookWalker(BaseWalker[VerseEvent]):
         for child in node.get("content", []):
             yield from self._visit(child)
 
+
 class BsbCorpusWalker(BaseWalker[VerseEvent]):
     """Walks an entire BSB translation directory in canonical USFM order."""
 
@@ -83,7 +96,7 @@ class BsbCorpusWalker(BaseWalker[VerseEvent]):
 
 
 class BsbPericopeWalker(BaseWalker[Pericope]):
-    """Walks BSB USJ book files in canonical order, deriving Pericope spans."""
+    """Walks BSB USJ book files in canonical order, deriving Pericopes directly."""
 
     def __init__(self, bsb_dir: Path):
         self.bsb_dir = bsb_dir
@@ -94,24 +107,10 @@ class BsbPericopeWalker(BaseWalker[Pericope]):
             book_path = self.bsb_dir / f"{code}.usj"
             if not book_path.exists():
                 continue
-            addresses: list[VerseAddress] = []
-            headings: list[tuple[VerseAddress, str]] = []
             for event in self._book_walker.lazy_walk(book_path):
-                addresses.append(event.address)
-                if event.heading is not None:
-                    headings.append((event.address, event.heading))
-
-            addr_index = {a: i for i, a in enumerate(addresses)}
-            for i, (addr, heading) in enumerate(headings):
-                start = addr_index[addr]
-                end = (
-                    addr_index[headings[i + 1][0]]
-                    if i + 1 < len(headings)
-                    else len(addresses)
-                )
-                yield Pericope(
-                    book=addr[0],
-                    start=(addr[1], addr[2]),
-                    heading=heading,
-                    verse_count=end - start,
-                )
+                if event.heading:
+                    yield Pericope(
+                        book=event.address[0],
+                        start=(event.address[1], event.address[2]),
+                        heading=event.heading,
+                    )

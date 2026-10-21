@@ -1,26 +1,27 @@
 import json
 import logging
-from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Sequence
 
-import numpy as np
 from codetiming import Timer
+import numpy as np
 from tqdm import tqdm
 from usearch.index import Index
 
-from bibleit_ingest.chunking import resolve_verse_to_chunk_indices
 from rag_core.metrics import evaluate_retrieval
+from .chunking import build_verse_to_chunk_index
+from .types import BookCorpus, Passage, VerseAddress
 
 
-def _configure_logger(name: str, log_path: Path) -> logging.Logger:
-    """Returns a logger that writes to both console and the given file."""
-    logger = logging.getLogger(name)
+def setup_logger(log_path: Path) -> logging.Logger:
+    logger = logging.getLogger("eval")
     logger.setLevel(logging.INFO)
     logger.handlers.clear()
-    logger.propagate = False
 
-    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+    formatter = logging.Formatter(
+        "[%(asctime)s] [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
@@ -36,13 +37,14 @@ def _configure_logger(name: str, log_path: Path) -> logging.Logger:
 
 def trigger_retrieval_eval(
     eval_path: Path,
-    chunks: Sequence[Any],
+    chunks: Sequence[Passage],
     chunk_embeddings: np.ndarray,
-    address_index: dict[Any, int],
+    corpus: BookCorpus,
     embed_query_fn: Callable[[str], np.ndarray],
     k: int = 10,
+    verse_to_chunks: dict[VerseAddress, list[int]] | None = None,
 ) -> dict[str, Any]:
-    """Runs queries in eval set through vector retrieval and returns metrics and diagnostics."""
+    """Runs queries in eval set through vector retrieval using O(1) inverted verse lookup."""
     eval_data = json.loads(eval_path.read_text())
     total_q = len(eval_data["queries"])
     logger = logging.getLogger(__name__)
@@ -50,6 +52,8 @@ def trigger_retrieval_eval(
 
     index = Index(ndim=chunk_embeddings.shape[1], metric="cos")
     index.add(np.arange(len(chunks)), chunk_embeddings.astype(np.float32))
+
+    v_map = verse_to_chunks if verse_to_chunks is not None else build_verse_to_chunk_index(corpus, chunks)
 
     qrels_dict: dict[str, dict[str, int]] = {}
     run_dict: dict[str, dict[str, float]] = {}
@@ -60,7 +64,7 @@ def trigger_retrieval_eval(
         for q in tqdm(eval_data["queries"], total=total_q, desc="evaluating queries", unit="query"):
             rel = q["relevant"][0]
             address = (rel["book"], rel["chapter"], rel["verse"])
-            relevant_indices = resolve_verse_to_chunk_indices(address, chunks, address_index)
+            relevant_indices = v_map.get(address, [])
             if not relevant_indices:
                 unresolvable.append(q["id"])
                 continue

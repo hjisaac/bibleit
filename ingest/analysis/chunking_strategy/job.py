@@ -41,7 +41,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         return f"f{f}_c{c}_o{o}{ovh_flag}_{strat}"
 
     def on_prepare(self) -> dict:
-        corpus = get_or_prepare_corpus(self.web_path, self.bsb_dir)
+        corpus, pericopes = get_or_prepare_corpus(self.web_path, self.bsb_dir)
 
         tok_model_name = self.config.get(
             "tokenizer_model", "nomic-ai/nomic-embed-text-v1.5"
@@ -51,15 +51,14 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         )
 
         return {
-            "pericopes": corpus.pericopes,
-            "ordered_verses": corpus.ordered_verses,
-            "address_index": corpus.address_index,
+            "pericopes": pericopes,
+            "corpus": corpus,
             "embedder": embedder,
         }
 
     def on_execute(self, prepared: dict) -> dict[str, Any]:
-        ordered_verses = prepared["ordered_verses"]
-        address_index = prepared["address_index"]
+        corpus = prepared["corpus"]
+        pericopes = prepared["pericopes"]
         if "strategy" not in self.config:
             raise KeyError("Missing required 'strategy' parameter in chunking configuration")
         strategy_name = str(self.config["strategy"])
@@ -75,24 +74,22 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
 
         chunk_cfg = dict(self.config)
         chunk_cfg.pop("strategy", None)
+        if "tokenizer" not in chunk_cfg and "embedder" in prepared:
+            chunk_cfg["tokenizer"] = prepared["embedder"].model.tokenizer
 
         chunker = get_chunker(
             strategy_name,
-            ordered_verses=ordered_verses,
-            address_index=address_index,
-            tokenizer=prepared["embedder"].model.tokenizer,
+            corpus=corpus,
             **chunk_cfg,
         )
-        chunks = chunker.chunk(prepared["pericopes"])
+        chunks = chunker.chunk(pericopes, corpus=corpus)
         logger.info("Generated %d chunks; evaluating token distributions...", len(chunks))
 
         tokenizer = prepared["embedder"].model.tokenizer
         limit = int(self.config.get("token_limit", 512))
-        strategy = self.config.get("render_strategy", "heading_and_text")
         renderer = get_renderer(
-            strategy=strategy,
-            ordered_verses=ordered_verses,
-            address_index=address_index,
+            strategy=render_strategy,
+            corpus=corpus,
         )
 
         texts = []
@@ -112,7 +109,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
                 "testament": "OT" if chunk.book in OLD_TESTAMENT_BOOKS else "NT",
                 "token_count": t_len,
                 "word_count": len(text.split()),
-                "verse_count": chunk.verse_count,
+                "verse_count": len(corpus.get_range(chunk.book, chunk.start, chunk.end)),
             })
 
         # Unified streaming corpus stats via datalens (with T-Digest quantiles)
@@ -168,16 +165,15 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
                 self.tracker.track_artifact(path, name=name, type="plot")
 
         # Save chunk definitions artifact
-        ordered_verses = prepared.get("ordered_verses", ())
         chunks_meta = [
             {
+                "id": idx,
                 "book": c.book,
-                "start": c.start,
-                "end": c.end,
-                "verse_count": c.verse_count,
-                "headings": c.get_headings_meta(ordered_verses),
+                "start": list(c.start),
+                "end": list(c.end),
+                "headings": [list(h) for h in c.headings],
             }
-            for c in result["chunks"]
+            for idx, c in enumerate(result["chunks"])
         ]
         chunks_path = self.run_dir / "chunks.json"
         chunks_path.write_text(json.dumps(chunks_meta, indent=2), encoding="utf-8")

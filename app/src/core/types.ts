@@ -16,14 +16,27 @@ export interface Verse extends VerseRef {
 }
 
 /** Retrieval unit: a passage window over consecutive verses. */
-export interface Chunk {
+export interface RawChunk {
   id: number;
   book: string;
   start: [number, number];
   end: [number, number];
   headings?: [number, number, string][];
-  /** Concatenated verse text (for display / BM25 the app uses verses directly). */
+}
+
+export interface Chunk extends RawChunk {
+  /** Concatenated verse text hydrated from VerseStore at search seam. */
   text: string;
+}
+
+export type VerseCorpusData = Record<string, string[][]>;
+
+export interface VerseStore {
+  get(book: string, chapter: number, verse: number): string | undefined;
+  getRange(book: string, start: [number, number], end: [number, number]): string;
+  has(book: string, chapter: number, verse: number): boolean;
+  chapterCount(book: string): number;
+  verseCount(book: string, chapter: number): number;
 }
 
 /** A range of verses the user explicitly referenced, e.g. "John 3:14-18". */
@@ -50,11 +63,11 @@ export interface RetrievalResult {
 }
 
 // ---------------------------------------------------------------------------
-// Artifact manifest (schema_version 2) — the offline/runtime boundary.
+// Artifact manifest (schema_version 3) — the offline/runtime boundary.
 // ---------------------------------------------------------------------------
 
 export interface Manifest {
-  schema_version: 2;
+  schema_version: 3;
   translation: {
     id: string;
     lang: string;

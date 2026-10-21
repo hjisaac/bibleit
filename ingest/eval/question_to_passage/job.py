@@ -12,7 +12,7 @@ from bibleit_ingest.artifacts import (
     resolve_matching_artifacts,
     write_lock_file,
 )
-from bibleit_ingest.chunking import get_chunker, resolve_verse_to_chunk_index
+from bibleit_ingest.chunking import get_chunker
 from bibleit_ingest.constants import (
     BSB_DIR,
     FASTEMBED_CACHE_DIR,
@@ -57,119 +57,66 @@ class EvalJobQuestionToPassage(EvalJobBase):
         embedding_model = EmbeddingModel(self.config["embedding_model"])
         self.config["chunk_source_model"] = str(embedding_model)
 
-        corpus = get_or_prepare_corpus(self.web_path, BSB_DIR)
+        corpus, pericopes = get_or_prepare_corpus(self.web_path, BSB_DIR)
 
         # 1. Resolve embedding artifact (explicit override, or auto-match from embed_corpus)
+        # emb_dir_override: Optional path supplied in config to bypass search and use an explicit embedding artifact.
         emb_dir_override = self.config.get("embedding_artifact_dir")
-        emb_run_dir = Path(emb_dir_override) if emb_dir_override else None
+        if emb_dir_override:
+            emb_run_dir = Path(emb_dir_override)
+            if not emb_run_dir.exists():
+                raise FileNotFoundError(f"Specified embedding_artifact_dir does not exist: {emb_dir_override}")
+        else:
+            emb_run_dir = None
 
         if "strategy" not in self.config:
             raise KeyError("Missing required 'strategy' parameter in evaluation configuration")
         strategy_name = str(self.config["strategy"])
+
+        # emb_outputs: Directory holding upstream embedding runs to search across.
+        # emb_criteria: Hyperparameter filters that upstream config.lock.yaml must match exactly.
+        emb_outputs = REPO / "ingest" / "analysis" / "embed_corpus" / "outputs"
+        emb_criteria: dict[str, Any] = {
+            "strategy": strategy_name,
+            "ceiling": ceiling,
+            "overlap": overlap,
+            "render_strategy": render_strategy,
+            "embedding_model": str(embedding_model),
+        }
+        if strategy_name == "adaptive" and floor is not None:
+            emb_criteria["floor"] = int(floor)
+        if "include_overlap_heading" in self.config:
+            emb_criteria["include_overlap_heading"] = bool(self.config["include_overlap_heading"])
+
         if not emb_run_dir:
-            emb_outputs = REPO / "ingest" / "analysis" / "embed_corpus" / "outputs"
-            emb_criteria = {
-                "strategy": strategy_name,
-                "ceiling": ceiling,
-                "overlap": overlap,
-                "render_strategy": render_strategy,
-                "embedding_model": str(embedding_model),
-            }
-            if strategy_name == "adaptive":
-                emb_criteria["floor"] = floor
-            if "include_overlap_heading" in self.config:
-                emb_criteria["include_overlap_heading"] = bool(self.config["include_overlap_heading"])
             emb_run_dir = resolve_matching_artifacts(emb_outputs, emb_criteria)
 
-        chunks: list[Passage]
-        chunk_embeddings: Any
+        if (
+            not emb_run_dir
+            or not (emb_run_dir / "embeddings.npy").exists()
+            or not (emb_run_dir / "chunks.json").exists()
+        ):
+            target_desc = f"{emb_run_dir}" if emb_run_dir else f"{emb_outputs} for criteria: {emb_criteria}"
+            raise FileNotFoundError(
+                f"No matching embedding artifact (embeddings.npy / chunks.json) found in {target_desc}"
+            )
+
+        logger.info("Found matching upstream embedding artifact at %s", emb_run_dir)
         upstream_lock_meta: dict[str, Any] = {}
+        if (emb_run_dir / "config.lock.yaml").exists():
+            upstream_lock_meta = read_lock_file(emb_run_dir / "config.lock.yaml")
 
-        if emb_run_dir and (emb_run_dir / "embeddings.npy").exists() and (emb_run_dir / "chunks.json").exists():
-            if (emb_run_dir / "config.lock.yaml").exists():
-                upstream_lock_meta = read_lock_file(emb_run_dir / "config.lock.yaml")
-            import numpy as np
-
-            chunk_embeddings = np.load(emb_run_dir / "embeddings.npy")
-            raw_meta = json.loads((emb_run_dir / "chunks.json").read_text(encoding="utf-8"))
-            chunks = []
-            for item in raw_meta:
-                book = item["book"]
-                if "start" in item:
-                    ch_s, v_s = item["start"]
-                    ch_e, v_e = item["end"]
-                elif "start_addr" in item:
-                    ch_s, v_s = item["start_addr"]
-                    ch_e, v_e = item["end_addr"]
-                else:
-                    ch_s, v_s = item["chapter"], item["verse"]
-                    ch_e, v_e = ch_s, v_s + item["verse_count"] - 1
-
-                start_idx = corpus.address_index[(book, ch_s, v_s)]
-                end_idx = start_idx + item["verse_count"]
-
-                sections = []
-                headings_raw = item.get("headings", [])
-                if headings_raw and isinstance(headings_raw[0], (list, tuple)):
-                    for ch, v, h in headings_raw:
-                        sec_idx = corpus.address_index.get((book, ch, v), start_idx)
-                        sections.append((sec_idx, h))
-                elif "sections" in item:
-                    for s in item["sections"]:
-                        sec_idx = corpus.address_index.get((book, s["chapter"], s["verse"]), start_idx)
-                        sections.append((sec_idx, s["heading"]))
-                elif headings_raw and isinstance(headings_raw[0], str):
-                    sections = [(start_idx, h) for h in headings_raw]
-
-                end_addr = corpus.ordered_verses[end_idx - 1][0] if end_idx > start_idx else (book, ch_e, v_e)
-                chunks.append(
-                    Passage(
-                        book=book,
-                        start=(ch_s, v_s),
-                        end=(end_addr[1], end_addr[2]),
-                        start_idx=start_idx,
-                        end_idx=end_idx,
-                        sections=tuple(sections),
-                    )
-                )
-        else:
-            logger.info("No matching embedding artifact found; computing in-line with strategy '%s'.", strategy_name)
-            chunk_cfg = dict(self.config)
-            chunk_cfg.pop("strategy", None)
-            chunker = get_chunker(
-                strategy_name,
-                ordered_verses=corpus.ordered_verses,
-                address_index=corpus.address_index,
-                **chunk_cfg,
+        chunk_embeddings = np.load(emb_run_dir / "embeddings.npy")
+        raw_meta = json.loads((emb_run_dir / "chunks.json").read_text(encoding="utf-8"))
+        chunks = [
+            Passage(
+                book=item["book"],
+                start=(item["start"][0], item["start"][1]),
+                end=(item["end"][0], item["end"][1]),
+                headings=tuple((int(ch), int(v), str(h)) for ch, v, h in item.get("headings", [])),
             )
-            chunks = chunker.chunk(corpus.pericopes)
-
-            threads = int(self.config.get("threads", 4))
-            embedder = Embedder(
-                model_name=embedding_model,
-                cache_dir=str(FASTEMBED_CACHE_DIR),
-                threads=threads,
-            )
-            renderer = get_renderer(
-                render_strategy,
-                ordered_verses=corpus.ordered_verses,
-                address_index=corpus.address_index,
-            )
-            texts = (renderer.render(chunk) for chunk in chunks)
-            batch_size = int(self.config.get("batch_size", 16))
-            with Timer(
-                text=f"Embedded {len(chunks)} chunks in {{:.1f}}s", logger=logger.info
-            ):
-                chunk_embeddings = np.array(
-                    list(
-                        tqdm(
-                            embedder.embed_documents(texts, batch_size=batch_size),
-                            total=len(chunks),
-                            desc=f"embedding chunks [{render_strategy}]",
-                            unit="chunk",
-                        )
-                    )
-                )
+            for item in raw_meta
+        ]
 
         assert len(chunks) == chunk_embeddings.shape[0], (
             f"chunks count ({len(chunks)}) != embedding rows ({chunk_embeddings.shape[0]})"
@@ -202,7 +149,6 @@ class EvalJobQuestionToPassage(EvalJobBase):
             "k": k,
             "chunks": chunks,
             "corpus": corpus,
-            "address_index": corpus.address_index,
             "chunk_embeddings": chunk_embeddings,
             "embedder": embedder,
             "query_map": query_map,
@@ -214,7 +160,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
             eval_path=self.eval_data_path,
             chunks=prepared["chunks"],
             chunk_embeddings=prepared["chunk_embeddings"],
-            address_index=prepared["address_index"],
+            corpus=prepared["corpus"],
             embed_query_fn=lambda q: prepared["query_map"].get(q, prepared["embedder"].embed_query(q)),
             k=prepared["k"],
         )
@@ -225,7 +171,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
             report_path = self.run_dir / "retrieval_inspect.md"
             generate_retrieval_report(
                 diagnostics=diagnostics,
-                renderer=lambda idx: format_passage(prepared["chunks"][idx], prepared["corpus"].ordered_verses),
+                renderer=lambda idx: format_passage(prepared["chunks"][idx], prepared["corpus"]),
                 metrics=result.get("metrics", {}),
                 params={
                     "k": self.config.get("k", 1),
