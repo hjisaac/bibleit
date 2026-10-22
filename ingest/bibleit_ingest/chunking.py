@@ -363,7 +363,9 @@ class TokenWindowChunker(Chunker):
 
     DEFAULT_CEILING = 512
     DEFAULT_OVERLAP = 0
-    # Reserves token budget for renderer-injected headings, citations, and model prefix tokens.
+    # Safety buffer: chunker only counts raw verse text, but renderers inject metadata
+    # (citation, headings, model prefix). Headroom prevents rendered chunks from exceeding
+    # the model's hard context limit (e.g. 512) and silently truncating tail verses.
     DEFAULT_HEADROOM_MARGIN = 25
 
     def __init__(
