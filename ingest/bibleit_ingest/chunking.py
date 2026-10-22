@@ -394,6 +394,8 @@ class TokenWindowChunker(Chunker):
         if self.tokenizer is not None:
             encoded = self.tokenizer.encode(text)
             return len(encoded.ids) if hasattr(encoded, "ids") else len(encoded)
+        # Heuristic fallback for tests/dry-runs without a model tokenizer:
+        # estimates subwords using an empirical English expansion ratio (~1.3 tokens/word).
         return max(1, int(len(text.split()) * 1.3))
 
     def chunk(
