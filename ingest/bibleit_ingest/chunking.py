@@ -363,6 +363,7 @@ class TokenWindowChunker(Chunker):
 
     DEFAULT_CEILING = 512
     DEFAULT_OVERLAP = 0
+    # Reserves token budget for renderer-injected headings, citations, and model prefix tokens.
     DEFAULT_HEADROOM_MARGIN = 25
 
     def __init__(
