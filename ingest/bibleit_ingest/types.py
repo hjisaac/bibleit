@@ -1,5 +1,9 @@
-from dataclasses import dataclass
-from typing import Iterable, Sequence
+from dataclasses import asdict, dataclass
+import hashlib
+import json
+from typing import Any, Iterable, Literal, Sequence
+
+from .constants import ARTIFACT_DIGEST_BYTES
 
 Coordinate = tuple[int, int]  # (chapter, verse)
 VerseAddress = tuple[str, int, int]  # (book, chapter, verse)
@@ -94,6 +98,57 @@ class Passage:
 
 
 Chunk = Passage
+RenderStrategy = Literal[
+    "text_only",
+    "heading_and_text",
+    "book_and_heading",
+    "address_and_heading",
+]
+
+_RENDER_STRATEGY_SHORT: dict[str, str] = {
+    "text_only": "text",
+    "heading_and_text": "heading",
+    "book_and_heading": "book_heading",
+    "address_and_heading": "addr_heading",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class ChunkConfig:
+    strategy: Literal["adaptive", "token_window", "pericope"] = "adaptive"
+    ceiling: int = 30
+    overlap: int = 0
+    floor: int = 5
+    headroom_margin: int = 25
+    render_strategy: RenderStrategy = "heading_and_text"
+    include_overlap_heading: bool = True
+    tokenizer: str | None = None
+
+    @property
+    def canonical_dict(self) -> dict[str, Any]:
+        """Dictionary of active parameters, omitting None values."""
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+    @property
+    def content_hash(self) -> str:
+        """Deterministic 12-char BLAKE2b hex digest of canonical parameters."""
+        payload = json.dumps(self.canonical_dict, sort_keys=True).encode("utf-8")
+        return hashlib.blake2b(payload, digest_size=ARTIFACT_DIGEST_BYTES).hexdigest()
+
+    @property
+    def _short_slug(self) -> str:
+        strat = _RENDER_STRATEGY_SHORT.get(self.render_strategy, self.render_strategy[:8])
+        ovh = f"_ovh{int(self.include_overlap_heading)}" if self.overlap > 0 else ""
+        if self.strategy == "pericope":
+            return f"peri_c{self.ceiling}_o{self.overlap}{ovh}_{strat}"
+        if self.strategy == "token_window":
+            return f"tok_c{self.ceiling}_o{self.overlap}{ovh}_{strat}"
+        return f"f{self.floor}_c{self.ceiling}_o{self.overlap}{ovh}_{strat}"
+
+    @property
+    def slug(self) -> str:
+        """Content-addressed slug: 12-char hash followed by the readable descriptor."""
+        return f"{self.content_hash}_{self._short_slug}"
 
 
 class BookCorpus:

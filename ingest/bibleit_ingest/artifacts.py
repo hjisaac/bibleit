@@ -1,13 +1,56 @@
 import json
 import logging
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 from omegaconf import OmegaConf
 
+from .types import Passage
+
 logger = logging.getLogger(__name__)
 
 LOCK_FILENAME = "config.lock.yaml"
+
+
+def save_chunks_artifact(path: Path, chunks: Sequence[Passage]) -> Path:
+    """Serializes Passage chunks to chunks.json using canonical Scripture coordinates."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    chunks_meta = [
+        {
+            "book": c.book,
+            "start": list(c.start),
+            "end": list(c.end),
+            "headings": [list(h) for h in c.headings],
+        }
+        for c in chunks
+    ]
+    path.write_text(json.dumps(chunks_meta, indent=2), encoding="utf-8")
+    return path
+
+
+def load_chunks_artifact(path: Path) -> list[Passage]:
+    """Deserializes chunks.json into a list of Passage domain objects."""
+    raw_meta = json.loads(path.read_text(encoding="utf-8"))
+    return [
+        Passage(
+            book=item["book"],
+            start=(item["start"][0], item["start"][1]),
+            end=(item["end"][0], item["end"][1]),
+            headings=tuple((int(ch), int(v), str(h)) for ch, v, h in item.get("headings", [])),
+        )
+        for item in raw_meta
+    ]
+
+
+def _sanitize_primitives(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        return {str(k): _sanitize_primitives(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_primitives(v) for v in obj]
+    if hasattr(obj, "item"):
+        return obj.item()
+    return obj
 
 
 def write_lock_file(path: Path, data: dict[str, Any]) -> Path:
@@ -15,7 +58,7 @@ def write_lock_file(path: Path, data: dict[str, Any]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         path.chmod(0o644)  # temporarily unprotect if overwriting
-    content = OmegaConf.to_yaml(OmegaConf.create(data))
+    content = OmegaConf.to_yaml(OmegaConf.create(_sanitize_primitives(data)))
     path.write_text(content, encoding="utf-8")
     path.chmod(0o444)  # mark read-only to prevent accidental edits
     return path
@@ -70,17 +113,15 @@ def read_lock_file(path: Path) -> dict[str, Any]:
 
 def resolve_matching_artifacts(
     stage_outputs_dir: Path,
-    criteria: dict[str, Any],
+    target_hash: str,
 ) -> Path | None:
-    """Scans subdirectories in stage_outputs_dir for a config.lock.yaml matching criteria.
+    """Scans subdirectories in stage_outputs_dir for a config.lock.yaml with matching hash.
 
     Returns the newest matching run directory, or None if no match is found.
     """
     if not stage_outputs_dir.exists():
         return None
 
-    matches: list[Path] = []
-    # Search run subdirectories in stage_outputs_dir sorted newest first
     candidates = sorted(
         [d for d in stage_outputs_dir.iterdir() if d.is_dir()],
         key=lambda p: p.stat().st_mtime,
@@ -93,17 +134,11 @@ def resolve_matching_artifacts(
             continue
         try:
             lock_data = read_lock_file(lock_path)
-            params = lock_data.get("parameters", lock_data)
-            # Require every criterion key to exist and match in artifact params
-            if all(k in params and params[k] == criteria[k] for k in criteria):
-                matches.append(run_dir)
+            if lock_data.get("hash") == target_hash:
+                logger.info("Resolved matching artifact at %s matching hash %s", run_dir, target_hash)
+                return run_dir
         except Exception as exc:
             logger.debug("Failed reading lock file %s: %s", lock_path, exc)
 
-    if matches:
-        chosen = matches[0]
-        logger.info("Resolved matching artifact at %s matching %s", chosen, criteria)
-        return chosen
-
-    logger.warning("No artifact matching %s found in %s", criteria, stage_outputs_dir)
+    logger.warning("No artifact matching hash %s found in %s", target_hash, stage_outputs_dir)
     return None

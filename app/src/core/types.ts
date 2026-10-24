@@ -15,9 +15,14 @@ export interface Verse extends VerseRef {
   text: string;
 }
 
+/** Canonical string key for a chunk: "BOOK:start_ch:start_v-end_ch:end_v" */
+export function getChunkKey(chunk: Pick<RawChunk, 'book' | 'start' | 'end'>): string {
+  return `${chunk.book}:${chunk.start[0]}:${chunk.start[1]}-${chunk.end[0]}:${chunk.end[1]}`;
+}
+
 /** Retrieval unit: a passage window over consecutive verses. */
 export interface RawChunk {
-  id: number;
+  id?: string | number;
   book: string;
   start: [number, number];
   end: [number, number];

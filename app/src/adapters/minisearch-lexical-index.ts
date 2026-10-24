@@ -1,15 +1,19 @@
 import MiniSearch from 'minisearch';
 import type { LexicalIndex } from '../core/ports';
-import type { Chunk, ScoredPassage } from '../core/types';
+import { getChunkKey, type Chunk, type ScoredPassage } from '../core/types';
 
 export class MiniSearchLexicalIndex implements LexicalIndex {
   private miniSearch: MiniSearch<Chunk>;
-  private chunksById: Map<number, Chunk> = new Map();
+  private chunksByKey: Map<string, Chunk> = new Map();
 
   constructor() {
     this.miniSearch = new MiniSearch<Chunk>({
+      idField: 'key',
       fields: ['text'],
-      storeFields: ['id'],
+      extractField: (document, fieldName) => {
+        if (fieldName === 'key') return getChunkKey(document);
+        return (document as Record<string, unknown>)[fieldName];
+      },
       searchOptions: {
         boost: { text: 1 },
         prefix: true,
@@ -19,11 +23,11 @@ export class MiniSearchLexicalIndex implements LexicalIndex {
   }
 
   async build(chunks: Chunk[]): Promise<void> {
-    this.chunksById.clear();
+    this.chunksByKey.clear();
     this.miniSearch.removeAll();
 
     for (const chunk of chunks) {
-      this.chunksById.set(chunk.id, chunk);
+      this.chunksByKey.set(getChunkKey(chunk), chunk);
     }
 
     this.miniSearch.addAll(chunks);
@@ -34,7 +38,7 @@ export class MiniSearchLexicalIndex implements LexicalIndex {
     const topResults = results.slice(0, k);
 
     return topResults.flatMap((res) => {
-      const chunk = this.chunksById.get(Number(res.id));
+      const chunk = this.chunksByKey.get(String(res.id));
       if (!chunk) return [];
       return [
         {

@@ -19,6 +19,9 @@ CHUNK_EMBEDDINGS_NPY_PATH = REPO / "ingest/scripts/chunk_embeddings.npy"
 # OS-temp-dir default.
 FASTEMBED_CACHE_DIR = REPO / "ingest/data/models/fastembed"
 
+# Raw digest bytes for BLAKE2b artifact hashing (6 bytes -> 12 hex characters).
+ARTIFACT_DIGEST_BYTES = 6
+
 
 class EmbeddingModel(StrEnum):
     """Every embedding model this project uses. Behaves as a plain string

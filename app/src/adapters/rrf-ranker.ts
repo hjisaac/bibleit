@@ -1,5 +1,5 @@
 import type { Ranker } from '../core/ports';
-import type { Chunk, ScoredPassage } from '../core/types';
+import { getChunkKey, type Chunk, type ScoredPassage } from '../core/types';
 
 export interface RrfOptions {
   /** RRF smoothing constant (default: 60 per standard Cormack et al.). */
@@ -41,17 +41,18 @@ export class RrfRanker implements Ranker {
     semantic: ScoredPassage[],
     k: number = 10,
   ): ScoredPassage[] {
-    const fusedScores = new Map<number, { chunk: Chunk; score: number }>();
+    const fusedScores = new Map<string, { chunk: Chunk; score: number }>();
 
     // 1. Accumulate RRF scores for lexical matches
     lexical.forEach((item, index) => {
       const rank = index + 1;
       const rrf = 1 / (this.kConst + rank);
-      const existing = fusedScores.get(item.chunk.id);
+      const key = getChunkKey(item.chunk);
+      const existing = fusedScores.get(key);
       if (existing) {
         existing.score += rrf;
       } else {
-        fusedScores.set(item.chunk.id, { chunk: item.chunk, score: rrf });
+        fusedScores.set(key, { chunk: item.chunk, score: rrf });
       }
     });
 
@@ -59,11 +60,12 @@ export class RrfRanker implements Ranker {
     semantic.forEach((item, index) => {
       const rank = index + 1;
       const rrf = 1 / (this.kConst + rank);
-      const existing = fusedScores.get(item.chunk.id);
+      const key = getChunkKey(item.chunk);
+      const existing = fusedScores.get(key);
       if (existing) {
         existing.score += rrf;
       } else {
-        fusedScores.set(item.chunk.id, { chunk: item.chunk, score: rrf });
+        fusedScores.set(key, { chunk: item.chunk, score: rrf });
       }
     });
 

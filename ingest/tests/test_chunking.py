@@ -14,7 +14,7 @@ from bibleit_ingest.renderers import (
     TextOnlyRenderer,
     get_renderer,
 )
-from bibleit_ingest.types import BookCorpus, Passage, Pericope, Verse
+from bibleit_ingest.types import BookCorpus, ChunkConfig, Passage, Pericope, Verse
 
 
 def _create_mock_corpus(verses_by_book: dict[str, list[tuple[int, int, str]]]) -> BookCorpus:
@@ -317,9 +317,22 @@ def test_token_window_chunker() -> None:
     assert chunks[0].start == (1, 1)
     assert chunks[0].headings[0][2] == "Beginning"
 
-    # Test factory instantiation
-    factory_chunker = get_chunker("token_window", corpus=corpus, ceiling=512, overlap=1)
-    assert isinstance(factory_chunker, TokenWindowChunker)
-    assert factory_chunker.ceiling == 512
-    assert factory_chunker.overlap == 1
+    # Test factory instantiation for all strategies
+    tok_chunker = get_chunker(ChunkConfig(strategy="token_window", ceiling=512, overlap=1), corpus=corpus)
+    assert isinstance(tok_chunker, TokenWindowChunker)
+    assert tok_chunker.ceiling == 512
+    assert tok_chunker.overlap == 1
+
+    adapt_chunker = get_chunker(ChunkConfig(strategy="adaptive", floor=4, ceiling=25, overlap=2), corpus=corpus)
+    assert isinstance(adapt_chunker, AdaptiveWindowChunker)
+    assert adapt_chunker.floor == 4
+    assert adapt_chunker.ceiling == 25
+    assert adapt_chunker.overlap == 2
+
+    peri_chunker = get_chunker(ChunkConfig(strategy="pericope", ceiling=35, overlap=0), corpus=corpus)
+    assert isinstance(peri_chunker, PericopeChunker)
+    assert peri_chunker.ceiling == 35
+
+    with pytest.raises(ValueError, match="Unknown chunking strategy"):
+        get_chunker(ChunkConfig(strategy="unknown_strategy"), corpus=corpus)  # type: ignore[arg-type]
 

@@ -121,7 +121,7 @@ describe('SearchView Result Cards & User Actions', () => {
 
     expect(playSpy).toHaveBeenCalledWith([
       expect.objectContaining({
-        id: 'chunk-42',
+        id: 'chunk-PHP:4:4-4:7',
         citation: 'Philippians 4:4–7',
         book: 'PHP',
         chapter: 4,

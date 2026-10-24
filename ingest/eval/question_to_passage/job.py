@@ -8,11 +8,11 @@ from codetiming import Timer
 from tqdm import tqdm
 
 from bibleit_ingest.artifacts import (
+    load_chunks_artifact,
     read_lock_file,
     resolve_matching_artifacts,
     write_lock_file,
 )
-from bibleit_ingest.chunking import get_chunker
 from bibleit_ingest.constants import (
     BSB_DIR,
     FASTEMBED_CACHE_DIR,
@@ -22,9 +22,8 @@ from bibleit_ingest.constants import (
 from bibleit_ingest.embedding import Embedder
 from bibleit_ingest.helpers import trigger_retrieval_eval
 from bibleit_ingest.pericopes import get_or_prepare_corpus
-from bibleit_ingest.renderers import get_renderer
 from bibleit_ingest.report import format_passage, generate_retrieval_report
-from bibleit_ingest.types import Passage
+from bibleit_ingest.types import ChunkConfig
 from eval.job import EvalJobBase
 
 logger = logging.getLogger(__name__)
@@ -38,11 +37,10 @@ class EvalJobQuestionToPassage(EvalJobBase):
 
     def _make_slug(self) -> str:
         k = self.config.get("k", 1)
-        f = self.config.get("floor", 5)
-        c = self.config.get("ceiling", 30)
+        chunk_cfg = ChunkConfig(**self.config["chunk"])
         model = str(self.config.get("embedding_model", "nomic"))
         model_short = "nomic" if "nomic" in model else model.split("/")[-1]
-        return f"k{k}_f{f}_c{c}_{model_short}"
+        return f"k{k}_{chunk_cfg.slug}_{model_short}"
 
     def on_start(self) -> None:
         super().on_start()
@@ -50,17 +48,13 @@ class EvalJobQuestionToPassage(EvalJobBase):
 
     def on_prepare(self) -> dict:
         k = int(self.config.get("k", 1))
-        floor = int(self.config.get("floor", 5))
-        ceiling = int(self.config.get("ceiling", 30))
-        overlap = int(self.config.get("overlap", 0))
-        render_strategy = str(self.config.get("render_strategy", "heading_and_text"))
+        chunk_cfg = ChunkConfig(**self.config["chunk"])
         embedding_model = EmbeddingModel(self.config["embedding_model"])
         self.config["chunk_source_model"] = str(embedding_model)
 
-        corpus, pericopes = get_or_prepare_corpus(self.web_path, BSB_DIR)
+        corpus, _ = get_or_prepare_corpus(self.web_path, BSB_DIR)
 
         # 1. Resolve embedding artifact (explicit override, or auto-match from embed_corpus)
-        # emb_dir_override: Optional path supplied in config to bypass search and use an explicit embedding artifact.
         emb_dir_override = self.config.get("embedding_artifact_dir")
         if emb_dir_override:
             emb_run_dir = Path(emb_dir_override)
@@ -69,34 +63,18 @@ class EvalJobQuestionToPassage(EvalJobBase):
         else:
             emb_run_dir = None
 
-        if "strategy" not in self.config:
-            raise KeyError("Missing required 'strategy' parameter in evaluation configuration")
-        strategy_name = str(self.config["strategy"])
-
-        # emb_outputs: Directory holding upstream embedding runs to search across.
-        # emb_criteria: Hyperparameter filters that upstream config.lock.yaml must match exactly.
+        # emb_outputs: Directory holding upstream embedding runs to search across by content hash.
         emb_outputs = REPO / "ingest" / "analysis" / "embed_corpus" / "outputs"
-        emb_criteria: dict[str, Any] = {
-            "strategy": strategy_name,
-            "ceiling": ceiling,
-            "overlap": overlap,
-            "render_strategy": render_strategy,
-            "embedding_model": str(embedding_model),
-        }
-        if strategy_name == "adaptive" and floor is not None:
-            emb_criteria["floor"] = int(floor)
-        if "include_overlap_heading" in self.config:
-            emb_criteria["include_overlap_heading"] = bool(self.config["include_overlap_heading"])
 
         if not emb_run_dir:
-            emb_run_dir = resolve_matching_artifacts(emb_outputs, emb_criteria)
+            emb_run_dir = resolve_matching_artifacts(emb_outputs, chunk_cfg.content_hash)
 
         if (
             not emb_run_dir
             or not (emb_run_dir / "embeddings.npy").exists()
             or not (emb_run_dir / "chunks.json").exists()
         ):
-            target_desc = f"{emb_run_dir}" if emb_run_dir else f"{emb_outputs} for criteria: {emb_criteria}"
+            target_desc = f"{emb_run_dir}" if emb_run_dir else f"{emb_outputs} for hash: {chunk_cfg.content_hash}"
             raise FileNotFoundError(
                 f"No matching embedding artifact (embeddings.npy / chunks.json) found in {target_desc}"
             )
@@ -107,21 +85,12 @@ class EvalJobQuestionToPassage(EvalJobBase):
             upstream_lock_meta = read_lock_file(emb_run_dir / "config.lock.yaml")
 
         chunk_embeddings = np.load(emb_run_dir / "embeddings.npy")
-        raw_meta = json.loads((emb_run_dir / "chunks.json").read_text(encoding="utf-8"))
-        chunks = [
-            Passage(
-                book=item["book"],
-                start=(item["start"][0], item["start"][1]),
-                end=(item["end"][0], item["end"][1]),
-                headings=tuple((int(ch), int(v), str(h)) for ch, v, h in item.get("headings", [])),
-            )
-            for item in raw_meta
-        ]
+        chunks = load_chunks_artifact(emb_run_dir / "chunks.json")
 
         assert len(chunks) == chunk_embeddings.shape[0], (
             f"chunks count ({len(chunks)}) != embedding rows ({chunk_embeddings.shape[0]})"
         )
-        logger.info("Loaded %d embedded chunks (strategy=%s)", len(chunks), render_strategy)
+        logger.info("Loaded %d embedded chunks (strategy=%s)", len(chunks), chunk_cfg.render_strategy)
 
         # 2. Query embedder
         threads = int(self.config.get("threads", 4))
@@ -166,6 +135,12 @@ class EvalJobQuestionToPassage(EvalJobBase):
         )
 
     def on_finalize(self, prepared: dict, result: dict) -> None:
+        chunk_cfg = ChunkConfig(**self.config["chunk"])
+        eval_params = {
+            "k": int(self.config.get("k", 1)),
+            **chunk_cfg.canonical_dict,
+            "embedding_model": str(self.config.get("embedding_model")),
+        }
         diagnostics = result.pop("diagnostics", [])
         if diagnostics:
             report_path = self.run_dir / "retrieval_inspect.md"
@@ -173,14 +148,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
                 diagnostics=diagnostics,
                 renderer=lambda idx: format_passage(prepared["chunks"][idx], prepared["corpus"]),
                 metrics=result.get("metrics", {}),
-                params={
-                    "k": self.config.get("k", 1),
-                    "floor": self.config.get("floor", 5),
-                    "ceiling": self.config.get("ceiling", 30),
-                    "overlap": self.config.get("overlap", 0),
-                    "render_strategy": self.config.get("render_strategy", "heading_and_text"),
-                    "embedding_model": self.config.get("embedding_model"),
-                },
+                params=eval_params,
                 out_path=report_path,
             )
             result["report_path"] = str(report_path)
@@ -192,14 +160,8 @@ class EvalJobQuestionToPassage(EvalJobBase):
         # Write immutable lock file for evaluation artifact
         lock_data = {
             "stage": "evaluation",
-            "parameters": {
-                "k": int(self.config.get("k", 1)),
-                "floor": int(self.config.get("floor", 5)),
-                "ceiling": int(self.config.get("ceiling", 30)),
-                "overlap": int(self.config.get("overlap", 0)),
-                "render_strategy": str(self.config.get("render_strategy", "heading_and_text")),
-                "embedding_model": str(self.config.get("embedding_model")),
-            },
+            "hash": chunk_cfg.content_hash,
+            "parameters": eval_params,
             "output": {
                 "metrics": result.get("metrics", {}),
                 "total_queries": result.get("total_queries", 0),

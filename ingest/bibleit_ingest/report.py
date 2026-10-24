@@ -168,7 +168,7 @@ class BaseRetrievalReport:
 
             for m in d.get("matches", []):
                 m_hdr, m_txt = self.render_item(m["chunk_idx"])
-                is_target = m["chunk_idx"] == d["target_chunk_idx"]
+                is_target = m["chunk_idx"] in d.get("relevant_chunks", [d["target_chunk_idx"]])
                 tag = "🎯 [TARGET] " if is_target else ""
                 label = f"{tag}{format_rank_label(m['rank'])} (Score: {m['score']:.4f}): {m_hdr}"
                 doc.add_block(DetailsBlock(summary=label, body=m_txt, is_open=(m["rank"] == 1 or is_target)))
