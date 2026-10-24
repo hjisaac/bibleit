@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Sequence
 
 from .constants import USFM_ORDER
-from .types import BookCorpus, Passage, Pericope, Verse, VerseAddress
+from .types import BookCorpus, ChunkConfig, Passage, Pericope, Verse, VerseAddress
 
 
 class Chunker(ABC):
@@ -499,35 +499,32 @@ def build_verse_to_chunk_index(
 
 
 def get_chunker(
-    *args: Any,
+    config: ChunkConfig,
     corpus: BookCorpus | None = None,
-    **kwargs: Any,
 ) -> Chunker:
-    """Instantiates the configured Chunker subclass."""
-    strategy = str(args[0] if args else kwargs.pop("strategy", "adaptive"))
-    kwargs.pop("strategy", None)
-    if strategy == "adaptive":
+    """Instantiates the configured Chunker subclass from a validated ChunkConfig."""
+    if config.strategy == "adaptive":
         return AdaptiveWindowChunker(
-            floor=int(kwargs.get("floor", AdaptiveWindowChunker.DEFAULT_FLOOR)),
-            ceiling=int(kwargs.get("ceiling", AdaptiveWindowChunker.DEFAULT_CEILING)),
-            overlap=int(kwargs.get("overlap", AdaptiveWindowChunker.DEFAULT_OVERLAP)),
+            floor=config.floor,
+            ceiling=config.ceiling,
+            overlap=config.overlap,
             corpus=corpus,
-            include_overlap_heading=bool(kwargs.get("include_overlap_heading", True)),
+            include_overlap_heading=config.include_overlap_heading,
         )
-    if strategy == "pericope":
+    if config.strategy == "pericope":
         return PericopeChunker(
-            ceiling=int(kwargs.get("ceiling", PericopeChunker.DEFAULT_CEILING)),
-            overlap=int(kwargs.get("overlap", PericopeChunker.DEFAULT_OVERLAP)),
+            ceiling=config.ceiling,
+            overlap=config.overlap,
             corpus=corpus,
-            include_overlap_heading=bool(kwargs.get("include_overlap_heading", True)),
+            include_overlap_heading=config.include_overlap_heading,
         )
-    if strategy == "token_window":
+    if config.strategy == "token_window":
         return TokenWindowChunker(
-            ceiling=int(kwargs.get("ceiling", TokenWindowChunker.DEFAULT_CEILING)),
-            overlap=int(kwargs.get("overlap", TokenWindowChunker.DEFAULT_OVERLAP)),
+            ceiling=config.ceiling,
+            overlap=config.overlap,
             corpus=corpus,
-            tokenizer=kwargs.get("tokenizer"),
-            headroom_margin=int(kwargs.get("headroom_margin", TokenWindowChunker.DEFAULT_HEADROOM_MARGIN)),
-            include_overlap_heading=bool(kwargs.get("include_overlap_heading", True)),
+            tokenizer=config.tokenizer,
+            headroom_margin=config.headroom_margin,
+            include_overlap_heading=config.include_overlap_heading,
         )
-    raise ValueError(f"Unknown chunking strategy: '{strategy}'")
+    raise ValueError(f"Unknown chunking strategy: '{config.strategy}'")

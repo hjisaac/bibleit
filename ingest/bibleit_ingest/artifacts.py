@@ -12,50 +12,6 @@ logger = logging.getLogger(__name__)
 
 LOCK_FILENAME = "config.lock.yaml"
 
-_RENDER_STRATEGY_SHORT = {
-    "text_only": "text",
-    "heading_and_text": "heading",
-    "book_and_heading": "book_heading",
-    "address_and_heading": "addr_heading",
-}
-
-
-def format_chunk_slug(config: Mapping[str, Any]) -> str:
-    """Formats a concise, deterministic slug describing chunking parameters."""
-    f = config.get("floor", 5)
-    c = config.get("ceiling", 30)
-    o = config.get("overlap", 0)
-    ovh_flag = ""
-    if o > 0 and "include_overlap_heading" in config and config["include_overlap_heading"] is not None:
-        ovh_flag = "_ovh1" if config.get("include_overlap_heading") else "_ovh0"
-    strat_key = str(config.get("render_strategy", "heading_and_text"))
-    strat = _RENDER_STRATEGY_SHORT.get(strat_key, strat_key[:8])
-    strategy = config.get("strategy", "adaptive")
-    if strategy == "pericope":
-        return f"peri_c{c}_o{o}{ovh_flag}_{strat}"
-    if strategy == "token_window":
-        return f"tok_c{c}_o{o}{ovh_flag}_{strat}"
-    return f"f{f}_c{c}_o{o}{ovh_flag}_{strat}"
-
-
-def extract_chunk_criteria(config: Mapping[str, Any]) -> dict[str, Any]:
-    """Extracts canonical chunking parameters for lock files and upstream artifact matching."""
-    if "strategy" not in config:
-        raise KeyError("Missing required 'strategy' parameter in configuration")
-    strategy = str(config["strategy"])
-    overlap = int(config.get("overlap", 0))
-    criteria: dict[str, Any] = {
-        "strategy": strategy,
-        "ceiling": int(config["ceiling"]),
-        "overlap": overlap,
-        "render_strategy": str(config.get("render_strategy", "heading_and_text")),
-    }
-    if strategy == "adaptive" and config.get("floor") is not None:
-        criteria["floor"] = int(config["floor"])
-    if overlap > 0 and "include_overlap_heading" in config and config["include_overlap_heading"] is not None:
-        criteria["include_overlap_heading"] = bool(config["include_overlap_heading"])
-    return criteria
-
 
 def save_chunks_artifact(path: Path, chunks: Sequence[Passage]) -> Path:
     """Serializes Passage chunks to chunks.json using canonical Scripture coordinates."""
@@ -157,17 +113,15 @@ def read_lock_file(path: Path) -> dict[str, Any]:
 
 def resolve_matching_artifacts(
     stage_outputs_dir: Path,
-    criteria: dict[str, Any],
+    target_hash: str,
 ) -> Path | None:
-    """Scans subdirectories in stage_outputs_dir for a config.lock.yaml matching criteria.
+    """Scans subdirectories in stage_outputs_dir for a config.lock.yaml with matching hash.
 
     Returns the newest matching run directory, or None if no match is found.
     """
     if not stage_outputs_dir.exists():
         return None
 
-    matches: list[Path] = []
-    # Search run subdirectories in stage_outputs_dir sorted newest first
     candidates = sorted(
         [d for d in stage_outputs_dir.iterdir() if d.is_dir()],
         key=lambda p: p.stat().st_mtime,
@@ -180,17 +134,11 @@ def resolve_matching_artifacts(
             continue
         try:
             lock_data = read_lock_file(lock_path)
-            params = lock_data.get("parameters", lock_data)
-            # Require every criterion key to exist and match in artifact params
-            if all(k in params and params[k] == criteria[k] for k in criteria):
-                matches.append(run_dir)
+            if lock_data.get("hash") == target_hash:
+                logger.info("Resolved matching artifact at %s matching hash %s", run_dir, target_hash)
+                return run_dir
         except Exception as exc:
             logger.debug("Failed reading lock file %s: %s", lock_path, exc)
 
-    if matches:
-        chosen = matches[0]
-        logger.info("Resolved matching artifact at %s matching %s", chosen, criteria)
-        return chosen
-
-    logger.warning("No artifact matching %s found in %s", criteria, stage_outputs_dir)
+    logger.warning("No artifact matching hash %s found in %s", target_hash, stage_outputs_dir)
     return None

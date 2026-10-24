@@ -4,8 +4,6 @@ from typing import Any
 from datalens import AnalysisConfig, run_analysis
 
 from bibleit_ingest.artifacts import (
-    extract_chunk_criteria,
-    format_chunk_slug,
     save_chunks_artifact,
     write_inspection_samples,
     write_lock_file,
@@ -15,6 +13,7 @@ from bibleit_ingest.constants import FASTEMBED_CACHE_DIR, OLD_TESTAMENT_BOOKS
 from bibleit_ingest.embedding import Embedder
 from bibleit_ingest.pericopes import get_or_prepare_corpus
 from bibleit_ingest.renderers import get_renderer
+from bibleit_ingest.types import ChunkConfig
 from analysis.job import AnalysisJobBase
 
 logger = logging.getLogger(__name__)
@@ -24,7 +23,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
     path_config_keys = ("web_path", "bsb_dir")
 
     def _make_slug(self) -> str:
-        return format_chunk_slug(self.config)
+        return ChunkConfig(**self.config["chunk"]).slug
 
     def on_prepare(self) -> dict:
         corpus, pericopes = get_or_prepare_corpus(self.web_path, self.bsb_dir)
@@ -45,36 +44,27 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
     def on_execute(self, prepared: dict) -> dict[str, Any]:
         corpus = prepared["corpus"]
         pericopes = prepared["pericopes"]
-        if "strategy" not in self.config:
-            raise KeyError("Missing required 'strategy' parameter in chunking configuration")
-        strategy_name = str(self.config["strategy"])
-        render_strategy = str(self.config.get("render_strategy", "heading_and_text"))
+        chunk_data = dict(self.config["chunk"])
+        if "tokenizer" not in chunk_data and "embedder" in prepared:
+            chunk_data["tokenizer"] = prepared["embedder"].model.tokenizer
+        chunk_cfg = ChunkConfig(**chunk_data)
+
         logger.info(
-            "Chunking corpus: strategy=%s, ceiling=%s, overlap=%s, include_overlap_heading=%s, renderer=%s",
-            strategy_name,
-            self.config.get("ceiling"),
-            self.config.get("overlap"),
-            self.config.get("include_overlap_heading"),
-            render_strategy,
+            "Chunking corpus: strategy=%s, ceiling=%s, overlap=%s, renderer=%s",
+            chunk_cfg.strategy,
+            chunk_cfg.ceiling,
+            chunk_cfg.overlap,
+            chunk_cfg.render_strategy,
         )
 
-        chunk_cfg = dict(self.config)
-        chunk_cfg.pop("strategy", None)
-        if "tokenizer" not in chunk_cfg and "embedder" in prepared:
-            chunk_cfg["tokenizer"] = prepared["embedder"].model.tokenizer
-
-        chunker = get_chunker(
-            strategy_name,
-            corpus=corpus,
-            **chunk_cfg,
-        )
+        chunker = get_chunker(chunk_cfg, corpus=corpus)
         chunks = chunker.chunk(pericopes, corpus=corpus)
         logger.info("Generated %d chunks; evaluating token distributions...", len(chunks))
 
         tokenizer = prepared["embedder"].model.tokenizer
         limit = int(self.config.get("token_limit", 512))
         renderer = get_renderer(
-            strategy=render_strategy,
+            strategy=chunk_cfg.render_strategy,
             corpus=corpus,
         )
 
@@ -152,10 +142,12 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
 
         save_chunks_artifact(self.run_dir / "chunks.json", result["chunks"])
 
+        chunk_cfg = ChunkConfig(**self.config["chunk"])
         lock_data = {
             "stage": "chunking",
+            "hash": chunk_cfg.content_hash,
             "parameters": {
-                **extract_chunk_criteria(self.config),
+                **chunk_cfg.canonical_dict,
                 "tokenizer_model": self.config.get("tokenizer_model", "nomic-ai/nomic-embed-text-v1.5"),
             },
             "output": {
@@ -169,6 +161,10 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
         if renderer:
             write_inspection_samples(self.run_dir, result["chunks"], renderer)
         logger.info("Saved chunk artifact with lock to %s", self.run_dir)
+
+        # Prune heavy in-memory data so logs and crucible output remain concise
+        for key in ("chunks", "texts", "records", "analysis_result", "renderer"):
+            result.pop(key, None)
 
 
 JOB_CLASS = AnalysisJobChunkingStrategy

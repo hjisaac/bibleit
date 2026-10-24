@@ -34,11 +34,15 @@ class Embedder(TextEmbedding, BaseEmbedder):
         return next(self.embed([f"{self.prefix_query}{text}"]))
 
     def embed_documents(
-        self, texts: Iterable[str], batch_size: int = 32
+        self,
+        texts: Iterable[str],
+        batch_size: int = 32,
+        parallel: int | None = None,
     ) -> Iterator[np.ndarray]:
         return self.embed(
             (f"{self.prefix_document}{t}" for t in texts),
             batch_size=batch_size,
+            parallel=parallel,
         )
 
     def embed_queries(

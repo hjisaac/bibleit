@@ -8,19 +8,20 @@ k:
   - 5
   - 10
 
-strategy: "token_window"
-ceiling:
-  - 256
-  - 512
-overlap:
-  - 0
-  - 1
-include_overlap_heading:
-  - true
-  - false
-render_strategy:
-  - "heading_and_text"
-  - "book_and_heading"
+chunk:
+  strategy: "token_window"
+  ceiling:
+    - 256
+    - 512
+  overlap:
+    - 0
+    - 1
+  include_overlap_heading:
+    - true
+    - false
+  render_strategy:
+    - "heading_and_text"
+    - "book_and_heading"
 
 eval_data_path: ingest/data/eval/question_to_passage.json
 web_path: ingest/data/translations/web/en/web.json

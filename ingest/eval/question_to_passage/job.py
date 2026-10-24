@@ -8,8 +8,6 @@ from codetiming import Timer
 from tqdm import tqdm
 
 from bibleit_ingest.artifacts import (
-    extract_chunk_criteria,
-    format_chunk_slug,
     load_chunks_artifact,
     read_lock_file,
     resolve_matching_artifacts,
@@ -25,6 +23,7 @@ from bibleit_ingest.embedding import Embedder
 from bibleit_ingest.helpers import trigger_retrieval_eval
 from bibleit_ingest.pericopes import get_or_prepare_corpus
 from bibleit_ingest.report import format_passage, generate_retrieval_report
+from bibleit_ingest.types import ChunkConfig
 from eval.job import EvalJobBase
 
 logger = logging.getLogger(__name__)
@@ -38,9 +37,10 @@ class EvalJobQuestionToPassage(EvalJobBase):
 
     def _make_slug(self) -> str:
         k = self.config.get("k", 1)
+        chunk_cfg = ChunkConfig(**self.config["chunk"])
         model = str(self.config.get("embedding_model", "nomic"))
         model_short = "nomic" if "nomic" in model else model.split("/")[-1]
-        return f"k{k}_{format_chunk_slug(self.config)}_{model_short}"
+        return f"k{k}_{chunk_cfg.slug}_{model_short}"
 
     def on_start(self) -> None:
         super().on_start()
@@ -48,14 +48,13 @@ class EvalJobQuestionToPassage(EvalJobBase):
 
     def on_prepare(self) -> dict:
         k = int(self.config.get("k", 1))
-        render_strategy = str(self.config.get("render_strategy", "heading_and_text"))
+        chunk_cfg = ChunkConfig(**self.config["chunk"])
         embedding_model = EmbeddingModel(self.config["embedding_model"])
         self.config["chunk_source_model"] = str(embedding_model)
 
         corpus, _ = get_or_prepare_corpus(self.web_path, BSB_DIR)
 
         # 1. Resolve embedding artifact (explicit override, or auto-match from embed_corpus)
-        # emb_dir_override: Optional path supplied in config to bypass search and use an explicit embedding artifact.
         emb_dir_override = self.config.get("embedding_artifact_dir")
         if emb_dir_override:
             emb_run_dir = Path(emb_dir_override)
@@ -64,23 +63,18 @@ class EvalJobQuestionToPassage(EvalJobBase):
         else:
             emb_run_dir = None
 
-        # emb_outputs: Directory holding upstream embedding runs to search across.
-        # emb_criteria: Hyperparameter filters that upstream config.lock.yaml must match exactly.
+        # emb_outputs: Directory holding upstream embedding runs to search across by content hash.
         emb_outputs = REPO / "ingest" / "analysis" / "embed_corpus" / "outputs"
-        emb_criteria: dict[str, Any] = {
-            **extract_chunk_criteria(self.config),
-            "embedding_model": str(embedding_model),
-        }
 
         if not emb_run_dir:
-            emb_run_dir = resolve_matching_artifacts(emb_outputs, emb_criteria)
+            emb_run_dir = resolve_matching_artifacts(emb_outputs, chunk_cfg.content_hash)
 
         if (
             not emb_run_dir
             or not (emb_run_dir / "embeddings.npy").exists()
             or not (emb_run_dir / "chunks.json").exists()
         ):
-            target_desc = f"{emb_run_dir}" if emb_run_dir else f"{emb_outputs} for criteria: {emb_criteria}"
+            target_desc = f"{emb_run_dir}" if emb_run_dir else f"{emb_outputs} for hash: {chunk_cfg.content_hash}"
             raise FileNotFoundError(
                 f"No matching embedding artifact (embeddings.npy / chunks.json) found in {target_desc}"
             )
@@ -96,7 +90,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
         assert len(chunks) == chunk_embeddings.shape[0], (
             f"chunks count ({len(chunks)}) != embedding rows ({chunk_embeddings.shape[0]})"
         )
-        logger.info("Loaded %d embedded chunks (strategy=%s)", len(chunks), render_strategy)
+        logger.info("Loaded %d embedded chunks (strategy=%s)", len(chunks), chunk_cfg.render_strategy)
 
         # 2. Query embedder
         threads = int(self.config.get("threads", 4))
@@ -141,9 +135,10 @@ class EvalJobQuestionToPassage(EvalJobBase):
         )
 
     def on_finalize(self, prepared: dict, result: dict) -> None:
+        chunk_cfg = ChunkConfig(**self.config["chunk"])
         eval_params = {
             "k": int(self.config.get("k", 1)),
-            **extract_chunk_criteria(self.config),
+            **chunk_cfg.canonical_dict,
             "embedding_model": str(self.config.get("embedding_model")),
         }
         diagnostics = result.pop("diagnostics", [])
@@ -165,6 +160,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
         # Write immutable lock file for evaluation artifact
         lock_data = {
             "stage": "evaluation",
+            "hash": chunk_cfg.content_hash,
             "parameters": eval_params,
             "output": {
                 "metrics": result.get("metrics", {}),

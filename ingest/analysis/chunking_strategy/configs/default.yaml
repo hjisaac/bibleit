@@ -1,10 +1,11 @@
 # Chunking parameters (verse-based)
-floor: 5
-ceiling: 30
-overlap: 1
-include_overlap_heading: true
-strategy: "adaptive"
-render_strategy: "heading_and_text"
+chunk:
+  strategy: "adaptive"
+  floor: 5
+  ceiling: 30
+  overlap: 1
+  include_overlap_heading: true
+  render_strategy: "heading_and_text"
 
 # Context limit for truncation checks
 token_limit: 512
