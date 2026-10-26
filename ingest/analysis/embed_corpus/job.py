@@ -31,14 +31,14 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
     path_config_keys = ("web_path", "bsb_dir")
 
     def _make_slug(self) -> str:
-        chunk_cfg = ChunkConfig(**self.config["chunk"])
+        chunk_cfg = ChunkConfig.from_mapping(self.config)
         model = str(self.config.get("embedding_model", "nomic"))
         model_short = "nomic" if "nomic" in model else model.split("/")[-1]
         return f"{chunk_cfg.slug}_{model_short}"
 
     def on_prepare(self) -> dict:
         corpus, _ = get_or_prepare_corpus(self.web_path, self.bsb_dir)
-        chunk_cfg = ChunkConfig(**self.config["chunk"])
+        chunk_cfg = ChunkConfig.from_mapping(self.config)
 
         # chunk_dir_override: Optional path supplied in config to bypass search and use an explicit chunk artifact.
         chunk_dir_override = self.config.get("chunk_run_dir")
@@ -128,7 +128,7 @@ class AnalysisJobEmbedCorpus(AnalysisJobBase):
         save_chunks_artifact(self.run_dir / "chunks.json", result["chunks"])
 
         matrix = result["embeddings"]
-        chunk_cfg = ChunkConfig(**self.config["chunk"])
+        chunk_cfg = ChunkConfig.from_mapping(self.config)
         lock_data = {
             "stage": "embedding",
             "hash": chunk_cfg.content_hash,

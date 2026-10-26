@@ -239,6 +239,78 @@ This document tracks direct empirical evidence, papers proving each claim, what 
 
 ---
 
+## Fact 13: Overlap Degrades Dense Retrieval via Top-k Slot Cannibalization
+
+### What Has Been Empirically Proven (2026-10-25 16-Run Eval Sweep)
+- While sliding window overlap ($o=1$) increases adjacent passage geometric continuity ($\mu = 0.880$ vs $0.865$), it **consistently degrades downstream retrieval performance** across all ceilings ($256$ and $512$) and ranking depths ($k \in [1, 3, 5, 10]$).
+- **Ceiling 256:**
+  - $o=0$: $\text{Hit@10} = \mathbf{70.32\%}, \text{MRR} = \mathbf{0.4677}, \text{NDCG@10} = \mathbf{0.5246}$
+  - $o=1$: $\text{Hit@10} = 69.07\%, \text{MRR} = 0.4556, \text{NDCG@10} = 0.5090$
+- **Ceiling 512:**
+  - $o=0$: $\text{Hit@10} = \mathbf{69.75\%}, \text{MRR} = \mathbf{0.4637}, \text{NDCG@10} = \mathbf{0.5202}$
+  - $o=1$: $\text{Hit@10} = 67.27\%, \text{MRR} = 0.4499, \text{NDCG@10} = 0.4989$
+
+### Why It Works This Way: Top-k Slot Cannibalization
+- When two adjacent passages share an overlapping verse, their vector representations become near-identical.
+- In top-$k$ retrieval, both the primary passage and its overlapping neighbor achieve high cosine similarity to the query.
+- The redundant neighbor passage **cannibalizes one of the scarce top-$k$ slots** (e.g. occupying rank 2 right after rank 1), displacing distinct alternative candidate passages down or pushing them entirely outside the top-$k$ evaluation window.
+- Zero-overlap ($o=0$) enforces strict mutual exclusivity among chunks, maximizing the information diversity of top-$k$ candidate sets.
+
+![Retrieval Evaluation Performance Across Candidates](assets/retrieval_sweep_performance.png)
+
+---
+
+## Fact 14: Canonical Grounding (`book_and_heading`) Doubles Semantic Margin
+
+### What Has Been Empirically Proven (2026-10-24 8-Run Embedding Sweep)
+- Prepending the canonical book name (e.g., `"Genesis: The Creation of the World"`) adds only $\approx 3\text{--}4$ tokens per passage, but **nearly doubles the topological contrast** ($\Delta = \text{Intra-Book} - \text{Cross-Book}$):
+  - Without book name (`heading_and_text`): $\Delta = \mathbf{+0.058 \text{ to } +0.067}$
+  - With book name (`book_and_heading`): $\Delta = \mathbf{+0.106 \text{ to } +0.125}$ ($2.1\times$ increase).
+- **Background Invariance:** Cross-book background similarity remains constant ($\mu \approx 0.69 \pm 0.04$).
+- Prepending the canonical book title injects strong topical prior clustering without introducing cross-book anisotropic distortion or false positives.
+
+---
+
+## Fact 15: The 512-Ceiling Plateau and 2x Client Memory Efficiency
+
+### What Has Been Empirically Proven
+- When comparing the zero-overlap winners at Ceiling 256 (`936945f7d470`) vs Ceiling 512 (`cbd6645a3d9a`):
+  - **Hit@1:** $35.10\%$ (256) vs $34.99\%$ (512) ($\Delta = 0.11\%$).
+  - **Hit@3:** $53.50\%$ (256) vs $\mathbf{55.19\%}$ (512) ($+1.69\%$ in favor of 512!).
+  - **Hit@10:** $\mathbf{70.32\%}$ (256) vs $69.75\%$ (512) ($\Delta = 0.57\%$).
+  - **MRR:** $\mathbf{0.4677}$ (256) vs $0.4637$ (512).
+  - **NDCG@10:** $\mathbf{0.5246}$ (256) vs $0.5202$ (512).
+- **Operational Payoff:**
+  - Ceiling 512 matches Ceiling 256 within $\approx 0.5\%$ retrieval accuracy, but cuts total chunks from **5,318 to 2,655** (a **$50.1\%$ reduction**).
+  - The vector index shrinks from **32 MB to 16 MB** uncompressed float32 (~2 MB int8), halving WebAssembly dot-product search latency on client mobile devices.
+
+---
+
+## Fact 16: The Natural Pericope Distribution & The Heavy-Tail Dilemma
+
+### Empirical Distribution of Biblical Pericopes (BSB / WEB Corpus, $N=3,015$)
+- **Median ($p50$):** **$269$ tokens** ($\approx 10\text{--}12$ verses).
+- **Min:** **$24$ tokens** (short poetic superscriptions or brief transitions).
+- **Max:** **$3,068$ tokens** (massive chapters such as Psalm 119 and genealogies).
+- **$p95$:** **$766$ tokens**; **$p99$:** **$1,162$ tokens**.
+- **Oversize Ratio:** **$506$ pericopes ($16.8\%$) exceed $512$ tokens**.
+
+### The Architectural Trade-off
+- Human editorial pericopes reflect narrative cohesion, not bounded vector budgets.
+- Pure pericope chunking creates an extreme variance challenge: $16.8\%$ of chunks are oversized, while tiny 1-verse pericopes create semantic fragmentation.
+- Bounded token-window chunking (`TokenWindowChunker`) bridges this gap: it packs whole short pericopes together up to the ceiling, but gracefully subdivides oversize pericopes to guarantee bounded sequence lengths.
+
+---
+
+## Fact 17: Deterministic Content-Addressed Artifact Lineage via BLAKE2b
+
+### Principle & Implementation
+- Eliminates fuzzy heuristic string matching (`extract_chunk_criteria`) in favor of cryptographic BLAKE2b digests ($d=6$ bytes, 12 hex characters) over canonical parameter dictionaries.
+- `ChunkConfig` serves as the single source of truth across all pipeline stages.
+- Enables idempotent execution, exact content resolution, and verifiable lineage across chunking, embedding, and retrieval evaluation stages.
+
+---
+
 ## Summary Reference Table for Future Papers
 
 | Fact / Concept | Core Finding & Paper | Why It Works | What to Try / How it Translates to `bibleit` |
@@ -249,12 +321,11 @@ This document tracks direct empirical evidence, papers proving each claim, what 
 | **Late Chunking** | Encode long document first, pool into small chunks at the end (*Günther et al., Jina AI, 2024*). | Preserves cross-chunk pronoun context while keeping search vectors small and sharp. | Try encoding entire chapters and pooling per pericope to resolve ambiguous pronouns. |
 | **Contextual Retrieval** | Prepending a 50-token context header cuts retrieval failure by 35% (*Anthropic, 2024*). | Small chunks stay sharp while retaining knowledge of where they come from. | Use `book_and_heading` rendering strategy (adds only ~15 tokens, provides full context). |
 | **Dimension vs. Chunk Size** | Increasing vector dimension ($d \rightarrow 4096$) does *not* fix long-chunk loss. | Query-doc length asymmetry inflates $\|\mathbf{d}\|$, suppressing cosine scores; distance concentration in high dims. | Sweep `[256, 512, 1024, 2048]` token ceilings to empirically locate the retrieval cliff. |
-| **TokenWindow Guarantee** | `TokenWindowChunker` with 25-tok margin guarantees 0% overflow across 31,102 verses (2026-10-15 sweep). | Packing density hits 70–75% of ceiling at $p50$ while strictly enforcing safety margin; $o=1$ costs +4.6 tokens. | Use $c=512, o=1$ (2,655 chunks, ~2 MB int8) for standard offline PWA deployment. |
-| **Structural vs. Semantic Seam** | 3–10 token text changes alter vector space geometry significantly despite length invariance. | Overlap headings create multi-topic bridges vs. purity; book grounding injects priors but risks intra-book collapse. | Keep structural flags in embedding ablation; evaluate via isotropy and downstream MRR/Recall. |
-| **Mobile PWA Budget** | ~2,655 chunks @ ~365 tokens fits in ~2.0 MB int8. | Exhaustive cosine search completes in <8 ms in WebAssembly / TypedArrays. | Enables 100% offline client-side semantic search with instant user response time. |
-| **CPU Embedding Dynamics** | $B=16$ with $N/2$ workers reaches **2.73 chunks/s**; $B=64$ causes $2.1\times$ throughput drop from cache thrashing. | Small batches fit in L2 cache; $N/2$ workers leaves 4 cores free for host system responsiveness. | Configure `batch_size: 16` and `parallel: 4` in embedding pipelines on 8-core CPUs. |
-| **Vector Geometry Hierarchy** | Cosine similarity decomposes into Adjacent ($0.855$), Intra-Book ($0.753$), Cross-Book ($0.693$). | $0.16$ separation proves fine-grained semantic margin; Roy & Vetterli effective rank is 498.55 / 768 (no collapse). | Monitor hierarchy and effective rank to detect anisotropic collapse across embedding models. |
-| **Monte Carlo Estimation** | $S=2,000$ uniform samples estimate population parameters of 14.1M pairs with $\text{SE} \le 0.011$ in $<0.2\text{s}$. | Avoids computing multi-gigabyte $14.1\text{M}$ Gram matrix while preserving statistical precision. | Use stratified Monte Carlo random sampling for fast real-time embedding diagnostics. |
-| **Cryptographic Lock Lineage** | Hierarchical `config.lock.yaml` preserves full provenance across chunking $\rightarrow$ embedding $\rightarrow$ eval. | Chaining upstream metadata guarantees downstream runtime asserts matching query-corpus models. | Enforce version-gated artifact seams between Python ingest and the Astro frontend. |
+| **TokenWindow Guarantee** | `TokenWindowChunker` with 25-tok margin guarantees 0% overflow across 31,102 verses (2026-10-15 sweep). | Packing density hits 70–75% of ceiling at $p50$ while strictly enforcing safety margin; $o=1$ costs +4.6 tokens. | Use $c=512, o=0$ (2,655 chunks, ~2 MB int8) for standard offline PWA deployment. |
+| **Slot Cannibalization** | Sliding overlap ($o=1$) lowers Hit@10 by $1.3\text{--}2.5\%$ and MRR by $0.012\text{--}0.014$ across all ceilings. | Duplicate neighbor chunks compete for top-$k$ rankings, displacing distinct alternative candidates. | Set $o=0$ for dense passage retrieval to maximize candidate diversity in top-$k$. |
+| **Book Grounding Contrast** | `book_and_heading` doubles canonical margin $\Delta$ ($+0.058 \rightarrow +0.125$) with constant cross-book noise. | Injects strong intra-book clustering prior without altering background isotropy. | Prepend book name to all passage texts during rendering. |
+| **512-Ceiling Plateau** | Ceiling 512 achieves identical retrieval accuracy to 256 within $0.5\%$, with $50.1\%$ fewer vectors. | Captures full pericopes without fragmentation while avoiding multi-chapter dilution. | Deploy Ceiling 512 ($2,655$ chunks / 16 MB float32) for optimal mobile memory & search speed. |
+| **Pericope Heavy Tail** | Biblical pericopes have median $269$ tokens, but $16.8\%$ exceed $512$ tokens (max $3,068$ tokens). | Human editorial breaks follow narrative arcs, creating high token variance. | Use bounded pericope chunking to preserve pericope boundaries while splitting heavy tails. |
+| **Cryptographic Lock Lineage** | Hierarchical `config.lock.yaml` with BLAKE2b digests guarantees exact seam provenance. | Chaining upstream hashes guarantees runtime assertions matching query-corpus models. | Enforce version-gated artifact seams between Python ingest and the Astro frontend. |
 
 

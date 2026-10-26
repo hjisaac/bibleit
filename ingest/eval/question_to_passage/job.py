@@ -25,6 +25,7 @@ from bibleit_ingest.pericopes import get_or_prepare_corpus
 from bibleit_ingest.report import format_passage, generate_retrieval_report
 from bibleit_ingest.types import ChunkConfig
 from eval.job import EvalJobBase
+from eval.question_to_passage.plots import generate_retrieval_plots
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
 
     def _make_slug(self) -> str:
         k = self.config.get("k", 1)
-        chunk_cfg = ChunkConfig(**self.config["chunk"])
+        chunk_cfg = ChunkConfig.from_mapping(self.config)
         model = str(self.config.get("embedding_model", "nomic"))
         model_short = "nomic" if "nomic" in model else model.split("/")[-1]
         return f"k{k}_{chunk_cfg.slug}_{model_short}"
@@ -48,7 +49,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
 
     def on_prepare(self) -> dict:
         k = int(self.config.get("k", 1))
-        chunk_cfg = ChunkConfig(**self.config["chunk"])
+        chunk_cfg = ChunkConfig.from_mapping(self.config)
         embedding_model = EmbeddingModel(self.config["embedding_model"])
         self.config["chunk_source_model"] = str(embedding_model)
 
@@ -135,7 +136,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
         )
 
     def on_finalize(self, prepared: dict, result: dict) -> None:
-        chunk_cfg = ChunkConfig(**self.config["chunk"])
+        chunk_cfg = ChunkConfig.from_mapping(self.config)
         eval_params = {
             "k": int(self.config.get("k", 1)),
             **chunk_cfg.canonical_dict,
@@ -143,11 +144,16 @@ class EvalJobQuestionToPassage(EvalJobBase):
         }
         diagnostics = result.pop("diagnostics", [])
         if diagnostics:
+            metrics_dict = result.get("metrics", {})
+            plot_path = generate_retrieval_plots(diagnostics, metrics_dict, eval_params["k"], self.run_dir)
+            if self.tracker is not None:
+                self.tracker.track_artifact(plot_path, name="retrieval-plots", type="plots")
+
             report_path = self.run_dir / "retrieval_inspect.md"
             generate_retrieval_report(
                 diagnostics=diagnostics,
                 renderer=lambda idx: format_passage(prepared["chunks"][idx], prepared["corpus"]),
-                metrics=result.get("metrics", {}),
+                metrics=metrics_dict,
                 params=eval_params,
                 out_path=report_path,
             )

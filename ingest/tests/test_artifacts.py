@@ -136,3 +136,32 @@ def test_save_and_load_chunks_artifact(tmp_path: Path) -> None:
     loaded = load_chunks_artifact(path)
     assert loaded == chunks
 
+
+def test_chunk_config_from_mapping() -> None:
+    # Top-level mapping (from Crucible sweep points)
+    flat_point = {
+        "strategy": "token_window",
+        "ceiling": 512,
+        "overlap": 1,
+        "token_limit": 512,
+        "track": True,
+    }
+    cfg_flat = ChunkConfig.from_mapping(flat_point)
+    assert cfg_flat.strategy == "token_window"
+    assert cfg_flat.ceiling == 512
+    assert cfg_flat.overlap == 1
+
+    # Nested 'chunk' mapping (from scoped configs)
+    nested_point = {
+        "chunk": {
+            "strategy": "adaptive",
+            "ceiling": 30,
+            "floor": 4,
+        },
+        "track": False,
+    }
+    cfg_nested = ChunkConfig.from_mapping(nested_point)
+    assert cfg_nested.strategy == "adaptive"
+    assert cfg_nested.ceiling == 30
+    assert cfg_nested.floor == 4
+

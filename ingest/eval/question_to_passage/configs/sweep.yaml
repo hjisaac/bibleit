@@ -8,16 +8,15 @@ k:
   - 4
   - 5
 
-chunk:
-  strategy: "adaptive"
-  floor: 5
-  ceiling: 30
-  overlap: 0
-  render_strategy:
-    - heading_and_text
-    - text_only
-    - book_and_heading
-    - address_and_heading
+strategy: "adaptive"
+floor: 5
+ceiling: 30
+overlap: 0
+render_strategy:
+  - heading_and_text
+  - text_only
+  - book_and_heading
+  - address_and_heading
 
 # REPO-relative, not CWD-relative (see job.py).
 eval_data_path: ingest/data/eval/question_to_passage.json

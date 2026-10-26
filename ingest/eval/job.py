@@ -41,7 +41,7 @@ class EvalJobBase(AbstractJob):
 
     def on_track(self) -> None:
         logger.info("Using config:\n%s", json.dumps(self.config, indent=2, default=str))
-        if config("TRACK", default=True, cast=bool):
+        if config("BIBLEIT_TRACKING_ENABLED", default=True, cast=bool):
             self.tracker = WBTracker(run_name=getattr(self, "run_name", self.run_id), project=self.project_name, config=self.config)
         else:
             self.tracker = None

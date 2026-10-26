@@ -1,14 +1,13 @@
 # Grid sweep configuration for chunking strategy analysis
-chunk:
-  strategy: "adaptive"
-  floor: [3, 5, 8]
-  ceiling: [20, 30]
-  overlap: [0, 1, 2]
-  render_strategy:
-    - "text_only"
-    - "heading_and_text"
-    - "book_and_heading"
-    - "address_and_heading"
+strategy: "adaptive"
+floor: [3, 5, 8]
+ceiling: [20, 30]
+overlap: [0, 1, 2]
+render_strategy:
+  - "text_only"
+  - "heading_and_text"
+  - "book_and_heading"
+  - "address_and_heading"
 
 token_limit: 512
 tokenizer_model: "nomic-ai/nomic-embed-text-v1.5"

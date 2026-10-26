@@ -1,7 +1,7 @@
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 import hashlib
 import json
-from typing import Any, Iterable, Literal, Sequence
+from typing import Any, Iterable, Literal, Mapping, Sequence
 
 from .constants import ARTIFACT_DIGEST_BYTES
 
@@ -144,6 +144,16 @@ class ChunkConfig:
         if self.strategy == "token_window":
             return f"tok_c{self.ceiling}_o{self.overlap}{ovh}_{strat}"
         return f"f{self.floor}_c{self.ceiling}_o{self.overlap}{ovh}_{strat}"
+
+    @classmethod
+    def from_mapping(cls, mapping: Mapping[str, Any]) -> "ChunkConfig":
+        """Constructs ChunkConfig from either a nested 'chunk' dict or top-level keys."""
+        source = mapping.get("chunk", mapping)
+        if not isinstance(source, Mapping):
+            raise TypeError(f"Expected mapping for chunk config, got {type(source).__name__}")
+        chunk_fields = {f.name for f in fields(cls)}
+        kwargs = {k: v for k, v in source.items() if k in chunk_fields}
+        return cls(**kwargs)
 
     @property
     def slug(self) -> str:

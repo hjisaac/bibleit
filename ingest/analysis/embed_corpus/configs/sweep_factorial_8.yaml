@@ -7,18 +7,17 @@ batch_size: 16
 threads: 4
 parallel: 4
 
-chunk:
-  strategy: "token_window"
-  ceiling:
-    - 256
-    - 512
-  overlap:
-    - 0
-    - 1
-  include_overlap_heading: true
-  render_strategy:
-    - "heading_and_text"
-    - "book_and_heading"
+strategy: "token_window"
+ceiling:
+  - 256
+  - 512
+overlap:
+  - 0
+  - 1
+include_overlap_heading: true
+render_strategy:
+  - "heading_and_text"
+  - "book_and_heading"
 
 chunk_run_dir: null
 web_path: "ingest/data/translations/web/en/web.json"

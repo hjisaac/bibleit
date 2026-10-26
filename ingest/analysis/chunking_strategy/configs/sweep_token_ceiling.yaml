@@ -1,20 +1,19 @@
 # Token ceiling ablation sweep
-chunk:
-  strategy: "token_window"
-  ceiling:
-    - 256
-    - 512
-    - 1024
-  overlap:
-    - 0
-    - 1
-  include_overlap_heading:
-    - true
-    - false
-  render_strategy:
-    - "heading_and_text"
-    - "book_and_heading"
-  headroom_margin: 25
+strategy: "token_window"
+ceiling:
+  - 256
+  - 512
+  - 1024
+overlap:
+  - 0
+  - 1
+include_overlap_heading:
+  - true
+  - false
+render_strategy:
+  - "heading_and_text"
+  - "book_and_heading"
+headroom_margin: 25
 
 token_limit: 512
 tokenizer_model: "nomic-ai/nomic-embed-text-v1.5"

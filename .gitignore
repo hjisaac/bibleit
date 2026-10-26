@@ -18,6 +18,7 @@ ingest/scripts/pericope_sizes.json
 ingest/eval/*/outputs/
 ingest/analysis/*/outputs/
 ingest/analysis/*/archive*
+ingest/eval/*/archive*
 *.tar.gz
 **/outputs/
 # Weights & Biases' own local run cache (see WBTracker) -- run data
@@ -271,3 +272,6 @@ app/.env
 app/.env.*
 app/.env.local
 !app/.env.example
+
+# Uncommitted white paper draft and assets
+paper/

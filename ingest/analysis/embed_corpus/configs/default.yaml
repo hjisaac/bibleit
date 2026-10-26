@@ -9,12 +9,13 @@ threads: 4
 parallel: 4
 
 # Upstream chunk artifact parameters (to auto-match from analysis/chunking_strategy/outputs)
-chunk:
-  strategy: "token_window"
-  ceiling: 256
-  overlap: 1
-  include_overlap_heading: true
-  render_strategy: "heading_and_text"
+strategy: "token_window"
+ceiling: 256
+overlap: 1
+floor: 5
+headroom_margin: 25
+include_overlap_heading: true
+render_strategy: "heading_and_text"
 
 # Optional explicit path to an upstream chunk run dir
 chunk_run_dir: null

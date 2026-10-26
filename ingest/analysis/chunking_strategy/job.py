@@ -23,7 +23,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
     path_config_keys = ("web_path", "bsb_dir")
 
     def _make_slug(self) -> str:
-        return ChunkConfig(**self.config["chunk"]).slug
+        return ChunkConfig.from_mapping(self.config).slug
 
     def on_prepare(self) -> dict:
         corpus, pericopes = get_or_prepare_corpus(self.web_path, self.bsb_dir)
@@ -44,10 +44,10 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
     def on_execute(self, prepared: dict) -> dict[str, Any]:
         corpus = prepared["corpus"]
         pericopes = prepared["pericopes"]
-        chunk_data = dict(self.config["chunk"])
-        if "tokenizer" not in chunk_data and "embedder" in prepared:
-            chunk_data["tokenizer"] = prepared["embedder"].model.tokenizer
-        chunk_cfg = ChunkConfig(**chunk_data)
+        extra = {}
+        if "tokenizer" not in self.config and "embedder" in prepared:
+            extra["tokenizer"] = prepared["embedder"].model.tokenizer
+        chunk_cfg = ChunkConfig.from_mapping({**self.config, **extra})
 
         logger.info(
             "Chunking corpus: strategy=%s, ceiling=%s, overlap=%s, renderer=%s",
@@ -142,7 +142,7 @@ class AnalysisJobChunkingStrategy(AnalysisJobBase):
 
         save_chunks_artifact(self.run_dir / "chunks.json", result["chunks"])
 
-        chunk_cfg = ChunkConfig(**self.config["chunk"])
+        chunk_cfg = ChunkConfig.from_mapping(self.config)
         lock_data = {
             "stage": "chunking",
             "hash": chunk_cfg.content_hash,

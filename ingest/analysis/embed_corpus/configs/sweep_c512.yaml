@@ -1,0 +1,24 @@
+# 4-run embedding sweep resuming Ceiling 512 points
+log_console_level: INFO
+log_file_level: INFO
+
+embedding_model: "nomic-ai/nomic-embed-text-v1.5"
+batch_size: 16
+threads: 4
+parallel: 4
+
+strategy: "token_window"
+ceiling:
+  - 512
+overlap:
+  - 0
+  - 1
+include_overlap_heading: true
+render_strategy:
+  - "heading_and_text"
+  - "book_and_heading"
+
+chunk_run_dir: null
+web_path: "ingest/data/translations/web/en/web.json"
+bsb_dir: "ingest/data/translations/bsb/en"
+track: true
