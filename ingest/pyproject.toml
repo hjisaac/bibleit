@@ -18,6 +18,7 @@ dependencies = [
     "python-decouple>=3.8",
     "snakemd>=2.0.0",
     "tqdm>=4.66.0",
+    "typer>=0.12",
     "usearch>=2.26.2",
 ]
 

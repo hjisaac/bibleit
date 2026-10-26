@@ -6,6 +6,8 @@ from fastembed import TextEmbedding
 
 from rag_core.embedders import BaseEmbedder
 
+from .constants import DOCUMENT_PREFIX, QUERY_PREFIX
+
 
 class Embedder(TextEmbedding, BaseEmbedder):
     """FastEmbed TextEmbedding subclass implementing BaseEmbedder."""
@@ -14,8 +16,8 @@ class Embedder(TextEmbedding, BaseEmbedder):
         self,
         model_name: str = "nomic-ai/nomic-embed-text-v1.5",
         cache_dir: Path | str | None = None,
-        prefix_query: str = "search_query: ",
-        prefix_document: str = "search_document: ",
+        prefix_query: str = QUERY_PREFIX,
+        prefix_document: str = DOCUMENT_PREFIX,
         **kwargs,
     ):
         super().__init__(

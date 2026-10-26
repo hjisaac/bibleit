@@ -781,6 +781,7 @@ dependencies = [
     { name = "ranx" },
     { name = "snakemd" },
     { name = "tqdm" },
+    { name = "typer" },
     { name = "usearch" },
 ]
 
@@ -801,6 +802,7 @@ requires-dist = [
     { name = "ranx", specifier = ">=0.3.21" },
     { name = "snakemd", specifier = ">=2.0.0" },
     { name = "tqdm", specifier = ">=4.66.0" },
+    { name = "typer", specifier = ">=0.12" },
     { name = "usearch", specifier = ">=2.26.2" },
 ]
 

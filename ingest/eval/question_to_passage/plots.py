@@ -17,11 +17,12 @@ def generate_retrieval_plots(
     metrics: dict[str, float],
     k: int,
     out_dir: Path,
-) -> Path:
+) -> dict[str, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "retrieval_diagnostics.png"
     total = len(diagnostics)
     if total == 0:
-        return out_dir / "retrieval_diagnostics.png"
+        return {"retrieval_diagnostics": out_path}
 
     ranks = [d.get("target_rank") for d in diagnostics]
     rank_counts = {r: ranks.count(r) for r in range(1, k + 1)}
@@ -91,4 +92,4 @@ def generate_retrieval_plots(
     out_path = out_dir / "retrieval_diagnostics.png"
     fig.savefig(out_path, dpi=180, bbox_inches="tight")
     plt.close(fig)
-    return out_path
+    return {"retrieval_diagnostics": out_path}

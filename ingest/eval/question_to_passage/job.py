@@ -40,8 +40,8 @@ class EvalJobQuestionToPassage(EvalJobBase):
         k = self.config.get("k", 1)
         chunk_cfg = ChunkConfig.from_mapping(self.config)
         model = str(self.config.get("embedding_model", "nomic"))
-        model_short = "nomic" if "nomic" in model else model.split("/")[-1]
-        return f"k{k}_{chunk_cfg.slug}_{model_short}"
+        quant_tag = "_i8" if self.config.get("quantized", False) else ""
+        return f"k{k}_{chunk_cfg.slug}_{model_short}{quant_tag}"
 
     def on_start(self) -> None:
         super().on_start()
@@ -55,43 +55,61 @@ class EvalJobQuestionToPassage(EvalJobBase):
 
         corpus, _ = get_or_prepare_corpus(self.web_path, BSB_DIR)
 
-        # 1. Resolve embedding artifact (explicit override, or auto-match from embed_corpus)
-        emb_dir_override = self.config.get("embedding_artifact_dir")
-        if emb_dir_override:
-            emb_run_dir = Path(emb_dir_override)
-            if not emb_run_dir.exists():
-                raise FileNotFoundError(f"Specified embedding_artifact_dir does not exist: {emb_dir_override}")
-        else:
-            emb_run_dir = None
-
-        # emb_outputs: Directory holding upstream embedding runs to search across by content hash.
-        emb_outputs = REPO / "ingest" / "analysis" / "embed_corpus" / "outputs"
-
-        if not emb_run_dir:
-            emb_run_dir = resolve_matching_artifacts(emb_outputs, chunk_cfg.content_hash)
-
-        if (
-            not emb_run_dir
-            or not (emb_run_dir / "embeddings.npy").exists()
-            or not (emb_run_dir / "chunks.json").exists()
-        ):
-            target_desc = f"{emb_run_dir}" if emb_run_dir else f"{emb_outputs} for hash: {chunk_cfg.content_hash}"
-            raise FileNotFoundError(
-                f"No matching embedding artifact (embeddings.npy / chunks.json) found in {target_desc}"
-            )
-
-        logger.info("Found matching upstream embedding artifact at %s", emb_run_dir)
+        # 1. Resolve artifact (quantized if requested, else raw embed_corpus)
+        use_quantized = bool(self.config.get("quantized", False))
         upstream_lock_meta: dict[str, Any] = {}
-        if (emb_run_dir / "config.lock.yaml").exists():
-            upstream_lock_meta = read_lock_file(emb_run_dir / "config.lock.yaml")
 
-        chunk_embeddings = np.load(emb_run_dir / "embeddings.npy")
-        chunks = load_chunks_artifact(emb_run_dir / "chunks.json")
+        if use_quantized:
+            quant_outputs = REPO / "ingest" / "analysis" / "quantize_corpus" / "outputs"
+            quant_dir_override = self.config.get("quantize_artifact_dir")
+            quant_run_dir = Path(quant_dir_override) if quant_dir_override else resolve_matching_artifacts(quant_outputs, chunk_cfg.content_hash)
+
+            if not quant_run_dir or not (quant_run_dir / "embeddings.i8.bin").exists() or not (quant_run_dir / "chunks.json").exists():
+                target_desc = f"{quant_run_dir}" if quant_run_dir else f"{quant_outputs} for hash: {chunk_cfg.content_hash}"
+                raise FileNotFoundError(f"No matching quantization artifact found in {target_desc}")
+
+            logger.info("Found matching upstream quantization artifact at %s", quant_run_dir)
+            if (quant_run_dir / "config.lock.yaml").exists():
+                upstream_lock_meta = read_lock_file(quant_run_dir / "config.lock.yaml")
+            chunks = load_chunks_artifact(quant_run_dir / "chunks.json")
+            dim = int(upstream_lock_meta.get("output", {}).get("shape", [len(chunks), 768])[1])
+            q_data = np.fromfile(quant_run_dir / "embeddings.i8.bin", dtype=np.int8).reshape(len(chunks), dim)
+            scales = np.fromfile(quant_run_dir / "scales.f32.bin", dtype=np.float32)
+            chunk_embeddings = (q_data.astype(np.float32) * scales[:, None])
+        else:
+            emb_dir_override = self.config.get("embedding_artifact_dir")
+            if emb_dir_override:
+                emb_run_dir = Path(emb_dir_override)
+                if not emb_run_dir.exists():
+                    raise FileNotFoundError(f"Specified embedding_artifact_dir does not exist: {emb_dir_override}")
+            else:
+                emb_run_dir = None
+
+            emb_outputs = REPO / "ingest" / "analysis" / "embed_corpus" / "outputs"
+            if not emb_run_dir:
+                emb_run_dir = resolve_matching_artifacts(emb_outputs, chunk_cfg.content_hash)
+
+            if (
+                not emb_run_dir
+                or not (emb_run_dir / "embeddings.npy").exists()
+                or not (emb_run_dir / "chunks.json").exists()
+            ):
+                target_desc = f"{emb_run_dir}" if emb_run_dir else f"{emb_outputs} for hash: {chunk_cfg.content_hash}"
+                raise FileNotFoundError(
+                    f"No matching embedding artifact (embeddings.npy / chunks.json) found in {target_desc}"
+                )
+
+            logger.info("Found matching upstream embedding artifact at %s", emb_run_dir)
+            if (emb_run_dir / "config.lock.yaml").exists():
+                upstream_lock_meta = read_lock_file(emb_run_dir / "config.lock.yaml")
+
+            chunk_embeddings = np.load(emb_run_dir / "embeddings.npy")
+            chunks = load_chunks_artifact(emb_run_dir / "chunks.json")
 
         assert len(chunks) == chunk_embeddings.shape[0], (
             f"chunks count ({len(chunks)}) != embedding rows ({chunk_embeddings.shape[0]})"
         )
-        logger.info("Loaded %d embedded chunks (strategy=%s)", len(chunks), chunk_cfg.render_strategy)
+        logger.info("Loaded %d embedded chunks (strategy=%s, quantized=%s)", len(chunks), chunk_cfg.render_strategy, use_quantized)
 
         # 2. Query embedder
         threads = int(self.config.get("threads", 4))
@@ -145,9 +163,10 @@ class EvalJobQuestionToPassage(EvalJobBase):
         diagnostics = result.pop("diagnostics", [])
         if diagnostics:
             metrics_dict = result.get("metrics", {})
-            plot_path = generate_retrieval_plots(diagnostics, metrics_dict, eval_params["k"], self.run_dir)
+            plot_paths = generate_retrieval_plots(diagnostics, metrics_dict, eval_params["k"], self.run_dir)
             if self.tracker is not None:
-                self.tracker.track_artifact(plot_path, name="retrieval-plots", type="plots")
+                for name, path in plot_paths.items():
+                    self.tracker.track_artifact(path, name=name, type="plot")
 
             report_path = self.run_dir / "retrieval_inspect.md"
             generate_retrieval_report(

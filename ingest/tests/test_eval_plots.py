@@ -15,6 +15,8 @@ def test_generate_retrieval_plots(tmp_path: Path):
         "hit_rate@3": 0.75,
         "ndcg@3": 0.65,
     }
-    plot_path = generate_retrieval_plots(diagnostics, metrics, k=3, out_dir=tmp_path)
+    plot_paths = generate_retrieval_plots(diagnostics, metrics, k=3, out_dir=tmp_path)
+    assert "retrieval_diagnostics" in plot_paths
+    plot_path = plot_paths["retrieval_diagnostics"]
     assert plot_path.exists()
     assert plot_path.stat().st_size > 0

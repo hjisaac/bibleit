@@ -6,24 +6,6 @@ import numpy as np
 
 from bibleit_ingest.sinks import StaticArtifactSink
 from bibleit_ingest.types import BookCorpus, Passage
-from rag_core.embedders import BaseEmbedder
-
-
-class MockEmbedder(BaseEmbedder):
-    @property
-    def model_name(self) -> str:
-        return "test-embedder-v1"
-
-    @property
-    def dim(self) -> int:
-        return 4
-
-    def embed_query(self, text: str) -> np.ndarray:
-        return np.zeros(4, dtype=np.float32)
-
-    def embed_documents(self, texts, batch_size=32):
-        for _ in texts:
-            yield np.zeros(4, dtype=np.float32)
 
 
 def test_static_artifact_sink(tmp_path: Path) -> None:
@@ -44,7 +26,6 @@ def test_static_artifact_sink(tmp_path: Path) -> None:
         )
     ]
     embeddings = np.array([[0.5, -0.5, 0.25, 1.0]], dtype=np.float32)
-    embedder = MockEmbedder()
 
     sink = StaticArtifactSink()
     sink.write(
@@ -52,8 +33,9 @@ def test_static_artifact_sink(tmp_path: Path) -> None:
         corpus=corpus,
         chunks=chunks,
         embeddings=embeddings,
-        embedder=embedder,
-        strategy_meta={"strategy": "adaptive_window", "floor": 2, "ceiling": 10},
+        model="test-embedder-v1",
+        query_prefix="search_query: ",
+        chunk_meta={"strategy": "adaptive_window", "floor": 2, "ceiling": 10},
     )
 
     manifest_path = tmp_path / "manifest.json"
@@ -62,10 +44,12 @@ def test_static_artifact_sink(tmp_path: Path) -> None:
     assert manifest["schema_version"] == 3
     assert manifest["translation"]["id"] == "web"
     assert manifest["corpus"]["count"] == 2
+    assert manifest["chunks"]["ceiling"] == 10
     assert manifest["embeddings"]["model"] == "test-embedder-v1"
     assert manifest["embeddings"]["dim"] == 4
     assert manifest["embeddings"]["count"] == 1
-    assert manifest["embeddings"]["quantization"]["type"] == "int8"
+    assert manifest["embeddings"]["query_prefix"] == "search_query: "
+    assert manifest["embeddings"]["quantization"]["type"] == "float32"
 
     # Verify verses.json.gz (dense/sparse array schema)
     verses_path = tmp_path / "verses.json.gz"
@@ -88,10 +72,9 @@ def test_static_artifact_sink(tmp_path: Path) -> None:
     assert chunks_data[0]["headings"] == [[1, 1, "Creation"]]
     assert "text" not in chunks_data[0]
 
-    # Verify binary embeddings and scales
-    emb_path = tmp_path / "embeddings.i8.bin"
-    scales_path = tmp_path / "scales.f32.bin"
+    # Verify binary float32 embeddings
+    emb_path = tmp_path / "embeddings.f32.bin"
     assert emb_path.exists()
-    assert scales_path.exists()
-    q_data = np.frombuffer(emb_path.read_bytes(), dtype=np.int8)
-    assert len(q_data) == 4
+    f_data = np.frombuffer(emb_path.read_bytes(), dtype=np.float32)
+    assert len(f_data) == 4
+    np.testing.assert_allclose(f_data, embeddings[0], atol=1e-6)
