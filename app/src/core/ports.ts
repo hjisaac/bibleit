@@ -87,7 +87,7 @@ export interface QueryEmbedder {
  * v1: brute-force int8 dot product. Swap: HNSW-wasm, binary + rerank.
  */
 export interface VectorIndex {
-  build(manifest: Manifest, data: ArrayBuffer, scales?: ArrayBuffer): Promise<void>;
+  build(manifest: Manifest, chunks: Chunk[], data: ArrayBuffer, scales?: ArrayBuffer): Promise<void>;
   search(queryVector: Float32Array, k: number): ScoredPassage[];
 }
 

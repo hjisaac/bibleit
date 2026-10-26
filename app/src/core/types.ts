@@ -80,11 +80,14 @@ export interface Manifest {
     license: string;
   };
   corpus: { verses: string; count: number };
-  chunks: { file: string; strategy: string; window: number; overlap: number };
+  /** Chunk-stage lock parameters (strategy, ceiling, overlap, ...) plus the run hash. */
+  chunks: { file: string; hash: string; strategy: string; [param: string]: unknown };
   embeddings: {
     file: string;
     model: string;
     dim: number;
+    /** Must be prepended to the query before embedding (e.g. "search_query: "). */
+    query_prefix: string;
     quantization: { type: 'int8'; scales: string } | { type: 'float32' };
     count: number;
   };

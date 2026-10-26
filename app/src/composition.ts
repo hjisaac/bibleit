@@ -43,35 +43,51 @@ interface Ports {
  * same interface, so the UI never changes.
  */
 export function buildLocalEngine(p: Ports): SearchEngine {
+  let verseStore: VerseStore | null = p.verseStore ?? null;
+  let lexicalReady = false;
+  let semanticReady = false;
+
   const ready = (async () => {
-    const manifest = await p.store.manifest();
+    try {
+      const [versesData, rawChunks] = await Promise.all([
+        p.store.verses(),
+        p.store.chunks(),
+      ]);
+      verseStore = verseStore ?? new ArrayVerseStore(versesData);
 
-    // INVARIANT: query model must match corpus model (see QueryEmbedder docs).
-    if (p.embedder.modelId !== manifest.embeddings.model) {
-      throw new Error(
-        `Embedder/corpus mismatch: app has "${p.embedder.modelId}", ` +
-          `artifacts were built with "${manifest.embeddings.model}". ` +
-          `Update the app or re-run ingest.`,
-      );
+      const chunks: Chunk[] = rawChunks.map((c) => ({
+        ...c,
+        text: verseStore!.getRange(c.book, c.start, c.end),
+      }));
+      await p.lexical.build(chunks);
+      lexicalReady = true;
+
+      try {
+        const manifest = await p.store.manifest();
+        // INVARIANT: query model must match corpus model (see QueryEmbedder docs).
+        if (p.embedder.modelId !== manifest.embeddings.model) {
+          throw new Error(
+            `Embedder/corpus mismatch: app has "${p.embedder.modelId}", ` +
+              `artifacts were built with "${manifest.embeddings.model}". ` +
+              `Update the app or re-run ingest.`,
+          );
+        }
+        const [emb] = await Promise.all([
+          p.store.embeddings(),
+          p.embedder.load(),
+        ]);
+        await p.vectors.build(manifest, chunks, emb.data, emb.scales);
+        semanticReady = true;
+      } catch (err) {
+        if (err instanceof Error && err.message.startsWith('Embedder/corpus mismatch:')) {
+          throw err;
+        }
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('Embedder/corpus mismatch:')) {
+        throw err;
+      }
     }
-
-    const [versesData, rawChunks, emb] = await Promise.all([
-      p.store.verses(),
-      p.store.chunks(),
-      p.store.embeddings(),
-    ]);
-    const verseStore = p.verseStore ?? new ArrayVerseStore(versesData);
-
-    const chunks: Chunk[] = rawChunks.map((c) => ({
-      ...c,
-      text: verseStore.getRange(c.book, c.start, c.end),
-    }));
-
-    await Promise.all([
-      p.lexical.build(chunks),
-      p.vectors.build(manifest, emb.data, emb.scales),
-      p.embedder.load(),
-    ]);
   })();
 
   return {
@@ -80,13 +96,22 @@ export function buildLocalEngine(p: Ports): SearchEngine {
     async retrieve(query, k = 10): Promise<RetrievalResult> {
       await ready;
       const parsedRefs = p.refParser.parse(query);
-      // TODO(v1): resolve parsedRefs to passages via the store.
-      const refPassages = [] as RetrievalResult['passages'];
-      const [lexical, queryVec] = await Promise.all([
-        Promise.resolve(p.lexical.search(query, k)),
-        p.embedder.embed(query),
-      ]);
-      const semantic = p.vectors.search(queryVec, k);
+      const refPassages = verseStore
+        ? parsedRefs.flatMap((r) => {
+            const start: [number, number] = [r.start.chapter, r.start.verse];
+            const end: [number, number] = r.end
+              ? [r.end.chapter, r.end.verse]
+              : [r.start.chapter, verseStore!.verseCount(r.start.book, r.start.chapter)];
+            const text = verseStore!.getRange(r.start.book, start, end);
+            return text
+              ? [{ chunk: { book: r.start.book, start, end, text }, score: 1, source: 'reference' as const }]
+              : [];
+          })
+        : [];
+      const lexical = lexicalReady ? p.lexical.search(query, k) : [];
+      const semantic = semanticReady
+        ? p.vectors.search(await p.embedder.embed(query), k)
+        : [];
       return {
         parsedRefs,
         passages: p.ranker.merge(refPassages, lexical, semantic, k),

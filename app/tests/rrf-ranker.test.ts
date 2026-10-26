@@ -52,7 +52,9 @@ describe('RrfRanker', () => {
 
     // chunk1 has rank 2 in lexical (1/62) + rank 1 in semantic (1/61) > chunk2 rank 1 in lexical (1/61)
     expect(getChunkKey(merged[0]!.chunk)).toBe(getChunkKey(chunk1));
+    expect(merged[0]!.source).toBe('semantic');
     expect(getChunkKey(merged[1]!.chunk)).toBe(getChunkKey(chunk2));
+    expect(merged[1]!.source).toBe('lexical');
   });
 
   it('deduplicates overlapping scripture passages', () => {

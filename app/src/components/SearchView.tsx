@@ -169,10 +169,23 @@ export function SearchView({
   const [searchHistory, setSearchHistory] = useState<string[]>(loadSearchHistory);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const isFirstMountRef = useRef(true);
-  const skipRetrieveQueryRef = useRef<string | null>(null);
-  const isFirstMountAnswerRef = useRef(true);
-  const skipAnswerResetQueryRef = useRef<string | null>(null);
+  const searchRunIdRef = useRef(0);
+
+  const runSearch = (targetQuery: string) => {
+    const trimmed = targetQuery.trim();
+    const runId = ++searchRunIdRef.current;
+    if (!trimmed) {
+      setPassages([]);
+      return;
+    }
+    const startTime = performance.now();
+    void engine.retrieve(trimmed).then((res) => {
+      if (searchRunIdRef.current === runId) {
+        setPassages(res.passages);
+        setLatencyMs(Math.round(performance.now() - startTime));
+      }
+    });
+  };
 
   const addQueryToHistory = (rawQuery: string) => {
     const trimmed = rawQuery.trim();
@@ -191,9 +204,8 @@ export function SearchView({
   };
 
   const handleApplyTopic = (topic: StarterTopic) => {
+    searchRunIdRef.current++;
     addQueryToHistory(topic.query);
-    skipRetrieveQueryRef.current = topic.query;
-    skipAnswerResetQueryRef.current = topic.query;
     setQuery(topic.query);
     setPassages(topic.passages);
     setAnswerText(topic.answerText);
@@ -215,6 +227,8 @@ export function SearchView({
     } else {
       setQuery(text);
       setAnswerText('');
+      setIsSynthesizing(false);
+      runSearch(text);
       const el = inputRef.current;
       if (el) {
         el.focus();
@@ -224,10 +238,7 @@ export function SearchView({
   };
 
   const isQuestion = isQuestionQuery(query);
-  const trimmedLower = query.trim().toLowerCase();
-  // Only match book picker if query is strictly a single book name / alias (no chapter numbers or extra words)
-  const isExactBookQuery = /^[1-3]?\s*[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF]+$/.test(trimmedLower);
-  const matchedBook = isExactBookQuery ? findBookByPrefix(trimmedLower) : undefined;
+  const matchedBook = findBookByPrefix(query);
 
   useEffect(() => {
     if (typeof localStorage === 'undefined') return;
@@ -240,44 +251,6 @@ export function SearchView({
       // Ignore storage errors
     }
   }, [query, passages, answerText]);
-
-  useEffect(() => {
-    if (isFirstMountRef.current) {
-      isFirstMountRef.current = false;
-      return;
-    }
-    if (skipRetrieveQueryRef.current === query) {
-      skipRetrieveQueryRef.current = null;
-      return;
-    }
-
-    let isCancelled = false;
-    const startTime = performance.now();
-
-    void engine.retrieve(query).then((res) => {
-      if (!isCancelled) {
-        setPassages(res.passages);
-        setLatencyMs(Math.round(performance.now() - startTime));
-      }
-    });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [engine, query]);
-
-  useEffect(() => {
-    if (isFirstMountAnswerRef.current) {
-      isFirstMountAnswerRef.current = false;
-      return;
-    }
-    if (skipAnswerResetQueryRef.current === query) {
-      skipAnswerResetQueryRef.current = null;
-      return;
-    }
-    setAnswerText('');
-    setIsSynthesizing(false);
-  }, [query]);
 
   useEffect(() => {
     if (expandedCardKey === null) return;
@@ -325,13 +298,11 @@ export function SearchView({
     setIsSynthesisCollapsed(false);
 
     try {
-      let currentPassages = passages;
-      if (currentPassages.length === 0) {
-        const res = await engine.retrieve(trimmed);
-        currentPassages = res.passages;
-        setPassages(currentPassages);
-      }
-      const stream = engine.answers.answer(trimmed, { passages: currentPassages, parsedRefs: [] });
+      const startTime = performance.now();
+      const res = await engine.retrieve(trimmed);
+      setPassages(res.passages);
+      setLatencyMs(Math.round(performance.now() - startTime));
+      const stream = engine.answers.answer(trimmed, res);
       for await (const chunk of stream) {
         setAnswerText((prev) => prev + chunk);
       }
@@ -461,6 +432,8 @@ export function SearchView({
             }}
             onInput={(e) => {
               setQuery((e.target as HTMLInputElement).value);
+              setAnswerText('');
+              setIsSynthesizing(false);
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -468,6 +441,8 @@ export function SearchView({
                 (e.target as HTMLInputElement).blur();
                 if (isQuestion && isAiEnabled && engine.answers.available && isOnline && !isSynthesizing) {
                   void handleSynthesize();
+                } else {
+                  runSearch(query);
                 }
               }
             }}
@@ -480,7 +455,9 @@ export function SearchView({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
+                searchRunIdRef.current++;
                 setQuery('');
+                setPassages([]);
                 setAnswerText('');
                 inputRef.current?.focus();
               }}

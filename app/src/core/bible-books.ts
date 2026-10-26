@@ -83,33 +83,27 @@ export const BIBLE_BOOKS_BY_ID: Readonly<Record<string, BibleBook>> = Object.fre
   Object.fromEntries(BIBLE_BOOKS.map((b) => [b.id, b])),
 );
 
-/** Fast O(1) hash map indexing all lowercase IDs, names, and aliases. */
-const BOOK_BY_EXACT_ALIAS = new Map<string, BibleBook>();
+/** Fast O(1) hash map indexing all valid prefixes (len >= 2) and exact aliases. */
+const BOOK_BY_PREFIX = new Map<string, BibleBook>();
 for (const b of BIBLE_BOOKS) {
-  BOOK_BY_EXACT_ALIAS.set(b.id.toLowerCase(), b);
-  BOOK_BY_EXACT_ALIAS.set(b.name.toLowerCase(), b);
+  for (const term of [b.name.toLowerCase(), ...b.aliases.map((a) => a.toLowerCase())]) {
+    for (let len = 2; len <= term.length; len++) {
+      const prefix = term.slice(0, len);
+      if (!BOOK_BY_PREFIX.has(prefix)) {
+        BOOK_BY_PREFIX.set(prefix, b);
+      }
+    }
+  }
+}
+for (const b of BIBLE_BOOKS) {
+  BOOK_BY_PREFIX.set(b.id.toLowerCase(), b);
+  BOOK_BY_PREFIX.set(b.name.toLowerCase(), b);
   for (const alias of b.aliases) {
-    BOOK_BY_EXACT_ALIAS.set(alias.toLowerCase(), b);
+    BOOK_BY_PREFIX.set(alias.toLowerCase(), b);
   }
 }
 
-/** Matches query string prefix to a Bible book deterministically. */
+/** Matches query string prefix to a Bible book in O(1). */
 export function findBookByPrefix(query: string): BibleBook | undefined {
-  const normalized = query.trim().toLowerCase();
-  if (normalized.length < 2) {
-    return undefined;
-  }
-
-  // O(1) direct alias lookup first.
-  const exact = BOOK_BY_EXACT_ALIAS.get(normalized);
-  if (exact) {
-    return exact;
-  }
-
-  // Prefix match fallback (only runs if not an exact alias).
-  return BIBLE_BOOKS.find(
-    (b) =>
-      b.name.toLowerCase().startsWith(normalized) ||
-      b.aliases.some((a) => a.startsWith(normalized) && normalized.length >= 3),
-  );
+  return BOOK_BY_PREFIX.get(query.trim().toLowerCase());
 }

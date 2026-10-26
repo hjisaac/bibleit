@@ -1,0 +1,35 @@
+{
+  "schema_version": 3,
+  "translation": {
+    "id": "web",
+    "lang": "en",
+    "name": "World English Bible",
+    "license": "public domain"
+  },
+  "corpus": {
+    "verses": "verses.json.gz",
+    "count": 31095
+  },
+  "chunks": {
+    "file": "chunks.json.gz",
+    "hash": "cbd6645a3d9a",
+    "strategy": "token_window",
+    "ceiling": 512,
+    "overlap": 0,
+    "floor": 5,
+    "headroom_margin": 25,
+    "render_strategy": "book_and_heading",
+    "include_overlap_heading": true,
+    "tokenizer_model": "nomic-ai/nomic-embed-text-v1.5"
+  },
+  "embeddings": {
+    "file": "embeddings.f32.bin",
+    "model": "nomic-ai/nomic-embed-text-v1.5",
+    "dim": 768,
+    "query_prefix": "search_query: ",
+    "quantization": {
+      "type": "float32"
+    },
+    "count": 2655
+  }
+}

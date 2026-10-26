@@ -12,7 +12,7 @@ export class MiniSearchLexicalIndex implements LexicalIndex {
       fields: ['text'],
       extractField: (document, fieldName) => {
         if (fieldName === 'key') return getChunkKey(document);
-        return (document as Record<string, unknown>)[fieldName];
+        return (document as unknown as Record<string, unknown>)[fieldName];
       },
       searchOptions: {
         boost: { text: 1 },

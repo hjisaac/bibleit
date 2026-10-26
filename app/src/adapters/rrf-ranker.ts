@@ -41,7 +41,10 @@ export class RrfRanker implements Ranker {
     semantic: ScoredPassage[],
     k: number = 10,
   ): ScoredPassage[] {
-    const fusedScores = new Map<string, { chunk: Chunk; score: number }>();
+    const fusedScores = new Map<
+      string,
+      { chunk: Chunk; score: number; bestRrf: number; source: ScoredPassage['source'] }
+    >();
 
     // 1. Accumulate RRF scores for lexical matches
     lexical.forEach((item, index) => {
@@ -51,8 +54,12 @@ export class RrfRanker implements Ranker {
       const existing = fusedScores.get(key);
       if (existing) {
         existing.score += rrf;
+        if (rrf > existing.bestRrf) {
+          existing.bestRrf = rrf;
+          existing.source = 'lexical';
+        }
       } else {
-        fusedScores.set(key, { chunk: item.chunk, score: rrf });
+        fusedScores.set(key, { chunk: item.chunk, score: rrf, bestRrf: rrf, source: 'lexical' });
       }
     });
 
@@ -64,18 +71,22 @@ export class RrfRanker implements Ranker {
       const existing = fusedScores.get(key);
       if (existing) {
         existing.score += rrf;
+        if (rrf > existing.bestRrf) {
+          existing.bestRrf = rrf;
+          existing.source = 'semantic';
+        }
       } else {
-        fusedScores.set(key, { chunk: item.chunk, score: rrf });
+        fusedScores.set(key, { chunk: item.chunk, score: rrf, bestRrf: rrf, source: 'semantic' });
       }
     });
 
     // 3. Sort fused items by accumulated score descending
     const sortedFused: ScoredPassage[] = Array.from(fusedScores.values())
       .sort((a, b) => b.score - a.score)
-      .map(({ chunk, score }) => ({
+      .map(({ chunk, score, source }) => ({
         chunk,
         score,
-        source: 'lexical', // fused candidate
+        source,
       }));
 
     // 4. Combine: references always first, followed by fused results
