@@ -1,24 +1,33 @@
 import type { JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { createDefaultEngine, createDefaultNarrator } from './composition';
+import { createDefaultArtifactStore, createDefaultEngine, createDefaultNarrator } from './composition';
 import { Header, type Theme } from './components/Header';
 import { Navbar, type ViewTab } from './components/Navbar';
 import { SearchView } from './components/SearchView';
 import { ReaderView } from './components/ReaderView';
 import { SavedView, type SavedVerse } from './components/SavedView';
-import { SettingsView, type PackageStatus } from './components/SettingsView';
+import { SettingsView } from './components/SettingsView';
 import { BookSelectorModal } from './components/BookSelectorModal';
 import { HelpModal } from './components/HelpModal';
 import { FeedbackModal } from './components/FeedbackModal';
 import { AudioPlayerBar } from './components/AudioPlayerBar';
-import { clearBookCache, downloadAllBooks, getCachedBooksCount } from './adapters/book-store';
 import { useHeadroom } from './core/headroom';
-import type { NarrationState } from './core/types';
+import type { Manifest, NarrationState } from './core/types';
+import { useStore } from '@nanostores/preact';
+import { $textPackageStatus, $aiPackageStatus } from './stores/packages';
+import { $theme, $activeTab, $isAiEnabled, $showHeadings, $hasSeenStorageBanner } from './stores/preferences';
+import { $readerLocation, $savedVerses, type ReaderLocation } from './stores/reader';
 
 export function App(): JSX.Element {
-  const engine = useMemo(() => createDefaultEngine(), []);
+  const store = useMemo(() => createDefaultArtifactStore(), []);
+  const engine = useMemo(() => createDefaultEngine(store), [store]);
   const narrator = useMemo(() => createDefaultNarrator(), []);
   const [narrationState, setNarrationState] = useState<NarrationState>(() => narrator.getState());
+  const [manifest, setManifest] = useState<Manifest | null>(null);
+
+  useEffect(() => {
+    store.manifest?.().then(setManifest).catch(() => {});
+  }, [store]);
 
   useEffect(() => {
     const unsubscribe = narrator.subscribe(setNarrationState);
@@ -29,44 +38,15 @@ export function App(): JSX.Element {
   }, [narrator]);
 
 
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof localStorage !== 'undefined') {
-      const saved = localStorage.getItem('bibleit_theme') as Theme | null;
-      if (saved && ['paper', 'sepia', 'obsidian'].includes(saved)) {
-        return saved;
-      }
-    }
-    return 'paper';
-  });
+  const theme = useStore($theme);
+  const handleThemeChange = (nextTheme: Theme) => $theme.set(nextTheme);
 
-  const handleThemeChange = (nextTheme: Theme) => {
-    setTheme(nextTheme);
-    if (typeof localStorage !== 'undefined') {
-      try {
-        localStorage.setItem('bibleit_theme', nextTheme);
-      } catch {
-        // Ignore quota errors
-      }
-    }
-  };
-  const [activeTab, setActiveTab] = useState<ViewTab>(() => {
-    if (typeof localStorage !== 'undefined') {
-      const saved = localStorage.getItem('bibleit_active_tab') as ViewTab | null;
-      if (saved && ['search', 'reader', 'saved', 'settings'].includes(saved)) {
-        return saved;
-      }
-    }
-    return 'search';
-  });
-
+  const activeTab = useStore($activeTab);
   const [isBarVisible, setIsBarVisible] = useHeadroom({ threshold: 50, deltaThreshold: 8 });
 
   const handleTabChange = (tab: ViewTab) => {
-    setActiveTab(tab);
+    $activeTab.set(tab);
     setIsBarVisible(true);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('bibleit_active_tab', tab);
-    }
   };
 
   const [isInspectorMode, setIsInspectorMode] = useState<boolean>(true);
@@ -75,170 +55,119 @@ export function App(): JSX.Element {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
 
-  const [textPackageStatus, setTextPackageStatus] = useState<PackageStatus>('not_downloaded');
-  const [aiPackageStatus, setAiPackageStatus] = useState<PackageStatus>('not_downloaded');
-  const [textProgress, setTextProgress] = useState<number>(0);
-  const [aiProgress, setAiProgress] = useState<number>(0);
-  const [hasSeenStorageBanner, setHasSeenStorageBanner] = useState<boolean>(() => {
-    if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem('bibleit_storage_banner_seen') === 'true';
-    }
-    return false;
-  });
+  const textPackageStatus = useStore($textPackageStatus);
+  const aiPackageStatus = useStore($aiPackageStatus);
+  const [textProgress, setTextProgress] = useState<number>(() =>
+    $textPackageStatus.get() === 'ready' ? 100 : 0,
+  );
+  const [aiProgress, setAiProgress] = useState<number>(() =>
+    $aiPackageStatus.get() === 'ready' ? 100 : 0,
+  );
+  const hasSeenStorageBanner = useStore($hasSeenStorageBanner);
   const [highlightStorage, setHighlightStorage] = useState<boolean>(false);
 
-  const [readerLocation, setReaderLocation] = useState<{
-    book: string;
-    chapter: number;
-    targetVerse?: number;
-    scrollKey: number;
-  }>(() => {
-    if (typeof localStorage !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('bibleit_last_read');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed && typeof parsed.book === 'string' && typeof parsed.chapter === 'number') {
-            return {
-              book: parsed.book,
-              chapter: parsed.chapter,
-              targetVerse: parsed.targetVerse ?? 1,
-              scrollKey: 0,
-            };
-          }
-        }
-      } catch {
-        // Fall back to default
-      }
+  const readerLocation = useStore($readerLocation);
+  const setReaderLocation = (
+    loc: ReaderLocation | ((prev: ReaderLocation) => ReaderLocation),
+  ) => {
+    if (typeof loc === 'function') {
+      $readerLocation.set(loc($readerLocation.get()));
+    } else {
+      $readerLocation.set(loc);
     }
-    return {
-      book: 'GEN',
-      chapter: 1,
-      targetVerse: 1,
-      scrollKey: 0,
-    };
-  });
+  };
 
-  useEffect(() => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(
-        'bibleit_last_read',
-        JSON.stringify({
-          book: readerLocation.book,
-          chapter: readerLocation.chapter,
-          targetVerse: readerLocation.targetVerse,
-        }),
-      );
+  const savedVerses = useStore($savedVerses);
+  const setSavedVerses = (
+    verses: SavedVerse[] | ((prev: SavedVerse[]) => SavedVerse[]),
+  ) => {
+    if (typeof verses === 'function') {
+      $savedVerses.set(verses($savedVerses.get()));
+    } else {
+      $savedVerses.set(verses);
     }
-  }, [readerLocation.book, readerLocation.chapter, readerLocation.targetVerse]);
-
-  const [savedVerses, setSavedVerses] = useState<SavedVerse[]>(() => {
-    if (typeof localStorage !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('bibleit_saved_verses');
-        if (stored) return JSON.parse(stored);
-      } catch {
-        // Fall back to default
-      }
-    }
-    return [
-      {
-        id: '1',
-        book: 'PHP',
-        bookName: 'Philippians',
-        chapter: 4,
-        verse: 7,
-        citation: 'Philippians 4:7',
-        text: 'And the peace of God, which surpasses all understanding, will guard your hearts and your thoughts in Christ Jesus.',
-        savedAt: Date.now(),
-      },
-    ];
-  });
+  };
 
   const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true,
   );
 
-  const [isAiEnabled, setIsAiEnabled] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bibleit_ai_enabled');
-      return saved !== null ? saved === 'true' : true;
-    }
-    return true;
-  });
-
+  const isAiEnabled = useStore($isAiEnabled);
   const handleToggleAi = (enabled: boolean) => {
-    setIsAiEnabled(enabled);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('bibleit_ai_enabled', String(enabled));
-    }
+    $isAiEnabled.set(enabled);
     showToast(enabled ? 'AI Scripture Overview enabled' : 'AI Scripture Overview deactivated');
   };
 
-  const [showHeadings, setShowHeadings] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bibleit_show_headings');
-      return saved !== null ? saved === 'true' : true;
-    }
-    return true;
-  });
-
+  const showHeadings = useStore($showHeadings);
   const handleToggleHeadings = (enabled: boolean) => {
-    setShowHeadings(enabled);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('bibleit_show_headings', String(enabled));
-    }
+    $showHeadings.set(enabled);
     showToast(enabled ? 'Pericope headings enabled' : 'Pericope headings hidden');
   };
 
-  // Sync offline text package state with real Cache API on boot
+  // Reconcile in-memory state if page was reloaded mid-download
   useEffect(() => {
-    getCachedBooksCount().then((count) => {
-      if (count >= 66) {
-        setTextPackageStatus('ready');
-        setTextProgress(100);
-      } else if (count > 0) {
-        setTextProgress(Math.round((count / 66) * 100));
-      }
-    });
+    if ($textPackageStatus.get() === 'downloading') $textPackageStatus.set('not_downloaded');
+    if ($aiPackageStatus.get() === 'downloading') $aiPackageStatus.set('not_downloaded');
   }, []);
 
+  // Sync offline packages state with real OPFS storage in background
+  useEffect(() => {
+    store.hasVerses?.().then((has) => {
+      $textPackageStatus.set(has ? 'ready' : 'not_downloaded');
+      if (has) setTextProgress(100);
+    });
+    store.hasEmbeddings?.().then((has) => {
+      $aiPackageStatus.set(has ? 'ready' : 'not_downloaded');
+      if (has) setAiProgress(100);
+    });
+  }, [store]);
+
   const handleDownloadText = async () => {
-    setTextPackageStatus('downloading');
+    $textPackageStatus.set('downloading');
+    setTextProgress(0);
     try {
-      await downloadAllBooks((progress) => {
-        setTextProgress(progress);
-      });
-      setTextPackageStatus('ready');
+      await store.verses((pct) => setTextProgress(Math.round(pct * 0.8)));
+      await store.chunks((pct) => setTextProgress(80 + Math.round(pct * 0.2)));
+      $textPackageStatus.set('ready');
       setTextProgress(100);
-      showToast('Scripture text verified & installed offline (2.0 MB)');
+      showToast('Scripture text verified & installed in OPFS (1.2 MB)');
     } catch (err) {
       console.error('Download failed:', err);
-      showToast('Download interrupted. Check network and try again.');
-      setTextPackageStatus('not_downloaded');
+      showToast(
+        err instanceof Error && err.name === 'CorruptArtifactError'
+          ? err.message
+          : 'Download interrupted. Check network and try again.',
+      );
+      $textPackageStatus.set('not_downloaded');
     }
   };
 
-  const handleDownloadAi = () => {
-    setAiPackageStatus('downloading');
-    setAiProgress(10);
-    setTimeout(() => setAiProgress(35), 400);
-    setTimeout(() => setAiProgress(65), 900);
-    setTimeout(() => setAiProgress(90), 1300);
-    setTimeout(() => {
+  const handleDownloadAi = async () => {
+    $aiPackageStatus.set('downloading');
+    setAiProgress(0);
+    try {
+      await store.embeddings((pct) => setAiProgress(pct));
+      $aiPackageStatus.set('ready');
       setAiProgress(100);
-      setAiPackageStatus('ready');
-      showToast('AI semantic model installed (23 MB)');
-    }, 1600);
+      showToast('AI semantic embeddings verified & installed (2.1 MB)');
+    } catch (err) {
+      console.error('Download failed:', err);
+      showToast(
+        err instanceof Error && err.name === 'CorruptArtifactError'
+          ? err.message
+          : 'AI download interrupted. Check network and try again.',
+      );
+      $aiPackageStatus.set('not_downloaded');
+    }
   };
 
   const handleClearStorage = async () => {
-    await clearBookCache();
-    setTextPackageStatus('not_downloaded');
-    setAiPackageStatus('not_downloaded');
+    await store.clear();
+    $textPackageStatus.set('not_downloaded');
+    $aiPackageStatus.set('not_downloaded');
     setTextProgress(0);
     setAiProgress(0);
-    showToast('Offline cache cleared.');
+    showToast('Offline storage cleared.');
   };
 
   const handleOpenStorage = () => {
@@ -247,10 +176,7 @@ export function App(): JSX.Element {
   };
 
   const handleDismissOnboarding = () => {
-    setHasSeenStorageBanner(true);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('bibleit_storage_banner_seen', 'true');
-    }
+    $hasSeenStorageBanner.set(true);
   };
 
   // Sync theme class to document body.
@@ -369,6 +295,7 @@ export function App(): JSX.Element {
         <div class={activeTab === 'search' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
           <SearchView
             engine={engine}
+            manifest={manifest}
             narrator={narrator}
             narrationState={narrationState}
             isOnline={isOnline}
@@ -412,6 +339,7 @@ export function App(): JSX.Element {
 
         {activeTab === 'settings' && (
           <SettingsView
+            manifest={manifest}
             currentTheme={theme}
             onThemeChange={handleThemeChange}
             isAiEnabled={isAiEnabled}

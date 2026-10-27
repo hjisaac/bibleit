@@ -1,10 +1,12 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Theme } from './Header';
+import type { Manifest } from '../core/types';
 
 export type PackageStatus = 'not_downloaded' | 'downloading' | 'ready';
 
 interface SettingsViewProps {
+  manifest?: Manifest | null;
   currentTheme: Theme;
   onThemeChange: (theme: Theme) => void;
   isAiEnabled: boolean;
@@ -26,6 +28,7 @@ interface SettingsViewProps {
 }
 
 export function SettingsView({
+  manifest,
   currentTheme,
   onThemeChange,
   isAiEnabled,
@@ -47,6 +50,38 @@ export function SettingsView({
 }: SettingsViewProps): JSX.Element {
   const storageSectionRef = useRef<HTMLDivElement>(null);
   const [isPulsing, setIsPulsing] = useState<boolean>(false);
+  const [isConfirmingClear, setIsConfirmingClear] = useState<boolean>(false);
+  const [confirmCountdown, setConfirmCountdown] = useState<number>(6);
+  const hasDownloadedArtifacts = textPackageStatus === 'ready' || aiPackageStatus === 'ready';
+
+  // Active countdown ticker for auto-disarming clear confirmation
+  useEffect(() => {
+    if (!isConfirmingClear) return undefined;
+    const interval = window.setInterval(() => {
+      setConfirmCountdown((prev) => {
+        if (prev <= 1) {
+          setIsConfirmingClear(false);
+          return 6;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [isConfirmingClear]);
+
+  const handleInitiateClear = () => {
+    setConfirmCountdown(6);
+    setIsConfirmingClear(true);
+  };
+
+  const handleCancelClear = () => {
+    setIsConfirmingClear(false);
+  };
+
+  const handleConfirmClear = () => {
+    setIsConfirmingClear(false);
+    onClearStorage();
+  };
 
   useEffect(() => {
     if (highlightStorage && storageSectionRef.current) {
@@ -207,8 +242,12 @@ export function SettingsView({
               color: 'var(--text-muted)',
             }}
           >
-            <div>• Embedder: Xenova/all-MiniLM-L6-v2 (dim: 384, int8)</div>
-            <div>• Chunk window: 5–30 verses per pericope</div>
+            <div>
+              • Embedder: {manifest?.embeddings.model ?? 'nomic-ai/nomic-embed-text-v1.5'} (dim: {manifest?.embeddings.dim ?? 768}, {manifest?.embeddings.quantization.type ?? 'int8'})
+            </div>
+            <div>
+              • Chunks: {manifest ? `${manifest.embeddings.count.toLocaleString()} chunks (${manifest.chunks.strategy})` : '2,655 chunks (token_window)'}
+            </div>
             <div>• Rank fusion: Reciprocal Rank Fusion (k=60)</div>
           </div>
         )}
@@ -269,9 +308,11 @@ export function SettingsView({
           </div>
           <span class="text-xs font-mono font-medium text-emerald-600">
             {textPackageStatus === 'ready' && aiPackageStatus === 'ready'
-              ? '25.0 MB in OPFS'
+              ? '3.3 MB in OPFS'
               : textPackageStatus === 'ready'
-              ? '2.0 MB in OPFS'
+              ? '1.2 MB in OPFS'
+              : aiPackageStatus === 'ready'
+              ? '2.1 MB in OPFS'
               : '0 MB cached'}
           </span>
         </div>
@@ -291,11 +332,11 @@ export function SettingsView({
                   Essential Scripture Text
                 </span>
                 <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
-                  2.0 MB
+                  1.2 MB
                 </span>
               </div>
               <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                All 66 Protestant books, 31,102 verses (WEB translation). Unlocks offline reading & keyword search.
+                All 66 Protestant books, 31,095 verses (WEB translation). Unlocks offline reading & keyword search.
               </p>
             </div>
 
@@ -337,7 +378,7 @@ export function SettingsView({
                 color: textPackageStatus === 'ready' ? 'var(--text-main)' : '#FFFFFF',
               }}
             >
-              {textPackageStatus === 'ready' ? 'Re-download' : textPackageStatus === 'downloading' ? 'Downloading...' : 'Download (2 MB)'}
+              {textPackageStatus === 'ready' ? 'Re-download' : textPackageStatus === 'downloading' ? 'Downloading...' : 'Download (1.2 MB)'}
             </button>
           </div>
         </div>
@@ -357,11 +398,11 @@ export function SettingsView({
                   Neural AI Semantic Model
                 </span>
                 <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
-                  23.0 MB
+                  2.1 MB
                 </span>
               </div>
               <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                MiniLM-L6 vector embeddings for on-device conceptual similarity search and RAG synthesis without network.
+                Nomic v1.5 vector embeddings (768-dim) for on-device conceptual similarity search.
               </p>
             </div>
 
@@ -403,23 +444,80 @@ export function SettingsView({
                 color: aiPackageStatus === 'ready' ? 'var(--text-main)' : '#FFFFFF',
               }}
             >
-              {aiPackageStatus === 'ready' ? 'Installed' : aiPackageStatus === 'downloading' ? 'Downloading...' : 'Download (23 MB)'}
+              {aiPackageStatus === 'ready' ? 'Installed' : aiPackageStatus === 'downloading' ? 'Downloading...' : 'Download (2.1 MB)'}
             </button>
           </div>
         </div>
 
-        {/* Clear Storage Action */}
-        <button
-          type="button"
-          onClick={onClearStorage}
-          class="w-full py-2 rounded-xl border text-xs font-semibold hover:opacity-75 transition-all text-red-600 dark:text-red-400"
-          style={{
-            borderColor: 'var(--border-subtle)',
-            backgroundColor: 'var(--bg-surface)',
-          }}
-        >
-          Free Up Local Space (Clear Artifacts)
-        </button>
+        {/* Clear Storage Action with Inline Confirmation & Visual Countdown */}
+        {isConfirmingClear ? (
+          <div
+            class="p-3 rounded-xl border space-y-2.5 animate-fadeIn"
+            style={{
+              borderColor: 'rgba(239, 68, 68, 0.4)',
+              backgroundColor: 'var(--bg-surface)',
+            }}
+          >
+            <div class="flex items-center gap-1.5 text-xs font-semibold text-red-600 dark:text-red-400">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+              <span>Delete all local offline data?</span>
+            </div>
+
+            <p class="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              Removes downloaded scripture text and AI models from OPFS. You can re-download anytime.
+            </p>
+
+            {/* Countdown progress bar */}
+            <div class="w-full bg-red-500/10 dark:bg-red-950/40 rounded-full h-1 overflow-hidden">
+              <div
+                class="bg-red-500 h-full rounded-full transition-all duration-1000 ease-linear"
+                style={{ width: `${(confirmCountdown / 6) * 100}%` }}
+              />
+            </div>
+
+            <div class="flex items-center gap-2 pt-0.5">
+              <button
+                type="button"
+                onClick={handleCancelClear}
+                class="flex-1 py-1.5 rounded-lg border text-xs font-medium hover:opacity-80 transition-all"
+                style={{
+                  borderColor: 'var(--border-subtle)',
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                  color: 'var(--text-main)',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmClear}
+                class="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition-all shadow-sm"
+              >
+                Yes, Delete All
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleInitiateClear}
+            disabled={!hasDownloadedArtifacts}
+            class="w-full py-2 rounded-xl border text-xs font-semibold transition-all text-red-600 dark:text-red-400 hover:opacity-75 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:opacity-40"
+            style={{
+              borderColor: 'var(--border-subtle)',
+              backgroundColor: 'var(--bg-surface)',
+            }}
+          >
+            Free Up Local Space (Clear Artifacts)
+          </button>
+        )}
       </div>
 
       {/* Active Translation */}

@@ -1,7 +1,7 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { AudioNarrator, SearchEngine } from '../core/ports';
-import { getChunkKey, type NarrationState, type NarrationWordBoundary, type ScoredPassage } from '../core/types';
+import { getChunkKey, type Manifest, type NarrationState, type NarrationWordBoundary, type ScoredPassage } from '../core/types';
 import { BIBLE_BOOKS_BY_ID, findBookByPrefix } from '../core/bible-books';
 import { resolveVerseText } from '../adapters/book-store';
 import { getRandomStarterTopic, POPULAR_TOPICS, SEARCH_SUGGESTIONS, STARTER_TOPICS, type StarterTopic } from '../core/starter-topics';
@@ -9,6 +9,7 @@ import type { SavedVerse } from './SavedView';
 
 interface SearchViewProps {
   engine: SearchEngine;
+  manifest?: Manifest | null;
   narrator?: AudioNarrator;
   narrationState?: NarrationState;
   isOnline: boolean;
@@ -139,6 +140,7 @@ function getInitialSearchState(): StoredSearch {
 
 export function SearchView({
   engine,
+  manifest,
   narrator,
   narrationState,
   isOnline,
@@ -572,7 +574,11 @@ export function SearchView({
         >
           <div class="flex items-center gap-1.5">
             <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-            <span>MiniLM-L6 (int8) · 31,102 verses</span>
+            <span>
+              {manifest
+                ? `${manifest.embeddings.model.split('/').pop()} (${manifest.embeddings.quantization.type}) · ${manifest.corpus.count.toLocaleString()} verses`
+                : 'nomic-embed-text-v1.5 (int8) · 31,095 verses'}
+            </span>
           </div>
           <span class="text-emerald-600 dark:text-emerald-400 font-semibold">{latencyMs}ms latency</span>
         </div>

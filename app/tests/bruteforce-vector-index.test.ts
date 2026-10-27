@@ -40,6 +40,36 @@ describe('BruteForceVectorIndex', () => {
     expect(hits[1]!.score).toBeCloseTo(0.6);
   });
 
+  it('ranks passages by int8 asymmetric cosine similarity with scales', async () => {
+    const int8Manifest: Manifest = {
+      ...mockManifest,
+      embeddings: {
+        ...mockManifest.embeddings,
+        file: 'embeddings.i8.bin',
+        quantization: { type: 'int8', scales: 'scales.f32.bin' },
+      },
+    };
+    const index = new BruteForceVectorIndex();
+    // 2 chunks, 3 dimensions
+    // chunk 0: [100, 0, 0] with scale 0.01 -> dequantized [1, 0, 0]
+    // chunk 1: [0, 100, 0] with scale 0.01 -> dequantized [0, 1, 0]
+    const int8Data = new Int8Array([
+      100, 0, 0,
+      0, 100, 0,
+    ]);
+    const scales = new Float32Array([0.01, 0.01]);
+    await index.build(int8Manifest, chunks, int8Data.buffer, scales.buffer);
+
+    const hits = index.search(new Float32Array([3, 4, 0]), 2);
+    expect(hits).toHaveLength(2);
+    // query is [3/5, 4/5, 0] normalized = [0.6, 0.8, 0]
+    // chunk 1 [0, 1, 0] dot [0.6, 0.8, 0] = 0.8 -> GEN ranks first
+    expect(hits[0]!.chunk.book).toBe('GEN');
+    expect(hits[0]!.score).toBeCloseTo(0.8);
+    expect(hits[1]!.chunk.book).toBe('JHN');
+    expect(hits[1]!.score).toBeCloseTo(0.6);
+  });
+
   it('throws on buffer length mismatch', async () => {
     const index = new BruteForceVectorIndex();
     const badMatrix = new Float32Array([1, 0, 0]);

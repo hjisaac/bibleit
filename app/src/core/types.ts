@@ -79,9 +79,9 @@ export interface Manifest {
     name: string;
     license: string;
   };
-  corpus: { verses: string; count: number };
+  corpus: { verses: string; count: number; sha256?: string };
   /** Chunk-stage lock parameters (strategy, ceiling, overlap, ...) plus the run hash. */
-  chunks: { file: string; hash: string; strategy: string; [param: string]: unknown };
+  chunks: { file: string; hash: string; strategy: string; sha256?: string; [param: string]: unknown };
   embeddings: {
     file: string;
     model: string;
@@ -90,6 +90,7 @@ export interface Manifest {
     query_prefix: string;
     quantization: { type: 'int8'; scales: string } | { type: 'float32' };
     count: number;
+    sha256?: string;
   };
 }
 

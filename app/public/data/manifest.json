@@ -8,10 +8,12 @@
   },
   "corpus": {
     "verses": "verses.json.gz",
-    "count": 31095
+    "count": 31095,
+    "sha256": "c8569c109787b01cc22c57ed5b480b32f1693a03dfd9a464ca4310e93053ba78"
   },
   "chunks": {
     "file": "chunks.json.gz",
+    "sha256": "b909848e972eec7d57acf666d192865f5ba71dd2c113c966758c167fe551177e",
     "hash": "cbd6645a3d9a",
     "strategy": "token_window",
     "ceiling": 512,
@@ -20,16 +22,19 @@
     "headroom_margin": 25,
     "render_strategy": "book_and_heading",
     "include_overlap_heading": true,
-    "tokenizer_model": "nomic-ai/nomic-embed-text-v1.5"
+    "embedding_model": "nomic-ai/nomic-embed-text-v1.5"
   },
   "embeddings": {
-    "file": "embeddings.f32.bin",
+    "file": "embeddings.i8.bin",
     "model": "nomic-ai/nomic-embed-text-v1.5",
     "dim": 768,
     "query_prefix": "search_query: ",
     "quantization": {
-      "type": "float32"
+      "type": "int8",
+      "scales": "scales.f32.bin",
+      "scales_sha256": "2c090a8cef09fc9d6d0e1f442502512124784cd8d6c4472ebd98c52ff30d3443"
     },
-    "count": 2655
+    "count": 2655,
+    "sha256": "cd0ca18c6cec6a3130986d37f1fd837027a646d4bca96de085d60ce7998fae7f"
   }
 }

@@ -16,15 +16,14 @@ import type {
 import { ArrayVerseStore } from './adapters/array-verse-store';
 import type { Chunk, RetrievalResult, VerseStore } from './core/types';
 
-// v1 adapters (each is one file in src/adapters/ — see design/architecture.md
-// for the swap path of every port):
-// import { OpfsArtifactStore } from './adapters/opfs-artifact-store';
-// import { RegexRefParser } from './adapters/regex-ref-parser';
-// import { MiniSearchLexicalIndex } from './adapters/minisearch-lexical-index';
-// import { TransformersQueryEmbedder } from './adapters/transformers-query-embedder';
-// import { BruteForceVectorIndex } from './adapters/bruteforce-vector-index';
-// import { RrfRanker } from './adapters/rrf-ranker';
-// import { NullAnswerProvider } from './adapters/null-answer-provider';
+import { OpfsArtifactStore } from './adapters/opfs-artifact-store';
+import { RegexRefParser } from './adapters/regex-ref-parser';
+import { MiniSearchLexicalIndex } from './adapters/minisearch-lexical-index';
+import { WorkerQueryEmbedder } from './adapters/worker-query-embedder';
+import { BruteForceVectorIndex } from './adapters/bruteforce-vector-index';
+import { RrfRanker } from './adapters/rrf-ranker';
+import { NullAnswerProvider } from './adapters/null-answer-provider';
+import { WebSpeechNarrator } from './adapters/web-speech-narrator';
 
 interface Ports {
   store: ArtifactStore;
@@ -120,20 +119,22 @@ export function buildLocalEngine(p: Ports): SearchEngine {
   };
 }
 
-/**
- * v1 wiring. Uncomment adapter imports as they are implemented.
- * Later, swapping to a server backend is exactly:
- *   return new RemoteEngine('https://api.bibleit.example/search');
- */
-import { MockSearchEngine } from './adapters/mock-search-engine';
-import { WebSpeechNarrator } from './adapters/web-speech-narrator';
+export function createDefaultArtifactStore(): ArtifactStore {
+  return new OpfsArtifactStore();
+}
 
-export function createDefaultEngine(): SearchEngine {
-  // Use mock engine until offline artifacts and adapters are completed.
-  return new MockSearchEngine();
+export function createDefaultEngine(store: ArtifactStore = createDefaultArtifactStore()): SearchEngine {
+  return buildLocalEngine({
+    store,
+    refParser: new RegexRefParser(),
+    lexical: new MiniSearchLexicalIndex(),
+    embedder: new WorkerQueryEmbedder(),
+    vectors: new BruteForceVectorIndex(),
+    ranker: new RrfRanker(),
+    answers: new NullAnswerProvider(),
+  });
 }
 
 export function createDefaultNarrator(): AudioNarrator {
   return new WebSpeechNarrator();
 }
-
