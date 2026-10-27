@@ -50,6 +50,9 @@ def test_static_artifact_sink(tmp_path: Path) -> None:
     assert manifest["embeddings"]["count"] == 1
     assert manifest["embeddings"]["query_prefix"] == "search_query: "
     assert manifest["embeddings"]["quantization"]["type"] == "float32"
+    assert "sha256" in manifest["corpus"] and len(manifest["corpus"]["sha256"]) == 64
+    assert "sha256" in manifest["chunks"] and len(manifest["chunks"]["sha256"]) == 64
+    assert "sha256" in manifest["embeddings"] and len(manifest["embeddings"]["sha256"]) == 64
 
     # Verify verses.json.gz (dense/sparse array schema)
     verses_path = tmp_path / "verses.json.gz"
@@ -78,3 +81,31 @@ def test_static_artifact_sink(tmp_path: Path) -> None:
     f_data = np.frombuffer(emb_path.read_bytes(), dtype=np.float32)
     assert len(f_data) == 4
     np.testing.assert_allclose(f_data, embeddings[0], atol=1e-6)
+
+
+def test_static_artifact_sink_int8(tmp_path: Path) -> None:
+    corpus = BookCorpus({"GEN": {1: {1: "In the beginning"}}})
+    chunks = [Passage(book="GEN", start=(1, 1), end=(1, 1))]
+    i8_embeddings = np.array([[10, -20, 30, 40]], dtype=np.int8)
+    scales = np.array([0.01], dtype=np.float32)
+
+    sink = StaticArtifactSink()
+    sink.write(
+        out_dir=tmp_path,
+        corpus=corpus,
+        chunks=chunks,
+        embeddings=i8_embeddings,
+        scales=scales,
+        model="nomic-ai/nomic-embed-text-v1.5",
+        query_prefix="search_query: ",
+        chunk_meta={"strategy": "token_window", "ceiling": 512, "overlap": 0},
+    )
+
+    manifest = json.loads((tmp_path / "manifest.json").read_text())
+    assert manifest["embeddings"]["quantization"]["type"] == "int8"
+    assert manifest["embeddings"]["quantization"]["scales"] == "scales.f32.bin"
+    assert "scales_sha256" in manifest["embeddings"]["quantization"]
+    assert (tmp_path / "embeddings.i8.bin").exists()
+    assert (tmp_path / "scales.f32.bin").exists()
+    assert len((tmp_path / "embeddings.i8.bin").read_bytes()) == 4
+    assert len((tmp_path / "scales.f32.bin").read_bytes()) == 4

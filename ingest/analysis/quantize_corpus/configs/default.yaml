@@ -1,0 +1,11 @@
+strategy: token_window
+ceiling: 512
+overlap: 0
+floor: 5
+headroom_margin: 25
+render_strategy: book_and_heading
+include_overlap_heading: true
+embedding_model: nomic-ai/nomic-embed-text-v1.5
+quantizer: int8
+normalize: true
+track: false

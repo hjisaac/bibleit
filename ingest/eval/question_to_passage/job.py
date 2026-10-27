@@ -40,6 +40,7 @@ class EvalJobQuestionToPassage(EvalJobBase):
         k = self.config.get("k", 1)
         chunk_cfg = ChunkConfig.from_mapping(self.config)
         model = str(self.config.get("embedding_model", "nomic"))
+        model_short = "nomic" if "nomic" in model else model.split("/")[-1]
         quant_tag = "_i8" if self.config.get("quantized", False) else ""
         return f"k{k}_{chunk_cfg.slug}_{model_short}{quant_tag}"
 

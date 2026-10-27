@@ -35,6 +35,7 @@ class EmbeddingModel(StrEnum):
     everywhere (fastembed calls pass a member directly as model_name)."""
 
     NOMIC_EMBED_TEXT_V1_5 = "nomic-ai/nomic-embed-text-v1.5"
+    NOMIC_EMBED_TEXT_V1_5_Q = "nomic-ai/nomic-embed-text-v1.5-Q"
 
 
 # Canonical 66-book order, 1-indexed. Matches getbible.net's `nr` field
