@@ -1,4 +1,5 @@
 import gzip
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -6,8 +7,6 @@ from typing import Any, Sequence
 
 import numpy as np
 
-from rag_core.embedders import BaseEmbedder
-from rag_core.quantization import BaseQuantizer, Int8Quantizer
 from rag_core.sinks import BaseSink
 
 from .types import BookCorpus, Passage
@@ -16,12 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 class StaticArtifactSink(BaseSink):
-    """Writes static PWA artifacts (manifest, verses, chunks, embeddings)."""
+    """Writes static PWA artifacts (manifest, verses, chunks, float32 embeddings)."""
 
     def __init__(
         self,
         translation: dict[str, str] | None = None,
-        quantizer: BaseQuantizer | None = None,
     ):
         self.translation = translation or {
             "id": "web",
@@ -29,7 +27,6 @@ class StaticArtifactSink(BaseSink):
             "name": "World English Bible",
             "license": "public domain",
         }
-        self.quantizer = quantizer or Int8Quantizer()
 
     def write(
         self,
@@ -37,21 +34,24 @@ class StaticArtifactSink(BaseSink):
         corpus: BookCorpus,
         chunks: Sequence[Passage],
         embeddings: np.ndarray,
-        embedder: BaseEmbedder,
-        strategy_meta: dict[str, Any] | None = None,
+        model: str,
+        query_prefix: str,
+        chunk_meta: dict[str, Any],
+        scales: np.ndarray | None = None,
         **kwargs: Any,
     ) -> Path:
+        if len(chunks) != embeddings.shape[0]:
+            raise ValueError(f"{len(chunks)} chunks but {embeddings.shape[0]} embedding rows")
         out_dir = Path(out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
-        meta = strategy_meta or {"strategy": "adaptive_window"}
 
-        # 1. Verses (compressed 2D array JSON: { [book]: string[][] })
-        verses_payload = corpus.to_dict()
+        # 1. Verses (hash uncompressed JSON payload; store deterministic mtime=0 gzip)
+        verses_raw = json.dumps(corpus.to_dict(), separators=(",", ":")).encode("utf-8")
+        verses_bytes = gzip.compress(verses_raw, mtime=0)
         verses_file = out_dir / "verses.json.gz"
-        with gzip.open(verses_file, "wt", encoding="utf-8") as f:
-            json.dump(verses_payload, f, separators=(",", ":"))
+        verses_file.write_bytes(verses_bytes)
 
-        # 2. Chunks (compressed coordinate spans without text)
+        # 2. Chunks (hash uncompressed JSON payload; store deterministic mtime=0 gzip)
         chunks_payload = [
             {
                 "id": i,
@@ -62,38 +62,52 @@ class StaticArtifactSink(BaseSink):
             }
             for i, chunk in enumerate(chunks)
         ]
+        chunks_raw = json.dumps(chunks_payload, separators=(",", ":")).encode("utf-8")
+        chunks_bytes = gzip.compress(chunks_raw, mtime=0)
         chunks_file = out_dir / "chunks.json.gz"
-        with gzip.open(chunks_file, "wt", encoding="utf-8") as f:
-            json.dump(chunks_payload, f, separators=(",", ":"))
+        chunks_file.write_bytes(chunks_bytes)
 
-        # 3. Quantized Embeddings & Scales
-        q_matrix, quant_meta = self.quantizer.quantize(embeddings)
-        ext = "i8.bin" if self.quantizer.name == "int8" else f"{self.quantizer.name}.bin"
-        emb_file = out_dir / f"embeddings.{ext}"
-        emb_file.write_bytes(q_matrix.tobytes())
-
-        quant_dict: dict[str, Any] = {"type": self.quantizer.name}
-        if "scales" in quant_meta:
+        # 3. Embeddings (int8 + scales or float32)
+        if embeddings.dtype == np.int8 or scales is not None:
+            emb_bytes = embeddings.astype(np.int8).tobytes()
+            emb_file = out_dir / "embeddings.i8.bin"
+            emb_file.write_bytes(emb_bytes)
+            scales_bytes = scales.astype(np.float32).tobytes() if scales is not None else b""
             scales_file = out_dir / "scales.f32.bin"
-            scales_file.write_bytes(quant_meta["scales"].tobytes())
-            quant_dict["scales"] = scales_file.name
+            scales_file.write_bytes(scales_bytes)
+            quant_meta = {
+                "type": "int8",
+                "scales": scales_file.name,
+                "scales_sha256": hashlib.sha256(scales_bytes).hexdigest(),
+            }
+        else:
+            emb_bytes = embeddings.astype(np.float32).tobytes()
+            emb_file = out_dir / "embeddings.f32.bin"
+            emb_file.write_bytes(emb_bytes)
+            quant_meta = {"type": "float32"}
 
-        # 4. Manifest (Schema Version 3)
+        # 4. Manifest with cryptographic SHA-256 integrity checksums over canonical payloads
         manifest = {
             "schema_version": 3,
             "translation": self.translation,
-            "corpus": {"verses": verses_file.name, "count": len(corpus.all_verses())},
-            "chunks": {"file": chunks_file.name, **meta},
+            "corpus": {
+                "verses": verses_file.name,
+                "count": len(corpus.all_verses()),
+                "sha256": hashlib.sha256(verses_raw).hexdigest(),
+            },
+            "chunks": {
+                "file": chunks_file.name,
+                "sha256": hashlib.sha256(chunks_raw).hexdigest(),
+                **chunk_meta,
+            },
             "embeddings": {
                 "file": emb_file.name,
-                "model": (
-                    getattr(embedder.raw_model, "model_name", None)
-                    if hasattr(embedder, "raw_model")
-                    else getattr(embedder, "model_name", "unknown")
-                ),
-                "dim": embedder.dim,
-                "quantization": quant_dict,
+                "model": model,
+                "dim": int(embeddings.shape[1]),
+                "query_prefix": query_prefix,
+                "quantization": quant_meta,
                 "count": len(chunks),
+                "sha256": hashlib.sha256(emb_bytes).hexdigest(),
             },
         }
         manifest_file = out_dir / "manifest.json"

@@ -10,4 +10,7 @@ def evaluate_retrieval(
     """Evaluates IR retrieval run against ground-truth qrels using ranx."""
     q = qrels if isinstance(qrels, Qrels) else Qrels(qrels)
     r = run if isinstance(run, Run) else Run(run)
-    return evaluate(q, r, list(metrics))
+    res = evaluate(q, r, list(metrics))
+    if isinstance(res, dict):
+        return {k: float(v) for k, v in res.items()}
+    return float(res)

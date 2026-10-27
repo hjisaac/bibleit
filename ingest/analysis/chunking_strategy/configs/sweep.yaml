@@ -1,4 +1,5 @@
 # Grid sweep configuration for chunking strategy analysis
+strategy: "adaptive"
 floor: [3, 5, 8]
 ceiling: [20, 30]
 overlap: [0, 1, 2]
@@ -14,3 +15,4 @@ embedding_model: null
 
 web_path: "ingest/data/translations/web/en/web.json"
 bsb_dir: "ingest/data/translations/bsb/en"
+track: true

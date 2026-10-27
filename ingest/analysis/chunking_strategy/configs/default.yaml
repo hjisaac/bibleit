@@ -1,9 +1,10 @@
 # Chunking parameters (verse-based)
+strategy: "adaptive"
 floor: 5
 ceiling: 30
 overlap: 1
+headroom_margin: 25
 include_overlap_heading: true
-strategy: "adaptive"
 render_strategy: "heading_and_text"
 
 # Context limit for truncation checks

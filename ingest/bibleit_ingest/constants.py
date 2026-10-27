@@ -19,12 +19,23 @@ CHUNK_EMBEDDINGS_NPY_PATH = REPO / "ingest/scripts/chunk_embeddings.npy"
 # OS-temp-dir default.
 FASTEMBED_CACHE_DIR = REPO / "ingest/data/models/fastembed"
 
+# Raw digest bytes for BLAKE2b artifact hashing (6 bytes -> 12 hex characters).
+ARTIFACT_DIGEST_BYTES = 6
+
+# Nomic task prefixes; exported in the manifest so the browser embeds queries identically.
+QUERY_PREFIX = "search_query: "
+DOCUMENT_PREFIX = "search_document: "
+
+EMBED_CORPUS_OUTPUTS = REPO / "ingest/analysis/embed_corpus/outputs"
+APP_DATA_DIR = REPO / "app/public/data"
+
 
 class EmbeddingModel(StrEnum):
     """Every embedding model this project uses. Behaves as a plain string
     everywhere (fastembed calls pass a member directly as model_name)."""
 
     NOMIC_EMBED_TEXT_V1_5 = "nomic-ai/nomic-embed-text-v1.5"
+    NOMIC_EMBED_TEXT_V1_5_Q = "nomic-ai/nomic-embed-text-v1.5-Q"
 
 
 # Canonical 66-book order, 1-indexed. Matches getbible.net's `nr` field

@@ -1,7 +1,7 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { AudioNarrator, SearchEngine } from '../core/ports';
-import type { NarrationState, NarrationWordBoundary, ScoredPassage } from '../core/types';
+import { getChunkKey, type Manifest, type NarrationState, type NarrationWordBoundary, type ScoredPassage } from '../core/types';
 import { BIBLE_BOOKS_BY_ID, findBookByPrefix } from '../core/bible-books';
 import { resolveVerseText } from '../adapters/book-store';
 import { getRandomStarterTopic, POPULAR_TOPICS, SEARCH_SUGGESTIONS, STARTER_TOPICS, type StarterTopic } from '../core/starter-topics';
@@ -9,6 +9,7 @@ import type { SavedVerse } from './SavedView';
 
 interface SearchViewProps {
   engine: SearchEngine;
+  manifest?: Manifest | null;
   narrator?: AudioNarrator;
   narrationState?: NarrationState;
   isOnline: boolean;
@@ -139,6 +140,7 @@ function getInitialSearchState(): StoredSearch {
 
 export function SearchView({
   engine,
+  manifest,
   narrator,
   narrationState,
   isOnline,
@@ -158,9 +160,9 @@ export function SearchView({
   const [query, setQuery] = useState(initialSearch.query);
   const [passages, setPassages] = useState<ScoredPassage[]>(initialSearch.passages);
   const [latencyMs, setLatencyMs] = useState(38);
-  const [expandedCardId, setExpandedCardId] = useState<number | null>(null);
+  const [expandedCardKey, setExpandedCardKey] = useState<string | null>(null);
   const [surroundingVerses, setSurroundingVerses] = useState<
-    Record<number, { prev?: string; next?: string }>
+    Record<string, { prev?: string; next?: string }>
   >({});
 
   const [answerText, setAnswerText] = useState<string>(initialSearch.answerText);
@@ -169,10 +171,23 @@ export function SearchView({
   const [searchHistory, setSearchHistory] = useState<string[]>(loadSearchHistory);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const isFirstMountRef = useRef(true);
-  const skipRetrieveQueryRef = useRef<string | null>(null);
-  const isFirstMountAnswerRef = useRef(true);
-  const skipAnswerResetQueryRef = useRef<string | null>(null);
+  const searchRunIdRef = useRef(0);
+
+  const runSearch = (targetQuery: string) => {
+    const trimmed = targetQuery.trim();
+    const runId = ++searchRunIdRef.current;
+    if (!trimmed) {
+      setPassages([]);
+      return;
+    }
+    const startTime = performance.now();
+    void engine.retrieve(trimmed).then((res) => {
+      if (searchRunIdRef.current === runId) {
+        setPassages(res.passages);
+        setLatencyMs(Math.round(performance.now() - startTime));
+      }
+    });
+  };
 
   const addQueryToHistory = (rawQuery: string) => {
     const trimmed = rawQuery.trim();
@@ -191,9 +206,8 @@ export function SearchView({
   };
 
   const handleApplyTopic = (topic: StarterTopic) => {
+    searchRunIdRef.current++;
     addQueryToHistory(topic.query);
-    skipRetrieveQueryRef.current = topic.query;
-    skipAnswerResetQueryRef.current = topic.query;
     setQuery(topic.query);
     setPassages(topic.passages);
     setAnswerText(topic.answerText);
@@ -215,6 +229,8 @@ export function SearchView({
     } else {
       setQuery(text);
       setAnswerText('');
+      setIsSynthesizing(false);
+      runSearch(text);
       const el = inputRef.current;
       if (el) {
         el.focus();
@@ -224,10 +240,7 @@ export function SearchView({
   };
 
   const isQuestion = isQuestionQuery(query);
-  const trimmedLower = query.trim().toLowerCase();
-  // Only match book picker if query is strictly a single book name / alias (no chapter numbers or extra words)
-  const isExactBookQuery = /^[1-3]?\s*[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF]+$/.test(trimmedLower);
-  const matchedBook = isExactBookQuery ? findBookByPrefix(trimmedLower) : undefined;
+  const matchedBook = findBookByPrefix(query);
 
   useEffect(() => {
     if (typeof localStorage === 'undefined') return;
@@ -242,47 +255,9 @@ export function SearchView({
   }, [query, passages, answerText]);
 
   useEffect(() => {
-    if (isFirstMountRef.current) {
-      isFirstMountRef.current = false;
-      return;
-    }
-    if (skipRetrieveQueryRef.current === query) {
-      skipRetrieveQueryRef.current = null;
-      return;
-    }
-
-    let isCancelled = false;
-    const startTime = performance.now();
-
-    void engine.retrieve(query).then((res) => {
-      if (!isCancelled) {
-        setPassages(res.passages);
-        setLatencyMs(Math.round(performance.now() - startTime));
-      }
-    });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [engine, query]);
-
-  useEffect(() => {
-    if (isFirstMountAnswerRef.current) {
-      isFirstMountAnswerRef.current = false;
-      return;
-    }
-    if (skipAnswerResetQueryRef.current === query) {
-      skipAnswerResetQueryRef.current = null;
-      return;
-    }
-    setAnswerText('');
-    setIsSynthesizing(false);
-  }, [query]);
-
-  useEffect(() => {
-    if (expandedCardId === null) return;
-    const passage = passages.find((p) => p.chunk.id === expandedCardId);
-    if (!passage || surroundingVerses[expandedCardId]) return;
+    if (expandedCardKey === null) return;
+    const passage = passages.find((p) => getChunkKey(p.chunk) === expandedCardKey);
+    if (!passage || surroundingVerses[expandedCardKey]) return;
 
     let isSubscribed = true;
     const book = passage.chunk.book;
@@ -298,7 +273,7 @@ export function SearchView({
       if (isSubscribed) {
         setSurroundingVerses((curr) => ({
           ...curr,
-          [expandedCardId]: { prev, next },
+          [expandedCardKey]: { prev, next },
         }));
       }
     });
@@ -306,10 +281,10 @@ export function SearchView({
     return () => {
       isSubscribed = false;
     };
-  }, [expandedCardId, passages, surroundingVerses]);
+  }, [expandedCardKey, passages, surroundingVerses]);
 
-  const toggleContext = (id: number) => {
-    setExpandedCardId((prev) => (prev === id ? null : id));
+  const toggleContext = (key: string) => {
+    setExpandedCardKey((prev) => (prev === key ? null : key));
   };
 
   const copyToClipboard = (text: string) => {
@@ -325,13 +300,11 @@ export function SearchView({
     setIsSynthesisCollapsed(false);
 
     try {
-      let currentPassages = passages;
-      if (currentPassages.length === 0) {
-        const res = await engine.retrieve(trimmed);
-        currentPassages = res.passages;
-        setPassages(currentPassages);
-      }
-      const stream = engine.answers.answer(trimmed, { passages: currentPassages, parsedRefs: [] });
+      const startTime = performance.now();
+      const res = await engine.retrieve(trimmed);
+      setPassages(res.passages);
+      setLatencyMs(Math.round(performance.now() - startTime));
+      const stream = engine.answers.answer(trimmed, res);
       for await (const chunk of stream) {
         setAnswerText((prev) => prev + chunk);
       }
@@ -461,6 +434,8 @@ export function SearchView({
             }}
             onInput={(e) => {
               setQuery((e.target as HTMLInputElement).value);
+              setAnswerText('');
+              setIsSynthesizing(false);
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -468,6 +443,8 @@ export function SearchView({
                 (e.target as HTMLInputElement).blur();
                 if (isQuestion && isAiEnabled && engine.answers.available && isOnline && !isSynthesizing) {
                   void handleSynthesize();
+                } else {
+                  runSearch(query);
                 }
               }
             }}
@@ -480,7 +457,9 @@ export function SearchView({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
+                searchRunIdRef.current++;
                 setQuery('');
+                setPassages([]);
                 setAnswerText('');
                 inputRef.current?.focus();
               }}
@@ -595,7 +574,11 @@ export function SearchView({
         >
           <div class="flex items-center gap-1.5">
             <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-            <span>MiniLM-L6 (int8) · 31,102 verses</span>
+            <span>
+              {manifest
+                ? `${manifest.embeddings.model.split('/').pop()} (${manifest.embeddings.quantization.type}) · ${manifest.corpus.count.toLocaleString()} verses`
+                : 'nomic-embed-text-v1.5 (int8) · 31,095 verses'}
+            </span>
           </div>
           <span class="text-emerald-600 dark:text-emerald-400 font-semibold">{latencyMs}ms latency</span>
         </div>
@@ -910,7 +893,8 @@ export function SearchView({
       {/* Results Stream */}
       <div class="flex flex-col space-y-3 pb-4">
         {passages.map((p) => {
-          const isExpanded = expandedCardId === p.chunk.id;
+          const chunkKey = getChunkKey(p.chunk);
+          const isExpanded = expandedCardKey === chunkKey;
           const refString = formatCitation(p.chunk.book, p.chunk.start, p.chunk.end);
           const isSameChapter = p.chunk.start[0] === p.chunk.end[0];
           const isSameVerse = isSameChapter && p.chunk.start[1] === p.chunk.end[1];
@@ -933,8 +917,8 @@ export function SearchView({
                 v.verse === p.chunk.start[1],
             ) ?? false;
 
-          const surrounding = surroundingVerses[p.chunk.id];
-          const segmentId = `chunk-${p.chunk.id}`;
+          const surrounding = surroundingVerses[chunkKey];
+          const segmentId = `chunk-${chunkKey}`;
           const isCardActive =
             narrationState?.status !== 'idle' &&
             narrationState?.activeSegment?.id === segmentId;
@@ -942,7 +926,7 @@ export function SearchView({
 
           return (
             <article
-              key={p.chunk.id}
+              key={chunkKey}
               class={`p-4 rounded-2xl border transition-all hover:shadow-sm ${
                 isCardActive ? 'ring-2 ring-amber-500/50' : ''
               }`}
@@ -1164,7 +1148,7 @@ export function SearchView({
               >
                 <button
                   type="button"
-                  onClick={() => toggleContext(p.chunk.id)}
+                  onClick={() => toggleContext(chunkKey)}
                   class="font-medium flex items-center gap-1 hover:underline"
                   style={{ color: 'var(--text-muted)' }}
                 >

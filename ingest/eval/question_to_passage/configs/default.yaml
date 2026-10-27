@@ -2,10 +2,11 @@ log_console_level: INFO
 log_file_level: INFO
 
 k: 1
-strategy: "adaptive"
-floor: 5
-ceiling: 30
+strategy: "token_window"
+ceiling: 256
 overlap: 1
+floor: 5
+headroom_margin: 25
 include_overlap_heading: true
 render_strategy: "heading_and_text"
 
@@ -13,5 +14,5 @@ render_strategy: "heading_and_text"
 eval_data_path: ingest/data/eval/question_to_passage.json
 web_path: ingest/data/translations/web/en/web.json
 embedding_model: nomic-ai/nomic-embed-text-v1.5
-threads: 2
+threads: 4
 track: true

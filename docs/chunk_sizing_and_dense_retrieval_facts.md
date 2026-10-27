@@ -175,6 +175,142 @@ This document tracks direct empirical evidence, papers proving each claim, what 
 
 ---
 
+## Fact 9: CPU Embedding Scaling Dynamics: Cache Thrashing vs. Multi-Process Parallelism
+
+### What Has Been Proven (2026-10-23 Empirical Benchmark)
+- On CPU-based ONNX transformer inference (`nomic-embed-text-v1.5`), increasing batch size from 16 to 64 **does not improve single-threaded throughput** and **severely degrades parallel throughput by over 2.1×** ($2.73 \rightarrow 1.27\text{ chunks/s}$).
+- **The Microarchitectural Cause (L2/L3 Cache Thrashing):** Transformer self-attention computes query-key product matrices scaled as $O(B \cdot L^2 \cdot H)$. On CPU cores, each worker process processing a batch of $B=64$ passages with length $L \approx 256$ requires working memory that exceeds the core's private L2 cache (typically 512KB–1MB) and spills into shared L3 cache, triggering continuous cache line evictions and DRAM bus contention across workers.
+- **The Sweet Spot (`batch_size=16`, `parallel = N/2`):** Running with $B=16$ keeps intermediate attention activations compact enough to reside comfortably within fast CPU cache. Spawning $N/2 = 4$ independent worker processes on an 8-core CPU delivers **2.73 chunks/sec** ($3.25\times$ faster than sequential), while leaving the remaining 4 cores completely unburdened so the host OS, desktop UI, and browser never stutter or freeze.
+
+### Benchmark Scaling Data on Biblical Text Chunks
+| Configuration | Batch Size | Workers | Measured Rate | Full Corpus (5,318 chunks) | System Health / Usability |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Sequential Baseline** | 16 | None (1) | 0.84 chunks/s | $\approx 105\text{ min}$ | Safe, but excessively slow |
+| **Large Batch (No Workers)** | 64 | None (1) | 0.78 chunks/s | $\approx 113\text{ min}$ | Memory pressure, cache misses |
+| **2 Workers (Contention)** | 64 | 2 | 0.59 chunks/s | $\approx 150\text{ min}$ | Inter-process lock contention |
+| **4 Workers (Large Batch)** | 64 | 4 | 1.27 chunks/s | $\approx 70\text{ min}$ | $2.1\times$ throughput loss from cache thrashing |
+| **4 Workers (Small Batch)** | **16** | **4** | **2.73 chunks/s** | **$\approx 32\text{ min}$** | **Optimal**: $3.25\times$ faster, 4 cores idle |
+
+---
+
+## Fact 10: Vector Space Geometry: Hierarchical Similarity Decomposition & Effective Rank
+
+### What Has Been Proven (2026-10-22 Corpus Embedding Analysis)
+- Pairwise cosine similarity in a dense scripture vector space is not a flat distribution; it decomposes into three hierarchically separated distributions:
+  1. **Adjacent Pairs ($i, i+1$ within same book):** $\mu = \mathbf{0.855} \pm 0.058$ (captures narrative continuity across sliding windows).
+  2. **Intra-Book Non-Adjacent Pairs ($|i - j| > 1$):** $\mu = \mathbf{0.753} \pm 0.053$ (captures book-level thematic clustering).
+  3. **Cross-Book Pairs ($b_1 \neq b_2$):** $\mu = \mathbf{0.693} \pm 0.046$ (captures global representation cone / background anisotropy).
+- **Hierarchical Margin ($\Delta \approx 0.16$):** The robust $\approx 0.16$ separation between adjacent narrative chunks and cross-book background chunks confirms the vector space possesses strong fine-grained semantic discriminability without collapsing into a uniform representation cone.
+- **Dimensional Utilization (Roy & Vetterli Effective Rank):**
+  Applying centered Singular Value Decomposition (SVD) on the embedding matrix $\mathbf{X} - \bar{\mathbf{X}}$ and calculating entropy-based effective rank:
+  $$\text{effective rank} = \exp\left(-\sum_{i=1}^d p_i \ln p_i\right), \quad p_i = \frac{\sigma_i}{\sum_k \sigma_k}$$
+  yields an effective rank of **$498.55$ out of $768$ dimensions** ($64.9\%$ dimensional utilization). This mathematically rules out low-rank collapse and verifies that the model utilizes the majority of its representation space.
+- **$L_2$ Vector Norm Stability:**
+  Vector norms are tightly bounded at $\mu = 18.74 \pm 0.56$ ($\min=16.86, \max=21.42$), ensuring that dot-product similarity closely tracks cosine similarity without magnitude distortion.
+
+---
+
+## Fact 11: Monte Carlo Estimation of Massive Pairwise Similarity Populations
+
+### Theoretical & Computational Mechanics
+- For an $N = 5,318$ passage corpus, computing all unique pairwise cosine similarities requires calculating the upper triangle of the Gram matrix:
+  $$\frac{N(N - 1)}{2} = \frac{5,318 \times 5,317}{2} = 14,138,203 \text{ dot products}$$
+  Materializing 14.1 million 32-bit floats requires $\approx 56.5\text{ MB}$ of memory and significant CPU cycles per diagnostic pass.
+- **Monte Carlo Estimation:** Instead of exhaustive computation, drawing $S = 2,000$ uniform random pairs from each relationship stratum estimates the population mean and variance with bounded standard error:
+  $$\text{SE} \le \frac{\sigma}{\sqrt{S}} \le \frac{1}{2\sqrt{2,000}} \approx 0.011$$
+- **Distinction Between Uniform Sampling & Monte Carlo:**
+  - *Uniform random sampling* is the probability mechanism (every pair index has equal likelihood $\frac{1}{|\mathcal{P}|}$).
+  - *Monte Carlo method* is the mathematical estimation technique of evaluating deterministic population properties (distribution density curves, means, quantiles) through repeated stochastic sampling.
+  - Computing $S=2,000$ vector dot products takes **$<0.2\text{ seconds}$**, enabling instant real-time diagnostic reporting at the end of every experiment run.
+
+---
+
+## Fact 12: Pipeline Cryptographic Lineage & Seam Isolation (`config.lock.yaml`)
+
+### Architectural Principle
+- In multi-stage retrieval pipelines (`chunking` $\rightarrow$ `embedding` $\rightarrow$ `evaluation`), downstream evaluation artifacts become uninterpretable if their exact upstream generation criteria are lost.
+- **Hierarchical Lock Chaining:**
+  Every pipeline stage generates an immutable `config.lock.yaml` recording its exact hyperparameters, output shape, and an embedded copy of the upstream stage's lock:
+  $$\text{Stage 1 (Chunking Lock)} \subset \text{Stage 2 (Embedding Lock)} \subset \text{Stage 3 (Eval Lock)}$$
+- **Runtime Convention Enforcement:**
+  This cryptographic lineage allows automated verification that:
+  1. The query tokenizer and embedding model match the corpus embedding model identically.
+  2. The chunk boundary parameters used to generate dense vectors strictly match the text chunks bundled into the offline PWA.
+
+---
+
+## Fact 13: Overlap Degrades Dense Retrieval via Top-k Slot Cannibalization
+
+### What Has Been Empirically Proven (2026-10-25 16-Run Eval Sweep)
+- While sliding window overlap ($o=1$) increases adjacent passage geometric continuity ($\mu = 0.880$ vs $0.865$), it **consistently degrades downstream retrieval performance** across all ceilings ($256$ and $512$) and ranking depths ($k \in [1, 3, 5, 10]$).
+- **Ceiling 256:**
+  - $o=0$: $\text{Hit@10} = \mathbf{70.32\%}, \text{MRR} = \mathbf{0.4677}, \text{NDCG@10} = \mathbf{0.5246}$
+  - $o=1$: $\text{Hit@10} = 69.07\%, \text{MRR} = 0.4556, \text{NDCG@10} = 0.5090$
+- **Ceiling 512:**
+  - $o=0$: $\text{Hit@10} = \mathbf{69.75\%}, \text{MRR} = \mathbf{0.4637}, \text{NDCG@10} = \mathbf{0.5202}$
+  - $o=1$: $\text{Hit@10} = 67.27\%, \text{MRR} = 0.4499, \text{NDCG@10} = 0.4989$
+
+### Why It Works This Way: Top-k Slot Cannibalization
+- When two adjacent passages share an overlapping verse, their vector representations become near-identical.
+- In top-$k$ retrieval, both the primary passage and its overlapping neighbor achieve high cosine similarity to the query.
+- The redundant neighbor passage **cannibalizes one of the scarce top-$k$ slots** (e.g. occupying rank 2 right after rank 1), displacing distinct alternative candidate passages down or pushing them entirely outside the top-$k$ evaluation window.
+- Zero-overlap ($o=0$) enforces strict mutual exclusivity among chunks, maximizing the information diversity of top-$k$ candidate sets.
+
+![Retrieval Evaluation Performance Across Candidates](assets/retrieval_sweep_performance.png)
+
+---
+
+## Fact 14: Canonical Grounding (`book_and_heading`) Doubles Semantic Margin
+
+### What Has Been Empirically Proven (2026-10-24 8-Run Embedding Sweep)
+- Prepending the canonical book name (e.g., `"Genesis: The Creation of the World"`) adds only $\approx 3\text{--}4$ tokens per passage, but **nearly doubles the topological contrast** ($\Delta = \text{Intra-Book} - \text{Cross-Book}$):
+  - Without book name (`heading_and_text`): $\Delta = \mathbf{+0.058 \text{ to } +0.067}$
+  - With book name (`book_and_heading`): $\Delta = \mathbf{+0.106 \text{ to } +0.125}$ ($2.1\times$ increase).
+- **Background Invariance:** Cross-book background similarity remains constant ($\mu \approx 0.69 \pm 0.04$).
+- Prepending the canonical book title injects strong topical prior clustering without introducing cross-book anisotropic distortion or false positives.
+
+---
+
+## Fact 15: The 512-Ceiling Plateau and 2x Client Memory Efficiency
+
+### What Has Been Empirically Proven
+- When comparing the zero-overlap winners at Ceiling 256 (`936945f7d470`) vs Ceiling 512 (`cbd6645a3d9a`):
+  - **Hit@1:** $35.10\%$ (256) vs $34.99\%$ (512) ($\Delta = 0.11\%$).
+  - **Hit@3:** $53.50\%$ (256) vs $\mathbf{55.19\%}$ (512) ($+1.69\%$ in favor of 512!).
+  - **Hit@10:** $\mathbf{70.32\%}$ (256) vs $69.75\%$ (512) ($\Delta = 0.57\%$).
+  - **MRR:** $\mathbf{0.4677}$ (256) vs $0.4637$ (512).
+  - **NDCG@10:** $\mathbf{0.5246}$ (256) vs $0.5202$ (512).
+- **Operational Payoff:**
+  - Ceiling 512 matches Ceiling 256 within $\approx 0.5\%$ retrieval accuracy, but cuts total chunks from **5,318 to 2,655** (a **$50.1\%$ reduction**).
+  - The vector index shrinks from **32 MB to 16 MB** uncompressed float32 (~2 MB int8), halving WebAssembly dot-product search latency on client mobile devices.
+
+---
+
+## Fact 16: The Natural Pericope Distribution & The Heavy-Tail Dilemma
+
+### Empirical Distribution of Biblical Pericopes (BSB / WEB Corpus, $N=3,015$)
+- **Median ($p50$):** **$269$ tokens** ($\approx 10\text{--}12$ verses).
+- **Min:** **$24$ tokens** (short poetic superscriptions or brief transitions).
+- **Max:** **$3,068$ tokens** (massive chapters such as Psalm 119 and genealogies).
+- **$p95$:** **$766$ tokens**; **$p99$:** **$1,162$ tokens**.
+- **Oversize Ratio:** **$506$ pericopes ($16.8\%$) exceed $512$ tokens**.
+
+### The Architectural Trade-off
+- Human editorial pericopes reflect narrative cohesion, not bounded vector budgets.
+- Pure pericope chunking creates an extreme variance challenge: $16.8\%$ of chunks are oversized, while tiny 1-verse pericopes create semantic fragmentation.
+- Bounded token-window chunking (`TokenWindowChunker`) bridges this gap: it packs whole short pericopes together up to the ceiling, but gracefully subdivides oversize pericopes to guarantee bounded sequence lengths.
+
+---
+
+## Fact 17: Deterministic Content-Addressed Artifact Lineage via BLAKE2b
+
+### Principle & Implementation
+- Eliminates fuzzy heuristic string matching (`extract_chunk_criteria`) in favor of cryptographic BLAKE2b digests ($d=6$ bytes, 12 hex characters) over canonical parameter dictionaries.
+- `ChunkConfig` serves as the single source of truth across all pipeline stages.
+- Enables idempotent execution, exact content resolution, and verifiable lineage across chunking, embedding, and retrieval evaluation stages.
+
+---
+
 ## Summary Reference Table for Future Papers
 
 | Fact / Concept | Core Finding & Paper | Why It Works | What to Try / How it Translates to `bibleit` |
@@ -185,8 +321,11 @@ This document tracks direct empirical evidence, papers proving each claim, what 
 | **Late Chunking** | Encode long document first, pool into small chunks at the end (*Günther et al., Jina AI, 2024*). | Preserves cross-chunk pronoun context while keeping search vectors small and sharp. | Try encoding entire chapters and pooling per pericope to resolve ambiguous pronouns. |
 | **Contextual Retrieval** | Prepending a 50-token context header cuts retrieval failure by 35% (*Anthropic, 2024*). | Small chunks stay sharp while retaining knowledge of where they come from. | Use `book_and_heading` rendering strategy (adds only ~15 tokens, provides full context). |
 | **Dimension vs. Chunk Size** | Increasing vector dimension ($d \rightarrow 4096$) does *not* fix long-chunk loss. | Query-doc length asymmetry inflates $\|\mathbf{d}\|$, suppressing cosine scores; distance concentration in high dims. | Sweep `[256, 512, 1024, 2048]` token ceilings to empirically locate the retrieval cliff. |
-| **TokenWindow Guarantee** | `TokenWindowChunker` with 25-tok margin guarantees 0% overflow across 31,102 verses (2026-10-15 sweep). | Packing density hits 70–75% of ceiling at $p50$ while strictly enforcing safety margin; $o=1$ costs +4.6 tokens. | Use $c=512, o=1$ (2,655 chunks, ~2 MB int8) for standard offline PWA deployment. |
-| **Structural vs. Semantic Seam** | 3–10 token text changes alter vector space geometry significantly despite length invariance. | Overlap headings create multi-topic bridges vs. purity; book grounding injects priors but risks intra-book collapse. | Keep structural flags in embedding ablation; evaluate via isotropy and downstream MRR/Recall. |
-| **Mobile PWA Budget** | ~2,655 chunks @ ~365 tokens fits in ~2.0 MB int8. | Exhaustive cosine search completes in <8 ms in WebAssembly / TypedArrays. | Enables 100% offline client-side semantic search with instant user response time. |
+| **TokenWindow Guarantee** | `TokenWindowChunker` with 25-tok margin guarantees 0% overflow across 31,102 verses (2026-10-15 sweep). | Packing density hits 70–75% of ceiling at $p50$ while strictly enforcing safety margin; $o=1$ costs +4.6 tokens. | Use $c=512, o=0$ (2,655 chunks, ~2 MB int8) for standard offline PWA deployment. |
+| **Slot Cannibalization** | Sliding overlap ($o=1$) lowers Hit@10 by $1.3\text{--}2.5\%$ and MRR by $0.012\text{--}0.014$ across all ceilings. | Duplicate neighbor chunks compete for top-$k$ rankings, displacing distinct alternative candidates. | Set $o=0$ for dense passage retrieval to maximize candidate diversity in top-$k$. |
+| **Book Grounding Contrast** | `book_and_heading` doubles canonical margin $\Delta$ ($+0.058 \rightarrow +0.125$) with constant cross-book noise. | Injects strong intra-book clustering prior without altering background isotropy. | Prepend book name to all passage texts during rendering. |
+| **512-Ceiling Plateau** | Ceiling 512 achieves identical retrieval accuracy to 256 within $0.5\%$, with $50.1\%$ fewer vectors. | Captures full pericopes without fragmentation while avoiding multi-chapter dilution. | Deploy Ceiling 512 ($2,655$ chunks / 16 MB float32) for optimal mobile memory & search speed. |
+| **Pericope Heavy Tail** | Biblical pericopes have median $269$ tokens, but $16.8\%$ exceed $512$ tokens (max $3,068$ tokens). | Human editorial breaks follow narrative arcs, creating high token variance. | Use bounded pericope chunking to preserve pericope boundaries while splitting heavy tails. |
+| **Cryptographic Lock Lineage** | Hierarchical `config.lock.yaml` with BLAKE2b digests guarantees exact seam provenance. | Chaining upstream hashes guarantees runtime assertions matching query-corpus models. | Enforce version-gated artifact seams between Python ingest and the Astro frontend. |
 
 

@@ -42,10 +42,14 @@ export interface SearchEngine {
 export interface ArtifactStore {
   /** Resolve the manifest (network-or-cache); single source of truth for versions. */
   manifest(): Promise<Manifest>;
-  verses(): Promise<VerseCorpusData>;
-  chunks(): Promise<RawChunk[]>;
+  verses(onProgress?: (progressPercent: number) => void): Promise<VerseCorpusData>;
+  chunks(onProgress?: (progressPercent: number) => void): Promise<RawChunk[]>;
   /** Raw embedding matrix as stored (quantized); interpretation is VectorIndex's job. */
-  embeddings(): Promise<{ data: ArrayBuffer; scales?: ArrayBuffer }>;
+  embeddings(onProgress?: (progressPercent: number) => void): Promise<{ data: ArrayBuffer; scales?: ArrayBuffer }>;
+  /** Check if verses are already installed in local storage without parsing. */
+  hasVerses?(): Promise<boolean>;
+  /** Check if embeddings are already installed in local storage without parsing. */
+  hasEmbeddings?(): Promise<boolean>;
   /** Drop local copies (settings → "free up space" / recover from corruption). */
   clear(): Promise<void>;
 }
@@ -87,7 +91,7 @@ export interface QueryEmbedder {
  * v1: brute-force int8 dot product. Swap: HNSW-wasm, binary + rerank.
  */
 export interface VectorIndex {
-  build(manifest: Manifest, data: ArrayBuffer, scales?: ArrayBuffer): Promise<void>;
+  build(manifest: Manifest, chunks: Chunk[], data: ArrayBuffer, scales?: ArrayBuffer): Promise<void>;
   search(queryVector: Float32Array, k: number): ScoredPassage[];
 }
 

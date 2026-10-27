@@ -1,5 +1,5 @@
 import type { Ranker } from '../core/ports';
-import type { Chunk, ScoredPassage } from '../core/types';
+import { getChunkKey, type Chunk, type ScoredPassage } from '../core/types';
 
 export interface RrfOptions {
   /** RRF smoothing constant (default: 60 per standard Cormack et al.). */
@@ -41,17 +41,25 @@ export class RrfRanker implements Ranker {
     semantic: ScoredPassage[],
     k: number = 10,
   ): ScoredPassage[] {
-    const fusedScores = new Map<number, { chunk: Chunk; score: number }>();
+    const fusedScores = new Map<
+      string,
+      { chunk: Chunk; score: number; bestRrf: number; source: ScoredPassage['source'] }
+    >();
 
     // 1. Accumulate RRF scores for lexical matches
     lexical.forEach((item, index) => {
       const rank = index + 1;
       const rrf = 1 / (this.kConst + rank);
-      const existing = fusedScores.get(item.chunk.id);
+      const key = getChunkKey(item.chunk);
+      const existing = fusedScores.get(key);
       if (existing) {
         existing.score += rrf;
+        if (rrf > existing.bestRrf) {
+          existing.bestRrf = rrf;
+          existing.source = 'lexical';
+        }
       } else {
-        fusedScores.set(item.chunk.id, { chunk: item.chunk, score: rrf });
+        fusedScores.set(key, { chunk: item.chunk, score: rrf, bestRrf: rrf, source: 'lexical' });
       }
     });
 
@@ -59,21 +67,26 @@ export class RrfRanker implements Ranker {
     semantic.forEach((item, index) => {
       const rank = index + 1;
       const rrf = 1 / (this.kConst + rank);
-      const existing = fusedScores.get(item.chunk.id);
+      const key = getChunkKey(item.chunk);
+      const existing = fusedScores.get(key);
       if (existing) {
         existing.score += rrf;
+        if (rrf > existing.bestRrf) {
+          existing.bestRrf = rrf;
+          existing.source = 'semantic';
+        }
       } else {
-        fusedScores.set(item.chunk.id, { chunk: item.chunk, score: rrf });
+        fusedScores.set(key, { chunk: item.chunk, score: rrf, bestRrf: rrf, source: 'semantic' });
       }
     });
 
     // 3. Sort fused items by accumulated score descending
     const sortedFused: ScoredPassage[] = Array.from(fusedScores.values())
       .sort((a, b) => b.score - a.score)
-      .map(({ chunk, score }) => ({
+      .map(({ chunk, score, source }) => ({
         chunk,
         score,
-        source: 'lexical', // fused candidate
+        source,
       }));
 
     // 4. Combine: references always first, followed by fused results

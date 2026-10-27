@@ -182,6 +182,21 @@ describe('SearchView Cold Start and Search Persistence', () => {
     expect(history[0]).toBe('Matthew 5:14');
   });
 
+  it('shows book navigator on keystroke without calling retrieve until Enter is pressed', () => {
+    renderSearchView();
+    retrieveSpy.mockClear();
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'John' } });
+
+    expect(screen.getByTitle('Read John 1:1')).toBeTruthy();
+    expect(retrieveSpy).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(retrieveSpy).toHaveBeenCalledTimes(1);
+    expect(retrieveSpy).toHaveBeenCalledWith('John');
+  });
+
   it('deduplicates case-insensitively and caps search history at 6 items', () => {
     localStorage.setItem(
       'bibleit_search_history',

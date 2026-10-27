@@ -4,14 +4,16 @@ log_file_level: INFO
 
 # Embedding configuration
 embedding_model: "nomic-ai/nomic-embed-text-v1.5"
-batch_size: 4
+batch_size: 16
 threads: 4
+parallel: 4
 
 # Upstream chunk artifact parameters (to auto-match from analysis/chunking_strategy/outputs)
-strategy: "adaptive"
-floor: 5
-ceiling: 30
+strategy: "token_window"
+ceiling: 256
 overlap: 1
+floor: 5
+headroom_margin: 25
 include_overlap_heading: true
 render_strategy: "heading_and_text"
 

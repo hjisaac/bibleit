@@ -15,9 +15,14 @@ export interface Verse extends VerseRef {
   text: string;
 }
 
+/** Canonical string key for a chunk: "BOOK:start_ch:start_v-end_ch:end_v" */
+export function getChunkKey(chunk: Pick<RawChunk, 'book' | 'start' | 'end'>): string {
+  return `${chunk.book}:${chunk.start[0]}:${chunk.start[1]}-${chunk.end[0]}:${chunk.end[1]}`;
+}
+
 /** Retrieval unit: a passage window over consecutive verses. */
 export interface RawChunk {
-  id: number;
+  id?: string | number;
   book: string;
   start: [number, number];
   end: [number, number];
@@ -74,14 +79,18 @@ export interface Manifest {
     name: string;
     license: string;
   };
-  corpus: { verses: string; count: number };
-  chunks: { file: string; strategy: string; window: number; overlap: number };
+  corpus: { verses: string; count: number; sha256?: string };
+  /** Chunk-stage lock parameters (strategy, ceiling, overlap, ...) plus the run hash. */
+  chunks: { file: string; hash: string; strategy: string; sha256?: string; [param: string]: unknown };
   embeddings: {
     file: string;
     model: string;
     dim: number;
+    /** Must be prepended to the query before embedding (e.g. "search_query: "). */
+    query_prefix: string;
     quantization: { type: 'int8'; scales: string } | { type: 'float32' };
     count: number;
+    sha256?: string;
   };
 }
 

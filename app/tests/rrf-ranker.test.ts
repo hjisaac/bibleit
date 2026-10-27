@@ -1,12 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { RrfRanker } from '../src/adapters/rrf-ranker';
-import type { Chunk, ScoredPassage } from '../src/core/types';
+import { getChunkKey, type Chunk, type ScoredPassage } from '../src/core/types';
 
 describe('RrfRanker', () => {
   const ranker = new RrfRanker({ kConst: 60 });
 
   const chunk1: Chunk = {
-    id: 1,
     book: 'JHN',
     start: [3, 16],
     end: [3, 16],
@@ -14,7 +13,6 @@ describe('RrfRanker', () => {
   };
 
   const chunk2: Chunk = {
-    id: 2,
     book: 'GEN',
     start: [1, 1],
     end: [1, 1],
@@ -22,7 +20,6 @@ describe('RrfRanker', () => {
   };
 
   const chunk3: Chunk = {
-    id: 3,
     book: 'JHN',
     start: [3, 15],
     end: [3, 17],
@@ -37,8 +34,8 @@ describe('RrfRanker', () => {
     const merged = ranker.merge(refs, lexical, semantic, 5);
 
     expect(merged.length).toBe(2);
-    expect(merged[0]?.chunk.id).toBe(2); // reference match stays #1
-    expect(merged[1]?.chunk.id).toBe(1);
+    expect(getChunkKey(merged[0]!.chunk)).toBe(getChunkKey(chunk2)); // reference match stays #1
+    expect(getChunkKey(merged[1]!.chunk)).toBe(getChunkKey(chunk1));
   });
 
   it('boosts chunks present in both lexical and semantic runs', () => {
@@ -54,8 +51,10 @@ describe('RrfRanker', () => {
     const merged = ranker.merge([], lexical, semantic, 5);
 
     // chunk1 has rank 2 in lexical (1/62) + rank 1 in semantic (1/61) > chunk2 rank 1 in lexical (1/61)
-    expect(merged[0]?.chunk.id).toBe(1);
-    expect(merged[1]?.chunk.id).toBe(2);
+    expect(getChunkKey(merged[0]!.chunk)).toBe(getChunkKey(chunk1));
+    expect(merged[0]!.source).toBe('semantic');
+    expect(getChunkKey(merged[1]!.chunk)).toBe(getChunkKey(chunk2));
+    expect(merged[1]!.source).toBe('lexical');
   });
 
   it('deduplicates overlapping scripture passages', () => {
@@ -68,6 +67,6 @@ describe('RrfRanker', () => {
     const merged = ranker.merge([], lexical, [], 5);
 
     expect(merged.length).toBe(1);
-    expect(merged[0]?.chunk.id).toBe(1); // Higher ranked passage is kept
+    expect(getChunkKey(merged[0]!.chunk)).toBe(getChunkKey(chunk1)); // Higher ranked passage is kept
   });
 });

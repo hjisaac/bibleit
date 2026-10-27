@@ -1,11 +1,13 @@
 import json
 import logging
 import os
+import shutil
 from pathlib import Path
 from typing import Any
 
 from crucible.core.jobs import AbstractJob
 from crucible.core.trackers.wandb import WBTracker
+from decouple import config
 
 from bibleit_ingest.constants import REPO
 
@@ -39,7 +41,7 @@ class EvalJobBase(AbstractJob):
 
     def on_track(self) -> None:
         logger.info("Using config:\n%s", json.dumps(self.config, indent=2, default=str))
-        if self.config.get("track", True) and os.environ.get("WANDB_MODE") != "disabled":
+        if config("BIBLEIT_TRACKING_ENABLED", default=True, cast=bool):
             self.tracker = WBTracker(run_name=getattr(self, "run_name", self.run_id), project=self.project_name, config=self.config)
         else:
             self.tracker = None
@@ -70,6 +72,5 @@ class EvalJobBase(AbstractJob):
             src_log = log_dir / f"{self.run_id}.log"
             dst_log = self.run_dir / "run.log"
             if src_log.exists():
-                import shutil
                 self.run_dir.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(src_log), str(dst_log))

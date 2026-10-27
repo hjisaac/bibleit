@@ -1,10 +1,13 @@
 import json
 import logging
+import os
+import shutil
 from pathlib import Path
 from typing import Any
 
 from crucible.core.jobs import AbstractJob
 from crucible.core.trackers.wandb import WBTracker
+from decouple import config
 
 from bibleit_ingest.constants import REPO
 
@@ -37,7 +40,7 @@ class AnalysisJobBase(AbstractJob):
 
     def on_track(self) -> None:
         logger.info("Using config:\n%s", json.dumps(self.config, indent=2, default=str))
-        if self.config.get("track", True) and os.environ.get("WANDB_MODE") != "disabled":
+        if config("BIBLEIT_TRACKING_ENABLED", default=True, cast=bool):
             self.tracker = WBTracker(run_name=getattr(self, "run_name", self.run_id), project=self.project_name, config=self.config)
         else:
             self.tracker = None
@@ -46,7 +49,8 @@ class AnalysisJobBase(AbstractJob):
         metrics = result.get("metrics", {})
         logger.info("Metrics:\n%s", json.dumps(metrics, indent=2))
 
-        summary = {k: v for k, v in result.items() if k not in ("chunks", "texts", "records")}
+        excluded = ("chunks", "texts", "records", "embeddings", "analysis_result", "renderer")
+        summary = {k: v for k, v in result.items() if k not in excluded}
         payload = {"run_conditions": self.config, **summary}
         target_dir = getattr(self, "run_dir", Path(self.config.get("log_dir", "outputs")))
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -65,6 +69,5 @@ class AnalysisJobBase(AbstractJob):
             src_log = log_dir / f"{self.run_id}.log"
             dst_log = self.run_dir / "run.log"
             if src_log.exists():
-                import shutil
                 self.run_dir.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(src_log), str(dst_log))
