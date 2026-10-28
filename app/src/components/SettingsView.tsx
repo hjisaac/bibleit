@@ -24,7 +24,6 @@ interface SettingsViewProps {
   onDownloadText: () => void;
   onDownloadAi: () => void;
   onClearStorage: () => void;
-  onOpenFeedback?: () => void;
 }
 
 export function SettingsView({
@@ -46,7 +45,6 @@ export function SettingsView({
   onDownloadText,
   onDownloadAi,
   onClearStorage,
-  onOpenFeedback,
 }: SettingsViewProps): JSX.Element {
   const storageSectionRef = useRef<HTMLDivElement>(null);
   const [isPulsing, setIsPulsing] = useState<boolean>(false);
@@ -543,34 +541,6 @@ export function SettingsView({
           <option>Louis Segond 1910 (LSG) — Domaine Public (Français)</option>
         </select>
       </div>
-
-      {/* Feedback & Bug Reports */}
-      {onOpenFeedback && (
-        <div
-          class="p-4 rounded-2xl border flex items-center justify-between gap-3"
-          style={{
-            backgroundColor: 'var(--bg-surface-elevated)',
-            borderColor: 'var(--border-subtle)',
-          }}
-        >
-          <div>
-            <span class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
-              Feedback & Bug Reports
-            </span>
-            <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              Found a bug, scripture typo, or have an idea? Attach a screenshot and let us know.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onOpenFeedback}
-            class="px-4 py-1.5 rounded-xl text-xs font-semibold text-white shrink-0 transition-opacity hover:opacity-90"
-            style={{ backgroundColor: 'var(--accent)' }}
-          >
-            Send Feedback
-          </button>
-        </div>
-      )}
     </section>
   );
 }

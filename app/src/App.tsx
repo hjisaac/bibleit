@@ -357,7 +357,6 @@ export function App(): JSX.Element {
             onDownloadText={handleDownloadText}
             onDownloadAi={handleDownloadAi}
             onClearStorage={handleClearStorage}
-            onOpenFeedback={() => setIsFeedbackOpen(true)}
           />
         )}
       </main>
