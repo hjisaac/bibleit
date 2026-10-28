@@ -77,15 +77,17 @@ describe('SearchView Result Cards & User Actions', () => {
   });
 
   function renderSearchView(overrides: Partial<SearchViewProps> = {}) {
-    // Pre-populate search in localStorage to simulate an active search result state
-    localStorage.setItem(
-      'bibleit_last_search',
-      JSON.stringify({
-        query: 'peace and joy',
-        passages: samplePassages,
-        answerText: '',
-      })
-    );
+    // Pre-populate search in localStorage if not already provided
+    if (!localStorage.getItem('bibleit_last_search')) {
+      localStorage.setItem(
+        'bibleit_last_search',
+        JSON.stringify({
+          query: 'peace and joy',
+          passages: samplePassages,
+          answerText: '',
+        })
+      );
+    }
 
     const props: SearchViewProps = {
       engine: mockEngine,
@@ -178,5 +180,122 @@ describe('SearchView Result Cards & User Actions', () => {
     } finally {
       Object.assign(navigator, { clipboard: originalClipboard });
     }
+  });
+
+  it('renders passage with collapsed height by default and expands with inside-scroll on toggle', () => {
+    renderSearchView();
+
+    const expandBtn = screen.getByText('+ Expand passage');
+    expect(expandBtn).toBeDefined();
+
+    // Text container is collapsed to max-h-24 with overflow-hidden
+    const textContainer = screen.getByText(/Rejoice in the Lord always/).closest('[class*="transition-[max-height]"]')!;
+    expect(textContainer.className).toContain('max-h-24');
+    expect(textContainer.className).toContain('overflow-hidden');
+
+    // Click expand
+    fireEvent.click(expandBtn);
+
+    // Button label changes to collapse and container becomes max-h-72 with inside scroll
+    expect(screen.getByText('– Collapse passage')).toBeDefined();
+    expect(textContainer.className).toContain('max-h-72');
+    expect(textContainer.className).toContain('overflow-y-auto');
+  });
+
+  it('ensures only one card is expanded at a time across multiple results', () => {
+    const twoPassages: ScoredPassage[] = [
+      samplePassages[0]!,
+      {
+        chunk: {
+          id: 43,
+          book: 'ROM',
+          start: [13, 8],
+          end: [13, 14],
+          headings: [[13, 8, 'Love Fulfills the Law']],
+          text: 'Owe no one anything, except to love one another; for he who loves his neighbor has fulfilled the law.',
+        },
+        score: 0.90,
+        source: 'semantic',
+      },
+    ];
+
+    localStorage.setItem(
+      'bibleit_last_search',
+      JSON.stringify({
+        query: 'love and joy',
+        passages: twoPassages,
+        answerText: '',
+      })
+    );
+
+    renderSearchView();
+
+    const expandButtons = screen.getAllByText('+ Expand passage');
+    expect(expandButtons.length).toBe(2);
+
+    const card1Text = screen.getByText(/Rejoice in the Lord always/).closest('[class*="transition-[max-height]"]')!;
+    const card2Text = screen.getByText(/Owe no one anything/).closest('[class*="transition-[max-height]"]')!;
+
+    // Both cards collapsed initially
+    expect(card1Text.className).toContain('max-h-24');
+    expect(card2Text.className).toContain('max-h-24');
+
+    // 1. Expand Card 1
+    fireEvent.click(expandButtons[0]!);
+    expect(card1Text.className).toContain('max-h-72');
+    expect(card2Text.className).toContain('max-h-24');
+
+    // 2. Expand Card 2 -> Card 1 MUST collapse!
+    const expandCard2Btn = screen.getByText('+ Expand passage');
+    fireEvent.click(expandCard2Btn);
+
+    expect(card1Text.className).toContain('max-h-24');
+    expect(card2Text.className).toContain('max-h-72');
+  });
+
+  it('automatically expands card when audio narration starts', () => {
+    renderSearchView();
+
+    const textContainer = screen.getByText(/Rejoice in the Lord always/).closest('[class*="transition-[max-height]"]')!;
+    expect(textContainer.className).toContain('max-h-24');
+
+    const listenButton = screen.getByLabelText('Listen to Philippians 4:4–7');
+    fireEvent.click(listenButton);
+
+    // Audio narration click immediately expands the card
+    expect(textContainer.className).toContain('max-h-72');
+    expect(textContainer.className).toContain('overflow-y-auto');
+  });
+
+  it('renders section headings inline above their scoped verses', () => {
+    const multiHeadingPassage: ScoredPassage = {
+      chunk: {
+        id: 2417,
+        book: 'ROM',
+        start: [13, 8],
+        end: [13, 14],
+        headings: [
+          [13, 8, 'Love Fulfills the Law'],
+          [13, 11, 'The Day Is Near'],
+        ],
+        text: 'Owe no one anything, except to love one another. Do this, knowing the time, that it is already time.',
+      },
+      score: 0.95,
+      source: 'semantic',
+    };
+
+    localStorage.setItem(
+      'bibleit_last_search',
+      JSON.stringify({
+        query: 'love your neighbor',
+        passages: [multiHeadingPassage],
+        answerText: '',
+      })
+    );
+
+    renderSearchView();
+
+    // Section 1 heading is rendered inline above the verses
+    expect(screen.getByText('Love Fulfills the Law')).toBeDefined();
   });
 });

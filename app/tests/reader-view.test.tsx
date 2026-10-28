@@ -97,7 +97,7 @@ describe('ReaderView - Parallel Border & Saved Verse Behavior', () => {
     expect(verse7.className).toContain('ring-2 ring-amber-500/50');
   });
 
-  it('keeps saved verse quiet when entering reader until long-pressed', async () => {
+  it('highlights saved verse background when opening it in reader without border until interacted', async () => {
     const savedVerses = [
       {
         id: '1',
@@ -132,11 +132,11 @@ describe('ReaderView - Parallel Border & Saved Verse Behavior', () => {
 
     const verse7 = screen.getByText(/And the peace of God/i).closest('p')!;
 
-    // Saved verse entering reader: NO yellow ring, NO yellow background highlight
+    // Saved verse entering reader: has target yellow background, but NO ring border yet
+    expect(verse7.style.backgroundColor).toBe('var(--highlight-verse)');
     expect(verse7.className).not.toContain('ring-2 ring-amber-500/50');
-    expect(verse7.style.backgroundColor).toBe('transparent');
 
-    // No action buttons visible yet
+    // No action buttons visible yet until long-pressed
     expect(screen.queryByRole('button', { name: /Unsave/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /Copy/i })).toBeNull();
 

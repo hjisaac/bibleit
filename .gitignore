@@ -264,6 +264,7 @@ __marimo__/
 
 # Node / Frontend
 .vite/
+.wrangler/
 node_modules/
 app/dist/
 app/dev-dist/

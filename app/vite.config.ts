@@ -33,6 +33,17 @@ export default defineConfig({
         ],
       },
     }),
+    // Exclude heavy WASM binary (>25MB) so Cloudflare Pages deployment succeeds (served from R2).
+    {
+      name: 'exclude-heavy-wasm',
+      generateBundle(_options, bundle) {
+        for (const fileName of Object.keys(bundle)) {
+          if (fileName.endsWith('.wasm')) {
+            delete bundle[fileName];
+          }
+        }
+      },
+    },
   ],
   server: {
     port: 3000,

@@ -3,6 +3,11 @@ import { pipeline, env } from '@huggingface/transformers';
 // Configure transformers.js for browser execution
 env.allowLocalModels = false;
 
+const r2Url = import.meta.env.VITE_CLOUDFLARE_R2_URL || 'https://pub-071cdcf1b2b34b1e9e77c65fbf233114.r2.dev/';
+if (r2Url && env.backends?.onnx?.wasm) {
+  env.backends.onnx.wasm.wasmPaths = r2Url.endsWith('/') ? r2Url : `${r2Url}/`;
+}
+
 let extractorPromise: Promise<any> | null = null;
 
 async function getExtractor() {
