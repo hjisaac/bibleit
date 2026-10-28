@@ -89,6 +89,6 @@ test.describe('Search Results - Card Expansion & Inside-Scroll', () => {
     const card1 = page.locator('article').nth(0);
     // Heading is rendered inline inside the text container above verse 8-14
     await expect(card1.getByText('Love Fulfills the Law')).toBeVisible();
-    await expect(card1.getByText('8–14')).toBeVisible();
+    await expect(card1.getByText('8–14', { exact: true })).toBeVisible();
   });
 });

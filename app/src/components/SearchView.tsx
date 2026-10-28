@@ -950,10 +950,7 @@ export function SearchView({
             )}
 
             {/* Card Footer Actions aligned with passage cards */}
-            <div
-              class="mt-3 flex items-center justify-between pt-2 border-t text-xs"
-              style={{ borderColor: 'var(--border-subtle)' }}
-            >
+            <div class="mt-2.5 flex items-center justify-between text-xs">
               {answerText.length > 0 && !isSynthesizing ? (
                 <button
                   type="button"
@@ -1163,7 +1160,7 @@ export function SearchView({
               </div>
 
               {/* Title & Scripture Citation Hierarchy */}
-              <div class="mb-2">
+              <div class="mb-1.5">
                 <h2
                   class="font-serif text-lg font-semibold tracking-tight"
                   style={{ color: 'var(--text-main)' }}
@@ -1175,12 +1172,16 @@ export function SearchView({
               <div
                 class={`relative font-serif text-[17px] leading-relaxed transition-[max-height] duration-300 ease-in-out ${
                   isExpanded
-                    ? 'max-h-72 sm:max-h-96 overflow-y-auto overscroll-contain pr-1'
+                    ? 'max-h-72 sm:max-h-96 overflow-y-auto overscroll-contain pr-1 py-1'
                     : 'max-h-24 overflow-hidden'
                 }`}
                 style={{
-                  maskImage: isExpanded ? 'none' : 'linear-gradient(to bottom, black 60%, transparent 100%)',
-                  WebkitMaskImage: isExpanded ? 'none' : 'linear-gradient(to bottom, black 60%, transparent 100%)',
+                  maskImage: isExpanded
+                    ? 'linear-gradient(to bottom, transparent 0%, black 20px, black calc(100% - 24px), transparent 100%)'
+                    : 'linear-gradient(to bottom, black 60%, transparent 100%)',
+                  WebkitMaskImage: isExpanded
+                    ? 'linear-gradient(to bottom, transparent 0%, black 20px, black calc(100% - 24px), transparent 100%)'
+                    : 'linear-gradient(to bottom, black 60%, transparent 100%)',
                 }}
               >
                 {isExpanded && surrounding?.prev && (
@@ -1240,10 +1241,7 @@ export function SearchView({
               </div>
 
               {/* Card Footer Actions */}
-              <div
-                class="mt-3 flex items-center justify-between pt-2 border-t text-xs"
-                style={{ borderColor: 'var(--border-subtle)' }}
-              >
+              <div class="mt-2.5 flex items-center justify-between text-xs">
                 <button
                   type="button"
                   onClick={() => toggleContext(chunkKey)}
