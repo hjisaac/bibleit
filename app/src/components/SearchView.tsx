@@ -70,16 +70,6 @@ function formatCitation(bookId: string, start: [number, number], end: [number, n
   return `${bookName} ${startCh}:${startV}–${endCh}:${endV}`;
 }
 
-function formatSectionScope(start: [number, number], end: [number, number]): string {
-  const isSameChapter = start[0] === end[0];
-  const isSameVerse = isSameChapter && start[1] === end[1];
-  return isSameVerse
-    ? `${start[1]}`
-    : isSameChapter
-    ? `${start[1]}–${end[1]}`
-    : `${start[0]}:${start[1]}–${end[0]}:${end[1]}`;
-}
-
 interface ChunkSectionView {
   heading?: string;
   scope: string;
@@ -984,14 +974,6 @@ export function SearchView({
           const chunkKey = getChunkKey(p.chunk);
           const isExpanded = expandedCardKey === chunkKey;
           const refString = formatCitation(p.chunk.book, p.chunk.start, p.chunk.end);
-          const isSameChapter = p.chunk.start[0] === p.chunk.end[0];
-          const isSameVerse = isSameChapter && p.chunk.start[1] === p.chunk.end[1];
-          const verseLabel = isSameVerse
-            ? `${p.chunk.start[1]}`
-            : isSameChapter
-            ? `${p.chunk.start[1]}–${p.chunk.end[1]}`
-            : `${p.chunk.start[0]}:${p.chunk.start[1]}–${p.chunk.end[0]}:${p.chunk.end[1]}`;
-
           const sections = getChunkSectionViews(p, splitPoints[chunkKey]);
 
           const isSaved =
