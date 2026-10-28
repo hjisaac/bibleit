@@ -42,9 +42,10 @@ All experimental runs and benchmark metrics are tracked and published openly:
   Ablation sweeps over token ceilings (256, 512, 1024), verse overlaps, and header render strategies to measure token distributions (P50, P90, P99), pericope preservation, and truncation boundaries.
 - **Embedding Space Diagnostics**: [Weights & Biases — `bibleit-analysis-embed-corpus`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-analysis-embed-corpus)  
   Vector space health diagnostics profiling representation spread, vector norm distributions, and pairwise cosine similarity across text rendering representations.
+- **Vector Quantization Diagnostics**: [Weights & Biases — `bibleit-analysis-quantize-corpus`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-analysis-quantize-corpus)  
+  Vector compression diagnostics profiling row-wise cosine fidelity, reconstruction MSE, and int8 scale distributions.
 - **Retrieval Benchmark**: [Weights & Biases — `bibleit-eval-question-to-passage`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-eval-question-to-passage)  
   Retrieval ranking performance (MRR, Hits@1, Hits@5, Hits@10) across embedding models and vector quantization targets.
-- **Public Workspace**: [Weights & Biases — `hjisaach-aims-south-africa`](https://wandb.ai/hjisaach-aims-south-africa)
 
 ## Documentation
 

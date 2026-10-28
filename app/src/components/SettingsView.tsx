@@ -17,12 +17,15 @@ interface SettingsViewProps {
   onToggleHeadings: (enabled: boolean) => void;
   textPackageStatus: PackageStatus;
   aiPackageStatus: PackageStatus;
+  modelPackageStatus: PackageStatus;
   textProgress: number;
   aiProgress: number;
+  modelProgress: number;
   highlightStorage?: boolean;
   onClearHighlight?: () => void;
   onDownloadText: () => void;
   onDownloadAi: () => void;
+  onDownloadModel: () => void;
   onClearStorage: () => void;
 }
 
@@ -38,19 +41,23 @@ export function SettingsView({
   onToggleHeadings,
   textPackageStatus,
   aiPackageStatus,
+  modelPackageStatus,
   textProgress,
   aiProgress,
+  modelProgress,
   highlightStorage,
   onClearHighlight,
   onDownloadText,
   onDownloadAi,
+  onDownloadModel,
   onClearStorage,
 }: SettingsViewProps): JSX.Element {
   const storageSectionRef = useRef<HTMLDivElement>(null);
   const [isPulsing, setIsPulsing] = useState<boolean>(false);
   const [isConfirmingClear, setIsConfirmingClear] = useState<boolean>(false);
   const [confirmCountdown, setConfirmCountdown] = useState<number>(6);
-  const hasDownloadedArtifacts = textPackageStatus === 'ready' || aiPackageStatus === 'ready';
+  const hasDownloadedArtifacts =
+    textPackageStatus === 'ready' || aiPackageStatus === 'ready' || modelPackageStatus === 'ready';
 
   // Active countdown ticker for auto-disarming clear confirmation
   useEffect(() => {
@@ -305,13 +312,15 @@ export function SettingsView({
             </p>
           </div>
           <span class="text-xs font-mono font-medium text-emerald-600">
-            {textPackageStatus === 'ready' && aiPackageStatus === 'ready'
-              ? '3.3 MB in OPFS'
-              : textPackageStatus === 'ready'
-              ? '1.2 MB in OPFS'
-              : aiPackageStatus === 'ready'
-              ? '2.1 MB in OPFS'
-              : '0 MB cached'}
+            {(() => {
+              let mb = 0;
+              if (textPackageStatus === 'ready') mb += 1.2;
+              if (aiPackageStatus === 'ready') mb += 2.1;
+              if (modelPackageStatus === 'ready') mb += 137;
+              if (mb === 0) return '0 MB cached';
+              if (modelPackageStatus === 'ready') return `${mb.toFixed(1)} MB cached`;
+              return `${mb.toFixed(1)} MB in OPFS`;
+            })()}
           </span>
         </div>
 
@@ -366,22 +375,24 @@ export function SettingsView({
                 ? 'Downloading verses...'
                 : 'Not stored locally'}
             </span>
-            <button
-              type="button"
-              onClick={onDownloadText}
-              disabled={textPackageStatus === 'downloading'}
-              class="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-85 disabled:opacity-50"
-              style={{
-                backgroundColor: textPackageStatus === 'ready' ? 'var(--bg-surface-elevated)' : 'var(--accent)',
-                color: textPackageStatus === 'ready' ? 'var(--text-main)' : '#FFFFFF',
-              }}
-            >
-              {textPackageStatus === 'ready' ? 'Re-download' : textPackageStatus === 'downloading' ? 'Downloading...' : 'Download (1.2 MB)'}
-            </button>
+            {textPackageStatus !== 'ready' && (
+              <button
+                type="button"
+                onClick={onDownloadText}
+                disabled={textPackageStatus === 'downloading'}
+                class="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-85 disabled:opacity-50"
+                style={{
+                  backgroundColor: 'var(--accent)',
+                  color: '#FFFFFF',
+                }}
+              >
+                {textPackageStatus === 'downloading' ? 'Downloading...' : 'Download (1.2 MB)'}
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Package 2: Neural AI Semantic Model */}
+        {/* Package 2: Precomputed Verse Vectors */}
         <div
           class="p-3 rounded-xl border flex flex-col gap-2.5"
           style={{
@@ -393,14 +404,14 @@ export function SettingsView({
             <div>
               <div class="flex items-center gap-2">
                 <span class="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
-                  Neural AI Semantic Model
+                  Precomputed Verse Vectors
                 </span>
                 <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
                   2.1 MB
                 </span>
               </div>
               <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                Nomic v1.5 vector embeddings (768-dim) for on-device conceptual similarity search.
+                Nomic v1.5 int8 quantized vectors for 2,655 passages. Enables offline vector similarity comparison.
               </p>
             </div>
 
@@ -427,23 +438,93 @@ export function SettingsView({
           <div class="flex items-center justify-between text-xs pt-1">
             <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
               {aiPackageStatus === 'ready'
-                ? 'Ready for offline semantic search'
+                ? 'Ready for vector search'
                 : aiPackageStatus === 'downloading'
-                ? 'Downloading model...'
+                ? 'Downloading vectors...'
                 : 'Optional add-on'}
             </span>
-            <button
-              type="button"
-              onClick={onDownloadAi}
-              disabled={aiPackageStatus === 'downloading'}
-              class="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-85 disabled:opacity-50"
-              style={{
-                backgroundColor: aiPackageStatus === 'ready' ? 'var(--bg-surface-elevated)' : 'var(--accent)',
-                color: aiPackageStatus === 'ready' ? 'var(--text-main)' : '#FFFFFF',
-              }}
-            >
-              {aiPackageStatus === 'ready' ? 'Installed' : aiPackageStatus === 'downloading' ? 'Downloading...' : 'Download (2.1 MB)'}
-            </button>
+            {aiPackageStatus !== 'ready' && (
+              <button
+                type="button"
+                onClick={onDownloadAi}
+                disabled={aiPackageStatus === 'downloading'}
+                class="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-85 disabled:opacity-50"
+                style={{
+                  backgroundColor: 'var(--accent)',
+                  color: '#FFFFFF',
+                }}
+              >
+                {aiPackageStatus === 'downloading' ? 'Downloading...' : 'Download (2.1 MB)'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Package 3: Neural Query Embedder */}
+        <div
+          class="p-3 rounded-xl border flex flex-col gap-2.5"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'var(--border-subtle)',
+          }}
+        >
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
+                  Neural Query Embedder
+                </span>
+                <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
+                  137 MB
+                </span>
+              </div>
+              <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Nomic v1.5 on-device neural model (Q8 ONNX). Converts search queries into 768-dim embeddings.
+              </p>
+            </div>
+
+            {modelPackageStatus === 'ready' ? (
+              <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
+                ✓ Installed
+              </span>
+            ) : modelPackageStatus === 'downloading' ? (
+              <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
+                {modelProgress}%
+              </span>
+            ) : null}
+          </div>
+
+          {modelPackageStatus === 'downloading' && (
+            <div class="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden">
+              <div
+                class="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
+                style={{ width: `${modelProgress}%` }}
+              />
+            </div>
+          )}
+
+          <div class="flex items-center justify-between text-xs pt-1">
+            <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
+              {modelPackageStatus === 'ready'
+                ? 'Ready for on-device inference'
+                : modelPackageStatus === 'downloading'
+                ? 'Downloading model weights...'
+                : 'Downloads on first semantic search'}
+            </span>
+            {modelPackageStatus !== 'ready' && (
+              <button
+                type="button"
+                onClick={onDownloadModel}
+                disabled={modelPackageStatus === 'downloading'}
+                class="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-85 disabled:opacity-50"
+                style={{
+                  backgroundColor: 'var(--accent)',
+                  color: '#FFFFFF',
+                }}
+              >
+                {modelPackageStatus === 'downloading' ? 'Downloading...' : 'Download (137 MB)'}
+              </button>
+            )}
           </div>
         </div>
 

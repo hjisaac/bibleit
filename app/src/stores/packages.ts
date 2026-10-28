@@ -10,3 +10,9 @@ export const $aiPackageStatus = persistentAtom<PackageStatus>(
   'bibleit_ai_status',
   'not_downloaded',
 );
+
+export const $modelPackageStatus = persistentAtom<PackageStatus>(
+  'bibleit_model_status',
+  'not_downloaded',
+);
+

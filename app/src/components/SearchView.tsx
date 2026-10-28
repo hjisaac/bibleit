@@ -760,29 +760,7 @@ export function SearchView({
           </div>
 
           {/* Guidance Footer */}
-          <div class="pt-6 border-t flex flex-col items-center justify-center text-center" style={{ borderColor: 'var(--border-subtle)' }}>
-            <div
-              class="w-10 h-10 rounded-2xl flex items-center justify-center mb-2.5 border shadow-sm"
-              style={{
-                backgroundColor: 'var(--bg-surface-elevated)',
-                borderColor: 'var(--border-subtle)',
-              }}
-            >
-              <svg
-                class="w-5 h-5"
-                style={{ color: 'var(--text-muted)' }}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="1.75"
-                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                />
-              </svg>
-            </div>
+          <div class="py-6 flex flex-col items-center justify-center text-center">
             <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
               Search Scripture
             </p>
@@ -1035,7 +1013,7 @@ export function SearchView({
                       {p.source === 'semantic'
                         ? `cos: ${p.score.toFixed(3)}`
                         : p.source === 'lexical'
-                        ? `BM25: ${p.score.toFixed(2)}`
+                        ? `BM25 (rrf): ${p.score.toFixed(4)}`
                         : 'RRF #1'}
                     </span>
                   )}
@@ -1154,8 +1132,8 @@ export function SearchView({
               <div
                 class={`relative font-serif text-[17px] leading-relaxed transition-[max-height] duration-300 ease-in-out ${
                   isExpanded
-                    ? 'max-h-72 sm:max-h-96 overflow-y-auto overscroll-contain pr-1 py-1'
-                    : 'max-h-24 overflow-hidden'
+                    ? 'max-h-96 sm:max-h-[30rem] overflow-y-auto overscroll-contain pr-1 py-1'
+                    : 'max-h-36 overflow-hidden'
                 }`}
                 style={{
                   maskImage: isExpanded
