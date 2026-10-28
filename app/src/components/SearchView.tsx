@@ -70,6 +70,72 @@ function formatCitation(bookId: string, start: [number, number], end: [number, n
   return `${bookName} ${startCh}:${startV}–${endCh}:${endV}`;
 }
 
+function formatSectionScope(start: [number, number], end: [number, number]): string {
+  const isSameChapter = start[0] === end[0];
+  const isSameVerse = isSameChapter && start[1] === end[1];
+  return isSameVerse
+    ? `${start[1]}`
+    : isSameChapter
+    ? `${start[1]}–${end[1]}`
+    : `${start[0]}:${start[1]}–${end[0]}:${end[1]}`;
+}
+
+interface ChunkSectionView {
+  heading?: string;
+  scope: string;
+  text: string;
+}
+
+function getChunkSectionViews(
+  p: ScoredPassage,
+  splitIdx?: number,
+): ChunkSectionView[] {
+  const headings = p.chunk.headings;
+  const isSameChapter = p.chunk.start[0] === p.chunk.end[0];
+  const isSameVerse = isSameChapter && p.chunk.start[1] === p.chunk.end[1];
+  const fullScope = isSameVerse
+    ? `${p.chunk.start[1]}`
+    : isSameChapter
+    ? `${p.chunk.start[1]}–${p.chunk.end[1]}`
+    : `${p.chunk.start[0]}:${p.chunk.start[1]}–${p.chunk.end[0]}:${p.chunk.end[1]}`;
+
+  if (!headings || headings.length <= 1) {
+    return [
+      {
+        heading: headings?.[0]?.[2],
+        scope: fullScope,
+        text: p.chunk.text,
+      },
+    ];
+  }
+
+  // Multi-heading passages (e.g. Romans 13:8-14)
+  if (splitIdx && splitIdx > 0 && splitIdx < p.chunk.text.length) {
+    const h1 = headings[0]!;
+    const h2 = headings[1]!;
+    return [
+      {
+        heading: h1[2],
+        scope: `${p.chunk.start[1]}–${h2[1] - 1}`,
+        text: p.chunk.text.slice(0, splitIdx).trim(),
+      },
+      {
+        heading: h2[2],
+        scope: `${h2[1]}–${p.chunk.end[1]}`,
+        text: p.chunk.text.slice(splitIdx).trim(),
+      },
+    ];
+  }
+
+  return [
+    {
+      heading: headings[0]![2],
+      scope: fullScope,
+      text: p.chunk.text,
+    },
+  ];
+}
+
 function isQuestionQuery(text: string): boolean {
   const trimmed = text.trim();
   if (trimmed.endsWith('?')) return true;
@@ -164,6 +230,7 @@ export function SearchView({
   const [surroundingVerses, setSurroundingVerses] = useState<
     Record<string, { prev?: string; next?: string }>
   >({});
+  const [splitPoints, setSplitPoints] = useState<Record<string, number>>({});
 
   const [answerText, setAnswerText] = useState<string>(initialSearch.answerText);
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
@@ -282,6 +349,30 @@ export function SearchView({
       isSubscribed = false;
     };
   }, [expandedCardKey, passages, surroundingVerses]);
+
+  useEffect(() => {
+    const multi = passages.filter((p) => p.chunk.headings && p.chunk.headings.length > 1);
+    if (multi.length === 0) return;
+
+    let isSubscribed = true;
+    for (const p of multi) {
+      const key = getChunkKey(p.chunk);
+      if (splitPoints[key] !== undefined) continue;
+      const h2 = p.chunk.headings![1]!;
+      void resolveVerseText(p.chunk.book, h2[0], h2[1]).then((vText) => {
+        if (!isSubscribed || !vText) return;
+        const snippet = vText.trim().slice(0, 20);
+        const idx = p.chunk.text.indexOf(snippet);
+        if (idx > 0) {
+          setSplitPoints((prev) => ({ ...prev, [key]: idx }));
+        }
+      });
+    }
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [passages, splitPoints]);
 
   const toggleContext = (key: string) => {
     setExpandedCardKey((prev) => (prev === key ? null : key));
@@ -904,10 +995,7 @@ export function SearchView({
             ? `${p.chunk.start[1]}–${p.chunk.end[1]}`
             : `${p.chunk.start[0]}:${p.chunk.start[1]}–${p.chunk.end[0]}:${p.chunk.end[1]}`;
 
-          const primaryHeading =
-            showHeadings && p.chunk.headings && p.chunk.headings.length > 0
-              ? p.chunk.headings.map(([,, title]) => title).join(' • ')
-              : null;
+          const sections = getChunkSectionViews(p, splitPoints[chunkKey]);
 
           const isSaved =
             savedVerses?.some(
@@ -987,6 +1075,7 @@ export function SearchView({
                           }
                           return;
                         }
+                        setExpandedCardKey(chunkKey);
                         narrator.play([
                           {
                             id: segmentId,
@@ -1081,65 +1170,74 @@ export function SearchView({
                 >
                   {refString}
                 </h2>
-                {primaryHeading && (
-                  <div
-                    class="text-xs font-medium mt-0.5"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    {primaryHeading}
+              </div>
+
+              <div
+                class={`relative font-serif text-[17px] leading-relaxed transition-[max-height] duration-300 ease-in-out ${
+                  isExpanded
+                    ? 'max-h-72 sm:max-h-96 overflow-y-auto overscroll-contain pr-1'
+                    : 'max-h-24 overflow-hidden'
+                }`}
+                style={{
+                  maskImage: isExpanded ? 'none' : 'linear-gradient(to bottom, black 60%, transparent 100%)',
+                  WebkitMaskImage: isExpanded ? 'none' : 'linear-gradient(to bottom, black 60%, transparent 100%)',
+                }}
+              >
+                {isExpanded && surrounding?.prev && (
+                  <p class="opacity-70 leading-relaxed mb-2 text-[15px]" style={{ color: 'var(--text-muted)' }}>
+                    <sup class="text-xs font-sans mr-1 opacity-50 font-normal">
+                      {p.chunk.start[1] - 1}
+                    </sup>
+                    {surrounding.prev}
+                  </p>
+                )}
+
+                {sections.map((sec, secIdx) => {
+                  let secCharOffset = 0;
+                  for (let i = 0; i < secIdx; i++) {
+                    secCharOffset += (sections[i]?.text.length ?? 0) + 1;
+                  }
+                  const secBoundary: NarrationWordBoundary | null = narrationState?.wordBoundary
+                    ? {
+                        charIndex: narrationState.wordBoundary.charIndex - secCharOffset,
+                        charLength: narrationState.wordBoundary.charLength,
+                      }
+                    : null;
+
+                  return (
+                    <div key={secIdx} class="mb-3 last:mb-0">
+                      {showHeadings && sec.heading && (
+                        <div class="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">
+                          {sec.heading}
+                        </div>
+                      )}
+                      <p style={{ color: 'var(--text-main)' }}>
+                        <sup class="text-xs opacity-60 font-sans mr-1 font-semibold">
+                          {sec.scope}
+                        </sup>
+                        {isCardActive
+                          ? renderHighlightedText(sec.text, secBoundary)
+                          : sec.text}
+                      </p>
+                    </div>
+                  );
+                })}
+
+                {isExpanded && surrounding?.next && (
+                  <p class="opacity-70 leading-relaxed mt-2 text-[15px]" style={{ color: 'var(--text-muted)' }}>
+                    <sup class="text-xs font-sans mr-1 opacity-50 font-normal">
+                      {p.chunk.end[1] + 1}
+                    </sup>
+                    {surrounding.next}
+                  </p>
+                )}
+
+                {isExpanded && !surrounding && (
+                  <div class="text-xs font-sans italic mt-1" style={{ color: 'var(--text-muted)' }}>
+                    Loading surrounding verses...
                   </div>
                 )}
               </div>
-
-              <p
-                class="font-serif text-[17px] leading-relaxed"
-                style={{ color: 'var(--text-main)' }}
-              >
-                <sup class="text-xs opacity-60 font-sans mr-1 font-semibold">
-                  {verseLabel}
-                </sup>
-                {isCardActive
-                  ? renderHighlightedText(p.chunk.text, narrationState?.wordBoundary)
-                  : p.chunk.text}
-              </p>
-
-
-              {/* Inline Context Accordion */}
-              {isExpanded && (
-                <div
-                  class="mt-3 pt-3 border-t font-serif text-[15px] space-y-2 animate-fadeIn"
-                  style={{
-                    borderColor: 'var(--border-subtle)',
-                    color: 'var(--text-muted)',
-                  }}
-                >
-                  {surrounding?.prev && (
-                    <p class="opacity-70 leading-relaxed">
-                      <sup class="text-xs font-sans mr-1 opacity-50 font-normal">
-                        {p.chunk.start[1] - 1}
-                      </sup>
-                      {surrounding.prev}
-                    </p>
-                  )}
-                  <p class="font-medium leading-relaxed" style={{ color: 'var(--text-main)' }}>
-                    <sup class="text-xs opacity-60 font-sans mr-1 font-semibold">{verseLabel}</sup>
-                    {p.chunk.text}
-                  </p>
-                  {surrounding?.next && (
-                    <p class="opacity-70 leading-relaxed">
-                      <sup class="text-xs font-sans mr-1 opacity-50 font-normal">
-                        {p.chunk.end[1] + 1}
-                      </sup>
-                      {surrounding.next}
-                    </p>
-                  )}
-                  {!surrounding && (
-                    <div class="text-xs font-sans italic" style={{ color: 'var(--text-muted)' }}>
-                      Loading surrounding verses...
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Card Footer Actions */}
               <div
@@ -1152,7 +1250,7 @@ export function SearchView({
                   class="font-medium flex items-center gap-1 hover:underline"
                   style={{ color: 'var(--text-muted)' }}
                 >
-                  <span>{isExpanded ? '– Collapse context' : '+ Expand context'}</span>
+                  <span>{isExpanded ? '– Collapse passage' : '+ Expand passage'}</span>
                 </button>
 
                 <button
