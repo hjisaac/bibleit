@@ -453,7 +453,7 @@ export function ReaderView({
                   hasYellowBorder ? 'ring-2 ring-amber-500/50' : ''
                 }`}
                 style={{
-                  backgroundColor: isTarget && !isSaved ? 'var(--highlight-verse)' : 'transparent',
+                  backgroundColor: isTarget ? 'var(--highlight-verse)' : 'transparent',
                   WebkitTouchCallout: 'none',
                   userSelect: 'none',
                 }}
