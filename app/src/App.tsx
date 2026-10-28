@@ -1,6 +1,12 @@
 import type { JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { createDefaultArtifactStore, createDefaultEngine, createDefaultNarrator } from './composition';
+import {
+  createDefaultArtifactStore,
+  createDefaultEmbedder,
+  createDefaultEngine,
+  createDefaultNarrator,
+} from './composition';
+import { isQueryModelCached, clearQueryModelCache } from './adapters/worker-query-embedder';
 import { Header, type Theme } from './components/Header';
 import { Navbar, type ViewTab } from './components/Navbar';
 import { SearchView } from './components/SearchView';
@@ -14,13 +20,14 @@ import { AudioPlayerBar } from './components/AudioPlayerBar';
 import { useHeadroom } from './core/headroom';
 import type { Manifest, NarrationState } from './core/types';
 import { useStore } from '@nanostores/preact';
-import { $textPackageStatus, $aiPackageStatus } from './stores/packages';
+import { $textPackageStatus, $aiPackageStatus, $modelPackageStatus } from './stores/packages';
 import { $theme, $activeTab, $isAiEnabled, $showHeadings, $hasSeenStorageBanner } from './stores/preferences';
 import { $readerLocation, $savedVerses, type ReaderLocation } from './stores/reader';
 
 export function App(): JSX.Element {
   const store = useMemo(() => createDefaultArtifactStore(), []);
-  const engine = useMemo(() => createDefaultEngine(store), [store]);
+  const embedder = useMemo(() => createDefaultEmbedder(), []);
+  const engine = useMemo(() => createDefaultEngine(store, embedder), [store, embedder]);
   const narrator = useMemo(() => createDefaultNarrator(), []);
   const [narrationState, setNarrationState] = useState<NarrationState>(() => narrator.getState());
   const [manifest, setManifest] = useState<Manifest | null>(null);
@@ -57,11 +64,15 @@ export function App(): JSX.Element {
 
   const textPackageStatus = useStore($textPackageStatus);
   const aiPackageStatus = useStore($aiPackageStatus);
+  const modelPackageStatus = useStore($modelPackageStatus);
   const [textProgress, setTextProgress] = useState<number>(() =>
     $textPackageStatus.get() === 'ready' ? 100 : 0,
   );
   const [aiProgress, setAiProgress] = useState<number>(() =>
     $aiPackageStatus.get() === 'ready' ? 100 : 0,
+  );
+  const [modelProgress, setModelProgress] = useState<number>(() =>
+    $modelPackageStatus.get() === 'ready' ? 100 : 0,
   );
   const hasSeenStorageBanner = useStore($hasSeenStorageBanner);
   const [highlightStorage, setHighlightStorage] = useState<boolean>(false);
@@ -108,9 +119,10 @@ export function App(): JSX.Element {
   useEffect(() => {
     if ($textPackageStatus.get() === 'downloading') $textPackageStatus.set('not_downloaded');
     if ($aiPackageStatus.get() === 'downloading') $aiPackageStatus.set('not_downloaded');
+    if ($modelPackageStatus.get() === 'downloading') $modelPackageStatus.set('not_downloaded');
   }, []);
 
-  // Sync offline packages state with real OPFS storage in background
+  // Sync offline packages state with real OPFS and browser cache in background
   useEffect(() => {
     store.hasVerses?.().then((has) => {
       $textPackageStatus.set(has ? 'ready' : 'not_downloaded');
@@ -120,7 +132,22 @@ export function App(): JSX.Element {
       $aiPackageStatus.set(has ? 'ready' : 'not_downloaded');
       if (has) setAiProgress(100);
     });
+    isQueryModelCached().then((isCached) => {
+      if (isCached) {
+        $modelPackageStatus.set('ready');
+        setModelProgress(100);
+      }
+    });
   }, [store]);
+
+  // Subscribe to query embedder progress events
+  useEffect(() => {
+    const unsub = embedder.onProgress((fraction) => {
+      $modelPackageStatus.set('downloading');
+      setModelProgress(Math.round(fraction * 100));
+    });
+    return unsub;
+  }, [embedder]);
 
   const handleDownloadText = async () => {
     $textPackageStatus.set('downloading');
@@ -149,7 +176,7 @@ export function App(): JSX.Element {
       await store.embeddings((pct) => setAiProgress(pct));
       $aiPackageStatus.set('ready');
       setAiProgress(100);
-      showToast('AI semantic embeddings verified & installed (2.1 MB)');
+      showToast('Verse vectors verified & installed in OPFS (2.1 MB)');
     } catch (err) {
       console.error('Download failed:', err);
       showToast(
@@ -161,13 +188,31 @@ export function App(): JSX.Element {
     }
   };
 
+  const handleDownloadModel = async () => {
+    $modelPackageStatus.set('downloading');
+    setModelProgress(0);
+    try {
+      await embedder.load((fraction) => setModelProgress(Math.round(fraction * 100)));
+      $modelPackageStatus.set('ready');
+      setModelProgress(100);
+      showToast('Neural query model installed in browser cache (137 MB)');
+    } catch (err) {
+      console.error('Model download failed:', err);
+      showToast('Model download interrupted. Check network and try again.');
+      $modelPackageStatus.set('not_downloaded');
+    }
+  };
+
   const handleClearStorage = async () => {
     await store.clear();
+    await clearQueryModelCache();
     $textPackageStatus.set('not_downloaded');
     $aiPackageStatus.set('not_downloaded');
+    $modelPackageStatus.set('not_downloaded');
     setTextProgress(0);
     setAiProgress(0);
-    showToast('Offline storage cleared.');
+    setModelProgress(0);
+    showToast('Offline storage and model cache cleared.');
   };
 
   const handleOpenStorage = () => {
@@ -288,7 +333,7 @@ export function App(): JSX.Element {
         isOnline={isOnline}
         isAiEnabled={isAiEnabled}
         onOpenHelp={() => setIsHelpOpen(true)}
-        onOpenAccount={() => showToast('Offline profile (Guest mode)')}
+        onOpenAccount={() => showToast('Guest mode')}
       />
 
       <main class="flex-1 flex flex-col overflow-hidden">
@@ -350,12 +395,15 @@ export function App(): JSX.Element {
             onToggleHeadings={handleToggleHeadings}
             textPackageStatus={textPackageStatus}
             aiPackageStatus={aiPackageStatus}
+            modelPackageStatus={modelPackageStatus}
             textProgress={textProgress}
             aiProgress={aiProgress}
+            modelProgress={modelProgress}
             highlightStorage={highlightStorage}
             onClearHighlight={() => setHighlightStorage(false)}
             onDownloadText={handleDownloadText}
             onDownloadAi={handleDownloadAi}
+            onDownloadModel={handleDownloadModel}
             onClearStorage={handleClearStorage}
           />
         )}

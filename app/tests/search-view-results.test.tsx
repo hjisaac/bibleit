@@ -188,17 +188,17 @@ describe('SearchView Result Cards & User Actions', () => {
     const expandBtn = screen.getByText('+ Expand passage');
     expect(expandBtn).toBeDefined();
 
-    // Text container is collapsed to max-h-24 with overflow-hidden
+    // Text container is collapsed to max-h-36 with overflow-hidden
     const textContainer = screen.getByText(/Rejoice in the Lord always/).closest('[class*="transition-[max-height]"]')!;
-    expect(textContainer.className).toContain('max-h-24');
+    expect(textContainer.className).toContain('max-h-36');
     expect(textContainer.className).toContain('overflow-hidden');
 
     // Click expand
     fireEvent.click(expandBtn);
 
-    // Button label changes to collapse and container becomes max-h-72 with inside scroll
+    // Button label changes to collapse and container becomes max-h-96 with inside scroll
     expect(screen.getByText('– Collapse passage')).toBeDefined();
-    expect(textContainer.className).toContain('max-h-72');
+    expect(textContainer.className).toContain('max-h-96');
     expect(textContainer.className).toContain('overflow-y-auto');
   });
 
@@ -237,33 +237,33 @@ describe('SearchView Result Cards & User Actions', () => {
     const card2Text = screen.getByText(/Owe no one anything/).closest('[class*="transition-[max-height]"]')!;
 
     // Both cards collapsed initially
-    expect(card1Text.className).toContain('max-h-24');
-    expect(card2Text.className).toContain('max-h-24');
+    expect(card1Text.className).toContain('max-h-36');
+    expect(card2Text.className).toContain('max-h-36');
 
     // 1. Expand Card 1
     fireEvent.click(expandButtons[0]!);
-    expect(card1Text.className).toContain('max-h-72');
-    expect(card2Text.className).toContain('max-h-24');
+    expect(card1Text.className).toContain('max-h-96');
+    expect(card2Text.className).toContain('max-h-36');
 
     // 2. Expand Card 2 -> Card 1 MUST collapse!
     const expandCard2Btn = screen.getByText('+ Expand passage');
     fireEvent.click(expandCard2Btn);
 
-    expect(card1Text.className).toContain('max-h-24');
-    expect(card2Text.className).toContain('max-h-72');
+    expect(card1Text.className).toContain('max-h-36');
+    expect(card2Text.className).toContain('max-h-96');
   });
 
   it('automatically expands card when audio narration starts', () => {
     renderSearchView();
 
     const textContainer = screen.getByText(/Rejoice in the Lord always/).closest('[class*="transition-[max-height]"]')!;
-    expect(textContainer.className).toContain('max-h-24');
+    expect(textContainer.className).toContain('max-h-36');
 
     const listenButton = screen.getByLabelText('Listen to Philippians 4:4–7');
     fireEvent.click(listenButton);
 
     // Audio narration click immediately expands the card
-    expect(textContainer.className).toContain('max-h-72');
+    expect(textContainer.className).toContain('max-h-96');
     expect(textContainer.className).toContain('overflow-y-auto');
   });
 

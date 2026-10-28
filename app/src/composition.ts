@@ -78,6 +78,7 @@ export function buildLocalEngine(p: Ports): SearchEngine {
         await p.vectors.build(manifest, chunks, emb.data, emb.scales);
         semanticReady = true;
       } catch (err) {
+        console.warn('[Semantic Index Init Error]:', err);
         if (err instanceof Error && err.message.startsWith('Embedder/corpus mismatch:')) {
           throw err;
         }
@@ -123,12 +124,23 @@ export function createDefaultArtifactStore(): ArtifactStore {
   return new OpfsArtifactStore();
 }
 
-export function createDefaultEngine(store: ArtifactStore = createDefaultArtifactStore()): SearchEngine {
+let defaultEmbedder: WorkerQueryEmbedder | null = null;
+export function createDefaultEmbedder(): WorkerQueryEmbedder {
+  if (!defaultEmbedder) {
+    defaultEmbedder = new WorkerQueryEmbedder();
+  }
+  return defaultEmbedder;
+}
+
+export function createDefaultEngine(
+  store: ArtifactStore = createDefaultArtifactStore(),
+  embedder: QueryEmbedder = createDefaultEmbedder(),
+): SearchEngine {
   return buildLocalEngine({
     store,
     refParser: new RegexRefParser(),
     lexical: new MiniSearchLexicalIndex(),
-    embedder: new WorkerQueryEmbedder(),
+    embedder,
     vectors: new BruteForceVectorIndex(),
     ranker: new RrfRanker(),
     answers: new NullAnswerProvider(),

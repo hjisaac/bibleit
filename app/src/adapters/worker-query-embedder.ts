@@ -8,7 +8,12 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
   private loadPromise: Promise<void> | null = null;
   private nextId = 1;
   private pending = new Map<number, { resolve: (v: Float32Array) => void; reject: (err: Error) => void }>();
-  private onProgressCb?: (fraction: number) => void;
+  private progressListeners = new Set<(fraction: number) => void>();
+
+  onProgress(cb: (fraction: number) => void): () => void {
+    this.progressListeners.add(cb);
+    return () => this.progressListeners.delete(cb);
+  }
 
   private getWorker(): Worker {
     if (!this.worker) {
@@ -25,7 +30,7 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
   }
 
   async load(onProgress?: (fraction: number) => void): Promise<void> {
-    if (onProgress) this.onProgressCb = onProgress;
+    if (onProgress) this.progressListeners.add(onProgress);
     if (this.loadPromise) return this.loadPromise;
 
     const worker = this.getWorker();
@@ -63,7 +68,7 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
     if (!data || typeof data !== 'object') return;
 
     if (data.type === 'progress' && typeof data.progress === 'number') {
-      this.onProgressCb?.(data.progress);
+      this.progressListeners.forEach((cb) => cb(data.progress));
     } else if (data.type === 'embed_result' && typeof data.id === 'number') {
       const req = this.pending.get(data.id);
       if (req) {
@@ -79,3 +84,24 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
     }
   }
 }
+
+export async function isQueryModelCached(): Promise<boolean> {
+  if (typeof caches === 'undefined') return false;
+  try {
+    const cache = await caches.open('transformers-cache');
+    const keys = await cache.keys();
+    return keys.some((k) => k.url.includes('model_quantized.onnx'));
+  } catch {
+    return false;
+  }
+}
+
+export async function clearQueryModelCache(): Promise<void> {
+  if (typeof caches === 'undefined') return;
+  try {
+    await caches.delete('transformers-cache');
+  } catch {
+    // Ignore cache deletion errors
+  }
+}
+

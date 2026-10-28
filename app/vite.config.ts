@@ -3,10 +3,23 @@ import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig({
-  base: process.env.BASE_URL || '/',
-  plugins: [
-    preact(),
+export default defineConfig(async ({ command, mode }) => {
+  const isDev = command === 'serve' && mode === 'development';
+  let sslPlugin: any[] = [];
+  if (isDev) {
+    try {
+      const basicSsl = (await import('@vitejs/plugin-basic-ssl')).default;
+      sslPlugin = [basicSsl()];
+    } catch {
+      // @vitejs/plugin-basic-ssl not yet installed; gracefully fall back to HTTP
+    }
+  }
+
+  return {
+    base: process.env.BASE_URL || '/',
+    plugins: [
+      ...sslPlugin,
+      preact(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png'],
@@ -54,4 +67,6 @@ export default defineConfig({
     globals: true,
     exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
   },
+};
 });
+

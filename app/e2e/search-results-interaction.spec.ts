@@ -47,8 +47,8 @@ test.describe('Search Results - Card Expansion & Inside-Scroll', () => {
     const card1 = page.locator('article').nth(0);
     const textContainer = card1.locator('div.relative.font-serif');
 
-    // 1. Initially collapsed with max-h-24 and overflow-hidden
-    await expect(textContainer).toHaveClass(/max-h-24/);
+    // 1. Initially collapsed with max-h-36 and overflow-hidden
+    await expect(textContainer).toHaveClass(/max-h-36/);
     await expect(textContainer).toHaveClass(/overflow-hidden/);
 
     const expandBtn = card1.getByRole('button', { name: '+ Expand passage' });
@@ -57,8 +57,8 @@ test.describe('Search Results - Card Expansion & Inside-Scroll', () => {
     // 2. Click expand
     await expandBtn.click();
 
-    // 3. Card text expands to max-h-72 with inside scroll (overflow-y-auto)
-    await expect(textContainer).toHaveClass(/max-h-72/);
+    // 3. Card text expands to max-h-96 with inside scroll (overflow-y-auto)
+    await expect(textContainer).toHaveClass(/max-h-96/);
     await expect(textContainer).toHaveClass(/overflow-y-auto/);
     await expect(card1.getByRole('button', { name: '– Collapse passage' })).toBeVisible();
   });
@@ -71,18 +71,18 @@ test.describe('Search Results - Card Expansion & Inside-Scroll', () => {
     const text2 = card2.locator('div.relative.font-serif');
 
     // Both cards collapsed initially
-    await expect(text1).toHaveClass(/max-h-24/);
-    await expect(text2).toHaveClass(/max-h-24/);
+    await expect(text1).toHaveClass(/max-h-36/);
+    await expect(text2).toHaveClass(/max-h-36/);
 
     // 1. Expand Card 1
     await card1.getByRole('button', { name: '+ Expand passage' }).click();
-    await expect(text1).toHaveClass(/max-h-72/);
-    await expect(text2).toHaveClass(/max-h-24/);
+    await expect(text1).toHaveClass(/max-h-96/);
+    await expect(text2).toHaveClass(/max-h-36/);
 
     // 2. Expand Card 2 -> Card 1 MUST collapse!
     await card2.getByRole('button', { name: '+ Expand passage' }).click();
-    await expect(text1).toHaveClass(/max-h-24/);
-    await expect(text2).toHaveClass(/max-h-72/);
+    await expect(text1).toHaveClass(/max-h-36/);
+    await expect(text2).toHaveClass(/max-h-96/);
   });
 
   test('displays section headings inline above their respective verses', async ({ page }) => {
