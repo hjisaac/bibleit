@@ -34,7 +34,10 @@ jobs:
         env:
           VITE_CLOUDFLARE_R2_URL: ${{ vars.VITE_CLOUDFLARE_R2_URL }}
           VITE_FEEDBACK_EMAIL: ${{ vars.VITE_FEEDBACK_EMAIL }}
-        run: pnpm build
+        run: |
+          export VITE_CLOUDFLARE_R2_URL=$(echo "$VITE_CLOUDFLARE_R2_URL" | tr -d '[:space:]')
+          export VITE_FEEDBACK_EMAIL=$(echo "$VITE_FEEDBACK_EMAIL" | tr -d '[:space:]')
+          pnpm build
 
       - name: Deploy to Cloudflare Pages
         env:
