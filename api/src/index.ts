@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
@@ -8,16 +10,22 @@ import {
   BruteForceVectorIndex,
   RrfRanker,
   NullAnswerProvider,
+  type ArtifactStore,
   type SearchEngine,
 } from '@bibleit/engine';
+import { FsArtifactStore } from './adapters/fs-artifact-store';
 import { HttpArtifactStore } from './adapters/http-artifact-store';
 import { NodeQueryEmbedder } from './adapters/node-query-embedder';
 
 const port = Number(process.env.PORT) || 7860;
-const artifactBaseUrl =
-  process.env.ARTIFACT_BASE_URL || 'https://pub-071cdcf1b2b34b1e9e77c65fbf233114.r2.dev/web';
+const artifactBaseUrl = process.env.ARTIFACT_BASE_URL;
+const defaultDataDir = path.resolve(__dirname, '../../app/public/data');
+const fallbackDataDir = path.resolve(process.cwd(), 'data');
+const dataDir = process.env.DATA_DIR || (fs.existsSync(defaultDataDir) ? defaultDataDir : fallbackDataDir);
 
-const store = new HttpArtifactStore(artifactBaseUrl);
+const store: ArtifactStore = artifactBaseUrl
+  ? new HttpArtifactStore(artifactBaseUrl)
+  : new FsArtifactStore(dataDir);
 const embedder = new NodeQueryEmbedder();
 
 const engine: SearchEngine = buildLocalEngine({
@@ -49,7 +57,7 @@ app.get('/health', (c) => {
     status: 'ok',
     ready: isReady,
     port,
-    artifactBaseUrl,
+    source: artifactBaseUrl ? { type: 'http', url: artifactBaseUrl } : { type: 'fs', path: dataDir },
   });
 });
 
