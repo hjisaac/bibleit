@@ -246,10 +246,10 @@ export function FeedbackModal({
               <p class="text-[11px] opacity-90">
                 You can email us directly at{' '}
                 <a
-                  href="mailto:hjisaach@gmail.com"
+                  href={`mailto:${import.meta.env.VITE_FEEDBACK_EMAIL.trim()}`}
                   class="underline font-semibold hover:opacity-80"
                 >
-                  hjisaach@gmail.com
+                  {import.meta.env.VITE_FEEDBACK_EMAIL.trim()}
                 </a>{' '}
                 or create an issue on{' '}
                 <a

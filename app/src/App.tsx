@@ -143,11 +143,24 @@ export function App(): JSX.Element {
   // Subscribe to query embedder progress events
   useEffect(() => {
     const unsub = embedder.onProgress((fraction) => {
-      $modelPackageStatus.set('downloading');
-      setModelProgress(Math.round(fraction * 100));
+      if ($modelPackageStatus.get() !== 'ready') {
+        $modelPackageStatus.set('downloading');
+        setModelProgress(Math.round(fraction * 100));
+      }
     });
     return unsub;
   }, [embedder]);
+
+  useEffect(() => {
+    engine.ready.then(() => {
+      isQueryModelCached().then((isCached) => {
+        if (isCached) {
+          $modelPackageStatus.set('ready');
+          setModelProgress(100);
+        }
+      });
+    }).catch(() => {});
+  }, [engine]);
 
   const handleDownloadText = async () => {
     $textPackageStatus.set('downloading');

@@ -1,9 +1,19 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(async ({ command, mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+
+  if (command === 'build') {
+    const requiredVars = ['VITE_FEEDBACK_EMAIL', 'VITE_CLOUDFLARE_R2_URL'];
+    const missing = requiredVars.filter((key) => !env[key]?.trim());
+    if (missing.length > 0) {
+      throw new Error(`[Build Failure] Missing required environment variables: ${missing.join(', ')}`);
+    }
+  }
+
   const isDev = command === 'serve' && mode === 'development';
   let sslPlugin: any[] = [];
   if (isDev) {
@@ -65,6 +75,10 @@ export default defineConfig(async ({ command, mode }) => {
   test: {
     environment: 'jsdom',
     globals: true,
+    env: {
+      VITE_FEEDBACK_EMAIL: 'test-feedback@example.com',
+      VITE_CLOUDFLARE_R2_URL: 'https://test-r2.dev/',
+    },
     exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
   },
 };

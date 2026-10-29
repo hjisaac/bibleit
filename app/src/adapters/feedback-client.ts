@@ -7,8 +7,7 @@ export interface FeedbackSubmission {
   readonly email?: string;
 }
 
-const FEEDBACK_EMAIL = import.meta.env.VITE_FEEDBACK_EMAIL || 'hjisaach@gmail.com';
-const FEEDBACK_ENDPOINT = `https://formsubmit.co/ajax/${FEEDBACK_EMAIL}`;
+const FEEDBACK_ENDPOINT = `https://formsubmit.co/ajax/${import.meta.env.VITE_FEEDBACK_EMAIL.trim()}`;
 
 export async function submitFeedback(submission: FeedbackSubmission): Promise<void> {
 

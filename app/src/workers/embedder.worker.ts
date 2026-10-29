@@ -3,12 +3,11 @@ import { pipeline, env } from '@huggingface/transformers';
 // Configure transformers.js for browser execution
 env.allowLocalModels = false;
 
-const r2Url = import.meta.env.VITE_CLOUDFLARE_R2_URL || 'https://pub-071cdcf1b2b34b1e9e77c65fbf233114.r2.dev/';
-if (r2Url && env.backends?.onnx?.wasm) {
-  const base = r2Url.endsWith('/') ? r2Url : `${r2Url}/`;
+const r2Base = import.meta.env.VITE_CLOUDFLARE_R2_URL.trim().replace(/\/+$/, '');
+if (env.backends?.onnx?.wasm) {
   env.backends.onnx.wasm.wasmPaths = {
-    mjs: `${base}ort-wasm-simd-threaded.asyncify.mjs`,
-    wasm: `${base}ort-wasm-simd-threaded.asyncify.wasm`,
+    mjs: `${r2Base}/ort-wasm-simd-threaded.asyncify.mjs`,
+    wasm: `${r2Base}/ort-wasm-simd-threaded.asyncify.wasm`,
   };
 }
 

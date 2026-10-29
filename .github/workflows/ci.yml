@@ -76,4 +76,10 @@ jobs:
       - name: Build and typecheck
         if: steps.check-app.outputs.has_app == 'true'
         working-directory: app
-        run: pnpm build
+        env:
+          VITE_CLOUDFLARE_R2_URL: ${{ vars.VITE_CLOUDFLARE_R2_URL || 'https://pub-071cdcf1b2b34b1e9e77c65fbf233114.r2.dev/' }}
+          VITE_FEEDBACK_EMAIL: ${{ vars.VITE_FEEDBACK_EMAIL || 'test@example.com' }}
+        run: |
+          export VITE_CLOUDFLARE_R2_URL=$(echo "$VITE_CLOUDFLARE_R2_URL" | tr -d '[:space:]')
+          export VITE_FEEDBACK_EMAIL=$(echo "$VITE_FEEDBACK_EMAIL" | tr -d '[:space:]')
+          pnpm build
