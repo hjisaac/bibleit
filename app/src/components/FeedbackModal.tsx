@@ -244,14 +244,20 @@ export function FeedbackModal({
             <div class="p-3 rounded-xl border text-xs bg-red-500/10 border-red-500/25 text-red-600 dark:text-red-400 space-y-1.5 leading-relaxed">
               <p class="font-semibold">Sorry, an issue occurred with the server.</p>
               <p class="text-[11px] opacity-90">
-                You can email us directly at{' '}
-                <a
-                  href="mailto:hjisaach@gmail.com"
-                  class="underline font-semibold hover:opacity-80"
-                >
-                  hjisaach@gmail.com
-                </a>{' '}
-                or create an issue on{' '}
+                {(import.meta.env.VITE_FEEDBACK_EMAIL || '').trim() ? (
+                  <>
+                    You can email us directly at{' '}
+                    <a
+                      href={`mailto:${(import.meta.env.VITE_FEEDBACK_EMAIL || '').trim()}`}
+                      class="underline font-semibold hover:opacity-80"
+                    >
+                      {(import.meta.env.VITE_FEEDBACK_EMAIL || '').trim()}
+                    </a>{' '}
+                    or create an issue on{' '}
+                  </>
+                ) : (
+                  <>You can create an issue on </>
+                )}
                 <a
                   href="https://github.com/hjisaac/bibleit/issues"
                   target="_blank"

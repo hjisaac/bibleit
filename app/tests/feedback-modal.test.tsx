@@ -13,6 +13,7 @@ describe('FeedbackModal & Entry Points', () => {
       json: async () => ({ success: true }),
     });
     vi.stubGlobal('fetch', fetchMock);
+    vi.stubEnv('VITE_FEEDBACK_EMAIL', 'test-feedback@example.com');
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
     if (typeof URL.createObjectURL === 'undefined') {
       URL.createObjectURL = vi.fn(() => 'blob:preview');
