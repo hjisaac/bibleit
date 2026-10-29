@@ -67,7 +67,7 @@ export function buildLocalEngine(p: Ports): SearchEngine {
     }
   })();
 
-  const semanticReadyPromise = (async () => {
+  void (async () => {
     try {
       const chunks = await baseReady;
       if (chunks.length === 0) return;

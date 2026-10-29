@@ -7,16 +7,9 @@ export interface FeedbackSubmission {
   readonly email?: string;
 }
 
-function getFeedbackEmail(): string {
-  return (import.meta.env.VITE_FEEDBACK_EMAIL || '').trim();
-}
+const FEEDBACK_ENDPOINT = `https://formsubmit.co/ajax/${import.meta.env.VITE_FEEDBACK_EMAIL.trim()}`;
 
 export async function submitFeedback(submission: FeedbackSubmission): Promise<void> {
-  const email = getFeedbackEmail();
-  if (!email) {
-    throw new Error('Feedback service unconfigured: missing VITE_FEEDBACK_EMAIL');
-  }
-  const endpoint = `https://formsubmit.co/ajax/${email}`;
 
   const formData = new FormData();
   formData.append('_subject', `[bibleit] ${submission.category.toUpperCase()}: ${submission.message.slice(0, 60)}`);
@@ -32,7 +25,7 @@ export async function submitFeedback(submission: FeedbackSubmission): Promise<vo
     formData.append('email', submission.email.trim());
   }
 
-  const response = await fetch(endpoint, {
+  const response = await fetch(FEEDBACK_ENDPOINT, {
     method: 'POST',
     headers: { Accept: 'application/json' },
     body: formData,
