@@ -622,6 +622,16 @@ export function SettingsView({
           <option>Louis Segond 1910 (LSG) — Domaine Public (Français)</option>
         </select>
       </div>
+
+      {/* App Version & Commit Details */}
+      <div class="pt-4 pb-2 text-center text-xs space-y-1" style={{ color: 'var(--text-muted)' }}>
+        <p class="font-medium tracking-wide">
+          bibleit v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.1.0'}
+          <span class="opacity-60 ml-1.5 font-mono text-[11px]">
+            ({typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : 'dev'})
+          </span>
+        </p>
+      </div>
     </section>
   );
 }
