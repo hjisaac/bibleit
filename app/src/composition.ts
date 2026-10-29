@@ -46,7 +46,7 @@ export function buildLocalEngine(p: Ports): SearchEngine {
   let lexicalReady = false;
   let semanticReady = false;
 
-  const ready = (async () => {
+  const baseReady = (async () => {
     try {
       const [versesData, rawChunks] = await Promise.all([
         p.store.verses(),
@@ -60,35 +60,41 @@ export function buildLocalEngine(p: Ports): SearchEngine {
       }));
       await p.lexical.build(chunks);
       lexicalReady = true;
-
-      try {
-        const manifest = await p.store.manifest();
-        // INVARIANT: query model must match corpus model (see QueryEmbedder docs).
-        if (p.embedder.modelId !== manifest.embeddings.model) {
-          throw new Error(
-            `Embedder/corpus mismatch: app has "${p.embedder.modelId}", ` +
-              `artifacts were built with "${manifest.embeddings.model}". ` +
-              `Update the app or re-run ingest.`,
-          );
-        }
-        const [emb] = await Promise.all([
-          p.store.embeddings(),
-          p.embedder.load(),
-        ]);
-        await p.vectors.build(manifest, chunks, emb.data, emb.scales);
-        semanticReady = true;
-      } catch (err) {
-        console.warn('[Semantic Index Init Error]:', err);
-        if (err instanceof Error && err.message.startsWith('Embedder/corpus mismatch:')) {
-          throw err;
-        }
-      }
+      return chunks;
     } catch (err) {
+      console.warn('[Base Index Init Error]:', err);
+      return [];
+    }
+  })();
+
+  const semanticReadyPromise = (async () => {
+    try {
+      const chunks = await baseReady;
+      if (chunks.length === 0) return;
+      const manifest = await p.store.manifest();
+      // INVARIANT: query model must match corpus model (see QueryEmbedder docs).
+      if (p.embedder.modelId !== manifest.embeddings.model) {
+        throw new Error(
+          `Embedder/corpus mismatch: app has "${p.embedder.modelId}", ` +
+            `artifacts were built with "${manifest.embeddings.model}". ` +
+            `Update the app or re-run ingest.`,
+        );
+      }
+      const [emb] = await Promise.all([
+        p.store.embeddings(),
+        p.embedder.load(),
+      ]);
+      await p.vectors.build(manifest, chunks, emb.data, emb.scales);
+      semanticReady = true;
+    } catch (err) {
+      console.warn('[Semantic Index Init Error]:', err);
       if (err instanceof Error && err.message.startsWith('Embedder/corpus mismatch:')) {
         throw err;
       }
     }
   })();
+
+  const ready = baseReady.then(() => {});
 
   return {
     ready,
