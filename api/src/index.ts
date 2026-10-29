@@ -13,10 +13,12 @@ import {
   type ArtifactStore,
   type SearchEngine,
 } from '@bibleit/engine';
+import { fileURLToPath } from 'node:url';
 import { FsArtifactStore } from './adapters/fs-artifact-store';
 import { HttpArtifactStore } from './adapters/http-artifact-store';
 import { NodeQueryEmbedder } from './adapters/node-query-embedder';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.PORT) || 7860;
 const artifactBaseUrl = process.env.ARTIFACT_BASE_URL;
 const defaultDataDir = path.resolve(__dirname, '../../app/public/data');

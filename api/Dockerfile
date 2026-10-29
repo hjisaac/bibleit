@@ -21,4 +21,4 @@ ENV PORT=7860
 ENV NODE_ENV=production
 ENV DATA_DIR=/app/data
 
-CMD ["node", "api/dist/index.js"]
+CMD ["pnpm", "--filter", "@bibleit/api", "start"]
