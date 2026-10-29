@@ -1,4 +1,6 @@
-import { pipeline, type FeatureExtractionPipeline } from '@huggingface/transformers';
+import os from 'node:os';
+import path from 'node:path';
+import { env, pipeline, type FeatureExtractionPipeline } from '@huggingface/transformers';
 import type { QueryEmbedder } from '@bibleit/engine';
 
 export class NodeQueryEmbedder implements QueryEmbedder {
@@ -15,6 +17,7 @@ export class NodeQueryEmbedder implements QueryEmbedder {
     this.modelId = modelId;
     this.dim = dim;
     this.queryPrefix = queryPrefix;
+    env.cacheDir = process.env.HF_HOME || path.join(os.homedir(), '.cache', 'huggingface', 'transformers');
   }
 
   async load(): Promise<void> {

@@ -1,8 +1,29 @@
+import dns from 'node:dns';
 import fs from 'node:fs';
 import path from 'node:path';
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+
+// Prevent 10s dual-stack DNS timeouts when downloading HF model weights on local networks.
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+  const defaultLookup = dns.lookup.bind(dns);
+  (dns as any).lookup = (hostname: string, options: any, cb: any) => {
+    const callback = typeof options === 'function' ? options : cb;
+    const opts = typeof options === 'object' ? options : {};
+    dns.resolve4(hostname, (err, addrs) => {
+      if (!err && addrs?.length) {
+        return opts?.all
+          ? callback(null, addrs.map((a) => ({ address: a, family: 4 })))
+          : callback(null, addrs[0], 4);
+      }
+      defaultLookup(hostname, options, callback);
+    });
+  };
+} catch {
+  // Gracefully fallback to default resolver in restricted container environments
+}
 import {
   buildLocalEngine,
   RegexRefParser,
