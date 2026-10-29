@@ -120,6 +120,59 @@ Building an offline-first vector search PWA introduced multiple subtle engineeri
 - **Issue:** Clicking `"Free Up Local Space (Clear Artifacts)"` when no packages were installed presented confusing confirmation cards.
 - **Fix:** Introduced reactive state disabling the clearance button (`disabled:opacity-40 disabled:cursor-not-allowed`) whenever OPFS reports $0\text{ MB}$ cached, paired with a visual ambient progress bar countdown that automatically disarms destructive confirmations after 6 seconds.
 
+### 4.5 Tiered Latency Decoupling: The 1.2 MB / 2.1 MB vs. 137 MB Edge Bootstrapping Dilemma
+
+#### The Research & Paper Foundation
+- **"Tiered Indexing for Information Retrieval"** (Cambazoglu et al., SIGIR / Yahoo! Research) & **"Challenges in Building Large-Scale Information Retrieval Systems"** (Dean, Google, WSDM 2009):
+  - In retrieval systems, coupling the initialization latency of all retrieval tiers into a single blocking gate degrades user-perceived performance (tail latency) and availability.
+  - Tiered retrieval architectures partition indices into **Tier-1 (low-latency, high-precision, compact)** and **Tier-2 (deep semantic, higher compute/payload)**. Serving queries from Tier-1 immediately while Tier-2 warms up preserves sub-second interactive search.
+
+#### The Edge PWA Payload Asymmetry
+In `bibleit`, the search subsystem consists of three distinct data artifacts:
+1. **Tier 1 (Text & Exact Reference)**: `verses.json.gz` ($1.2\text{ MB}$) + `chunks.json.gz` / MiniSearch inverted index ($180\text{ KB}$). Total payload: **$<1.5\text{ MB}$**.
+2. **Tier 2A (Precomputed Corpus Matrix)**: `embeddings.i8.bin` ($2.1\text{ MB}$). Contains 2,655 INT8 quantized 768-dimensional pericope vectors.
+3. **Tier 2B (On-Device Neural Query Embedder)**: `model_quantized.onnx` ($137\text{ MB}$) + WebAssembly runtime (`ort-wasm-simd-threaded.asyncify.mjs`, $\approx 25\text{ MB}$).
+
+#### The Architectural Trap
+- Treating `engine.ready` as a monolithic promise that blocks until the 137 MB neural model is downloaded, verified, and compiled locks out the user for 5 to 30+ seconds on cellular connections.
+- During this window, exact reference lookups (e.g., *"John 3:16"*) and lexical keyword searches are completely capable of running in $<10\text{ ms}$, but remain artificially blocked by the neural model's cold-start network payload.
+
+#### The Production Solution
+- **Decoupled Dual-Promise Lifecycle (`ready` vs. `semanticReady`)**:
+  - `engine.ready` resolves as soon as Tier 1 (`verses.json.gz` + `chunks.json.gz`) completes OPFS hydration (~1 second).
+  - Exact verse references and lexical searches become active immediately at Frame 0.
+  - `semanticReady` runs asynchronously in the background. If a semantic query is submitted while `semanticReady` is pending, the engine returns Tier-1 lexical results immediately and smoothly transitions to full Reciprocal Rank Fusion (RRF) once the neural worker signals compilation completion.
+
+### 4.6 WebAssembly Worker Threading & Interaction to Next Paint (INP)
+
+#### The Performance Constraint
+- Running INT8 quantized transformer inference on client CPUs (12-layer BERT-based architectures) requires computing billions of multiply-accumulate operations:
+  $$\mathbf{z} = \text{Softmax}\left(\frac{\mathbf{Q}\mathbf{K}^T}{\sqrt{d_k}}\right) \mathbf{V}$$
+- In ONNX Runtime Web using WASM SIMD, computing an embedding vector for a 15-token user query requires **$100\text{--}300\text{ ms}$** of sustained CPU execution on modern mobile silicon.
+- Executing this matrix multiplication on the browser's main UI thread violates the Core Web Vitals **Interaction to Next Paint (INP $\le 200\text{ ms}$)** threshold, freezing scroll gestures and keystroke animations.
+
+#### The Solution: Isolated Web Worker Pipeline
+- Inference is strictly isolated inside a dedicated Web Worker (`embedder.worker.ts`).
+- Communication with the main thread uses structured clone messaging passing zero-copy string payloads and Float32Array vector buffers.
+- The UI thread remains completely responsive at 60/120 FPS during neural inference.
+- **WASM Module Dynamic Resolution**: ONNX Runtime Web dynamically imports its threaded asyncify modules (`ort-wasm-simd-threaded.asyncify.mjs`). CDN URL configuration must be strictly sanitized against trailing whitespace and carriage returns to prevent `%20%20` URL-encoded module load errors.
+
+### 4.7 Fail-Fast Build-Time Invariant Gates vs. Runtime Defensive Degradation
+
+#### The Defect Pattern
+- Client-side Single Page Applications (SPAs) and PWAs statically inline build environment variables (e.g. `import.meta.env.VITE_CLOUDFLARE_R2_URL`).
+- Using defensive inline runtime fallbacks (e.g. `const url = import.meta.env.VAR || 'fallback'`) conceals deployment misconfigurations. CI/CD pipelines report successful builds while edge production deployments fail silently or hit hardcoded development servers.
+
+#### The Enforcement Pattern
+- Environment requirements are asserted at build time in `vite.config.ts`:
+  ```typescript
+  if (command === 'build') {
+    const missing = requiredVars.filter(v => !env[v]);
+    if (missing.length > 0) throw new Error(`[Build Failure] Missing required environment variables: ${missing.join(', ')}`);
+  }
+  ```
+- This enforces strict invariant guarantees: an edge artifact cannot be packaged or deployed unless all necessary CDN and backend service contracts are validated.
+
 ---
 
 ## 5. Summary of Architecture Principles for `bibleit`
@@ -127,3 +180,7 @@ Building an offline-first vector search PWA introduced multiple subtle engineeri
 1. **Quantization is Asymmetric:** Keep queries in full Float32 precision; quantize scripture corpus to Int8 with per-row scale factors.
 2. **Corpus Compression is High-Fidelity:** $2,655$ vectors compress from $8.16\text{ MB}$ down to $2.05\text{ MB}$ with $>0.9999$ cosine alignment.
 3. **Model Quantization is Necessary for Edge PWA:** While INT8 ONNX incurs a $\sim 1.5\%$ retrieval penalty on Hit@10, reducing model weight size from $522\text{ MB}$ to $138\text{ MB}$ is essential for mobile browser execution.
+4. **Decouple Edge Search Tiers:** Serve sub-second lexical and reference queries immediately from Tier 1 ($1.2\text{ MB}$ verses, $180\text{ KB}$ lexical chunks) while asynchronously compiling the Tier 2 neural model ($137\text{ MB}$).
+5. **Worker-Isolated Neural Inference:** Offload ONNX WASM SIMD execution to dedicated Web Workers to protect Main Thread Interaction to Next Paint (INP).
+6. **Enforce Build-Time Environment Invariants:** Never mask missing configuration with runtime fallbacks; fail fast in the bundler before packaging edge artifacts.
+
