@@ -81,4 +81,14 @@ describe('HybridEngine', () => {
     expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
     expect(result).toEqual(mockLocalResult);
   });
+
+  it('bypasses remote fetch when isDeviceOnly callback returns true', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test', () => true);
+    const result = await engine.retrieve('love');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
+    expect(result.passages[0]?.chunk.text).toContain('For God so loved the world');
+  });
 });

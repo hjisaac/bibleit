@@ -9,15 +9,24 @@ export class HybridEngine implements SearchEngine {
   readonly answers: AnswerProvider;
   private localEngine: SearchEngine;
   private remoteUrl: string | null;
+  private isDeviceOnly?: () => boolean;
 
-  constructor(localEngine: SearchEngine, remoteUrl?: string | null) {
+  constructor(
+    localEngine: SearchEngine,
+    remoteUrl?: string | null,
+    isDeviceOnly?: () => boolean,
+  ) {
     this.localEngine = localEngine;
     this.remoteUrl = remoteUrl?.trim().replace(/\/+$/, '') || null;
+    this.isDeviceOnly = isDeviceOnly;
     this.ready = localEngine.ready;
     this.answers = localEngine.answers;
   }
 
   async retrieve(query: string, k = 10): Promise<RetrievalResult> {
+    if (this.isDeviceOnly?.()) {
+      return this.localEngine.retrieve(query, k);
+    }
     if (this.remoteUrl && typeof navigator !== 'undefined' && navigator.onLine) {
       try {
         const controller = new AbortController();

@@ -21,11 +21,15 @@ interface SettingsViewProps {
   textProgress: number;
   aiProgress: number;
   modelProgress: number;
+  searchMode?: 'auto' | 'device';
+  onToggleSearchMode?: (mode: 'auto' | 'device') => void;
   highlightStorage?: boolean;
-  onClearHighlight?: () => void;
   onDownloadText: () => void;
+  onCancelDownloadText?: () => void;
   onDownloadAi: () => void;
+  onCancelDownloadAi?: () => void;
   onDownloadModel: () => void;
+  onCancelDownloadModel?: () => void;
   onClearStorage: () => void;
 }
 
@@ -45,11 +49,16 @@ export function SettingsView({
   textProgress,
   aiProgress,
   modelProgress,
+  searchMode = 'auto',
+  onToggleSearchMode,
   highlightStorage,
   onClearHighlight,
   onDownloadText,
+  onCancelDownloadText,
   onDownloadAi,
+  onCancelDownloadAi,
   onDownloadModel,
+  onCancelDownloadModel,
   onClearStorage,
 }: SettingsViewProps): JSX.Element {
   const storageSectionRef = useRef<HTMLDivElement>(null);
@@ -291,6 +300,48 @@ export function SettingsView({
         </div>
       </div>
 
+      {/* Force Device-Only Search Toggle */}
+      <div
+        class="p-4 rounded-2xl border space-y-3"
+        style={{
+          backgroundColor: 'var(--bg-surface-elevated)',
+          borderColor: 'var(--border-subtle)',
+        }}
+      >
+        <div class="flex items-center justify-between">
+          <div class="pr-3">
+            <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
+              <span>Force Device-Only Search</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono font-medium">
+                Offline
+              </span>
+            </div>
+            <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {textPackageStatus === 'ready'
+                ? 'Search scripture strictly on-device without contacting backend servers.'
+                : 'Download the scripture package below to unlock device-only search.'}
+            </p>
+          </div>
+
+          <label
+            class={`relative inline-flex items-center shrink-0 ${
+              textPackageStatus === 'ready' ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+            }`}
+          >
+            <input
+              type="checkbox"
+              disabled={textPackageStatus !== 'ready'}
+              checked={searchMode === 'device'}
+              onChange={(e) =>
+                onToggleSearchMode?.((e.target as HTMLInputElement).checked ? 'device' : 'auto')
+              }
+              class="sr-only peer"
+            />
+            <div class="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
+          </label>
+        </div>
+      </div>
+
       {/* Offline Packages & Storage Control */}
       <div
         ref={storageSectionRef}
@@ -375,20 +426,32 @@ export function SettingsView({
                 ? 'Downloading verses...'
                 : 'Not stored locally'}
             </span>
-            {textPackageStatus !== 'ready' && (
+            {textPackageStatus === 'downloading' ? (
+              <button
+                type="button"
+                onClick={onCancelDownloadText}
+                class="px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors hover:opacity-80"
+                style={{
+                  borderColor: 'var(--border-subtle)',
+                  color: 'var(--text-muted)',
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                }}
+              >
+                Cancel
+              </button>
+            ) : textPackageStatus !== 'ready' ? (
               <button
                 type="button"
                 onClick={onDownloadText}
-                disabled={textPackageStatus === 'downloading'}
-                class="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-85 disabled:opacity-50"
+                class="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-85"
                 style={{
                   backgroundColor: 'var(--accent)',
                   color: '#FFFFFF',
                 }}
               >
-                {textPackageStatus === 'downloading' ? 'Downloading...' : 'Download (1.2 MB)'}
+                Download (1.2 MB)
               </button>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -443,20 +506,32 @@ export function SettingsView({
                 ? 'Downloading vectors...'
                 : 'Optional add-on'}
             </span>
-            {aiPackageStatus !== 'ready' && (
+            {aiPackageStatus === 'downloading' ? (
+              <button
+                type="button"
+                onClick={onCancelDownloadAi}
+                class="px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors hover:opacity-80"
+                style={{
+                  borderColor: 'var(--border-subtle)',
+                  color: 'var(--text-muted)',
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                }}
+              >
+                Cancel
+              </button>
+            ) : aiPackageStatus !== 'ready' ? (
               <button
                 type="button"
                 onClick={onDownloadAi}
-                disabled={aiPackageStatus === 'downloading'}
-                class="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-85 disabled:opacity-50"
+                class="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-85"
                 style={{
                   backgroundColor: 'var(--accent)',
                   color: '#FFFFFF',
                 }}
               >
-                {aiPackageStatus === 'downloading' ? 'Downloading...' : 'Download (2.1 MB)'}
+                Download (2.1 MB)
               </button>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -511,20 +586,32 @@ export function SettingsView({
                 ? 'Downloading model weights...'
                 : 'Downloads on first semantic search'}
             </span>
-            {modelPackageStatus !== 'ready' && (
+            {modelPackageStatus === 'downloading' ? (
+              <button
+                type="button"
+                onClick={onCancelDownloadModel}
+                class="px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors hover:opacity-80"
+                style={{
+                  borderColor: 'var(--border-subtle)',
+                  color: 'var(--text-muted)',
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                }}
+              >
+                Cancel
+              </button>
+            ) : modelPackageStatus !== 'ready' ? (
               <button
                 type="button"
                 onClick={onDownloadModel}
-                disabled={modelPackageStatus === 'downloading'}
-                class="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-85 disabled:opacity-50"
+                class="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-85"
                 style={{
                   backgroundColor: 'var(--accent)',
                   color: '#FFFFFF',
                 }}
               >
-                {modelPackageStatus === 'downloading' ? 'Downloading...' : 'Download (137 MB)'}
+                Download (137 MB)
               </button>
-            )}
+            ) : null}
           </div>
         </div>
 

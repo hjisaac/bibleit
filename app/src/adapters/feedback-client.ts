@@ -1,3 +1,5 @@
+import { env } from '../env';
+
 export type FeedbackCategory = 'bug' | 'feature' | 'scripture' | 'general';
 
 export interface FeedbackSubmission {
@@ -7,7 +9,7 @@ export interface FeedbackSubmission {
   readonly email?: string;
 }
 
-const FEEDBACK_ENDPOINT = `https://formsubmit.co/ajax/${import.meta.env.VITE_FEEDBACK_EMAIL.trim()}`;
+const FEEDBACK_ENDPOINT = `https://formsubmit.co/ajax/${env.feedbackEmail}`;
 
 export async function submitFeedback(submission: FeedbackSubmission): Promise<void> {
 

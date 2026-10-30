@@ -1,15 +1,14 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { AudioNarrator, SearchEngine } from '../core/ports';
-import { getChunkKey, type Manifest, type NarrationState, type NarrationWordBoundary, type ScoredPassage } from '../core/types';
+import { getChunkKey, type NarrationState, type NarrationWordBoundary, type ScoredPassage } from '../core/types';
 import { BIBLE_BOOKS_BY_ID, findBookByPrefix } from '../core/bible-books';
 import { resolveVerseText } from '../adapters/book-store';
-import { getRandomStarterTopic, POPULAR_TOPICS, SEARCH_SUGGESTIONS, STARTER_TOPICS, type StarterTopic } from '../core/starter-topics';
+import { POPULAR_TOPICS, SEARCH_SUGGESTIONS } from '../core/starter-topics';
 import type { SavedVerse } from './SavedView';
 
 interface SearchViewProps {
   engine: SearchEngine;
-  manifest?: Manifest | null;
   narrator?: AudioNarrator;
   narrationState?: NarrationState;
   isOnline: boolean;
@@ -137,9 +136,9 @@ function isQuestionQuery(text: string): boolean {
   return questionWords.some((word) => lower.startsWith(`${word} `) || lower.startsWith(`${word}'`));
 }
 
-const SEARCH_STORAGE_KEY = 'bibleit_last_search';
-const SEARCH_HISTORY_KEY = 'bibleit_search_history';
-const MAX_HISTORY_ITEMS = 6;
+export const SEARCH_STORAGE_KEY = 'bibleit_last_search';
+export const SEARCH_HISTORY_KEY = 'bibleit_search_history';
+export const MAX_HISTORY_ITEMS = 3;
 
 function loadSearchHistory(): string[] {
   if (typeof localStorage === 'undefined') return [];
@@ -186,17 +185,15 @@ function getInitialSearchState(): StoredSearch {
       // Storage unavailable or invalid JSON
     }
   }
-  const topic = getRandomStarterTopic();
   return {
-    query: topic.query,
-    passages: topic.passages,
-    answerText: topic.answerText,
+    query: '',
+    passages: [],
+    answerText: '',
   };
 }
 
 export function SearchView({
   engine,
-  manifest,
   narrator,
   narrationState,
   isOnline,
@@ -215,7 +212,8 @@ export function SearchView({
   const [initialSearch] = useState(getInitialSearchState);
   const [query, setQuery] = useState(initialSearch.query);
   const [passages, setPassages] = useState<ScoredPassage[]>(initialSearch.passages);
-  const [latencyMs, setLatencyMs] = useState(38);
+  const [isPanelOpen, setIsPanelOpen] = useState(initialSearch.query.trim().length === 0);
+  const lastSubmittedQueryRef = useRef(initialSearch.query);
   const [expandedCardKey, setExpandedCardKey] = useState<string | null>(null);
   const [surroundingVerses, setSurroundingVerses] = useState<
     Record<string, { prev?: string; next?: string }>
@@ -237,11 +235,9 @@ export function SearchView({
       setPassages([]);
       return;
     }
-    const startTime = performance.now();
     void engine.retrieve(trimmed).then((res) => {
       if (searchRunIdRef.current === runId) {
         setPassages(res.passages);
-        setLatencyMs(Math.round(performance.now() - startTime));
       }
     });
   };
@@ -257,42 +253,12 @@ export function SearchView({
     });
   };
 
-  const handleClearHistory = () => {
-    setSearchHistory([]);
-    saveSearchHistory([]);
-  };
-
-  const handleApplyTopic = (topic: StarterTopic) => {
-    searchRunIdRef.current++;
-    addQueryToHistory(topic.query);
-    setQuery(topic.query);
-    setPassages(topic.passages);
-    setAnswerText(topic.answerText);
-    setIsSynthesisCollapsed(false);
+  const handleSelectQuery = (text: string) => {
+    setQuery(text);
     const el = inputRef.current;
     if (el) {
       el.focus();
-      el.setSelectionRange(topic.query.length, topic.query.length);
-    }
-  };
-
-  const handleSelectQuery = (text: string) => {
-    addQueryToHistory(text);
-    const matchedStarter = STARTER_TOPICS.find(
-      (t) => t.query.toLowerCase() === text.trim().toLowerCase(),
-    );
-    if (matchedStarter) {
-      handleApplyTopic(matchedStarter);
-    } else {
-      setQuery(text);
-      setAnswerText('');
-      setIsSynthesizing(false);
-      runSearch(text);
-      const el = inputRef.current;
-      if (el) {
-        el.focus();
-        el.setSelectionRange(text.length, text.length);
-      }
+      el.setSelectionRange(text.length, text.length);
     }
   };
 
@@ -376,15 +342,15 @@ export function SearchView({
   const handleSynthesize = async () => {
     const trimmed = query.trim();
     if (!trimmed || isSynthesizing) return;
+    lastSubmittedQueryRef.current = trimmed;
+    setIsPanelOpen(false);
     setIsSynthesizing(true);
     setAnswerText('');
     setIsSynthesisCollapsed(false);
 
     try {
-      const startTime = performance.now();
       const res = await engine.retrieve(trimmed);
       setPassages(res.passages);
-      setLatencyMs(Math.round(performance.now() - startTime));
       const stream = engine.answers.answer(trimmed, res);
       for await (const chunk of stream) {
         setAnswerText((prev) => prev + chunk);
@@ -513,19 +479,25 @@ export function SearchView({
             style={{
               color: 'var(--text-main)',
             }}
+            onFocus={() => {
+              setIsPanelOpen(true);
+            }}
             onInput={(e) => {
               setQuery((e.target as HTMLInputElement).value);
-              setAnswerText('');
-              setIsSynthesizing(false);
+              setIsPanelOpen(true);
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                addQueryToHistory(query);
+                const trimmed = query.trim();
+                if (!trimmed) return;
+                addQueryToHistory(trimmed);
+                lastSubmittedQueryRef.current = trimmed;
+                setIsPanelOpen(false);
                 (e.target as HTMLInputElement).blur();
                 if (isQuestion && isAiEnabled && engine.answers.available && isOnline && !isSynthesizing) {
                   void handleSynthesize();
                 } else {
-                  runSearch(query);
+                  runSearch(trimmed);
                 }
               }
             }}
@@ -540,8 +512,7 @@ export function SearchView({
                 e.stopPropagation();
                 searchRunIdRef.current++;
                 setQuery('');
-                setPassages([]);
-                setAnswerText('');
+                setIsPanelOpen(true);
                 inputRef.current?.focus();
               }}
               class="text-xs p-1 rounded-full hover:opacity-75 shrink-0 ml-1.5"
@@ -620,69 +591,17 @@ export function SearchView({
         </div>
       )}
 
-      {/* Mixed Suggestion Chips (Shown when a search is active) */}
-      {query.trim().length > 0 && (
-        <div class="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2 text-xs shrink-0 no-scrollbar">
-          <span class="text-[10px] shrink-0 font-medium tracking-wide uppercase" style={{ color: 'var(--text-subtle)' }}>
-            Try:
-          </span>
-          {STARTER_TOPICS.map((topic) => (
-            <button
-              key={topic.id}
-              type="button"
-              onClick={() => handleApplyTopic(topic)}
-              class="shrink-0 px-2 py-0.5 rounded-md border text-[11px] transition-opacity hover:opacity-80"
-              style={{
-                borderColor: 'var(--border-subtle)',
-                backgroundColor: 'var(--bg-surface-elevated)',
-                color: 'var(--text-muted)',
-              }}
-            >
-              {topic.query}
-            </button>
-          ))}
-        </div>
-      )}
 
-      {/* Technical Diagnostics Bar (Shown only in Inspector Mode when a query has run) */}
-      {isInspectorMode && query.trim().length > 0 && (
-        <div
-          class="flex items-center justify-between text-[10px] sm:text-[11px] mb-2.5 px-1 py-1 border-b border-dashed font-mono shrink-0"
-          style={{
-            borderColor: 'var(--border-subtle)',
-            color: 'var(--text-subtle)',
-          }}
-        >
-          <div class="flex items-center gap-1.5">
-            <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-            <span>
-              {manifest
-                ? `${manifest.embeddings.model.split('/').pop()} (${manifest.embeddings.quantization.type}) · ${manifest.corpus.count.toLocaleString()} verses`
-                : 'nomic-embed-text-v1.5 (int8) · 31,095 verses'}
-            </span>
-          </div>
-          <span class="text-emerald-600 dark:text-emerald-400 font-semibold">{latencyMs}ms latency</span>
-        </div>
-      )}
-
-      {/* Empty Guidance State */}
-      {query.trim().length === 0 && (
-        <div class="py-4 flex flex-col gap-6 animate-fadeIn">
+      {/* Guidance Panel P (Shown on cold start or when search is focused/empty) */}
+      {isPanelOpen && (
+        <div class="py-3 mb-2 flex flex-col gap-4 animate-fadeIn">
           {/* Recent Searches */}
           {searchHistory.length > 0 && (
             <div>
-              <div class="flex items-center justify-between mb-2">
+              <div class="mb-2">
                 <span class="text-[11px] font-semibold tracking-wider uppercase" style={{ color: 'var(--text-subtle)' }}>
                   Recent Searches
                 </span>
-                <button
-                  type="button"
-                  onClick={handleClearHistory}
-                  class="text-[11px] transition-opacity hover:opacity-75"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  Clear
-                </button>
               </div>
               <div class="flex flex-wrap gap-1.5">
                 {searchHistory.map((item) => (
@@ -758,21 +677,11 @@ export function SearchView({
               ))}
             </div>
           </div>
-
-          {/* Guidance Footer */}
-          <div class="py-6 flex flex-col items-center justify-center text-center">
-            <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
-              Search Scripture
-            </p>
-            <p class="text-xs max-w-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-              Search by book & verse reference (e.g. <i>John 3:16</i>), topic, or question. Switch to the <b>Reader</b> tab to browse full chapters.
-            </p>
-          </div>
         </div>
       )}
 
       {/* No Results State */}
-      {query.trim().length > 0 && passages.length === 0 && (
+      {!isPanelOpen && query.trim().length > 0 && passages.length === 0 && (
         <div class="py-16 flex flex-col items-center justify-center text-center animate-fadeIn">
           <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
             No matching passages found

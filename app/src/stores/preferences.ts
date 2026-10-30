@@ -20,3 +20,6 @@ export const $hasSeenStorageBanner = persistentAtom<boolean>('bibleit_storage_ba
   encode: String,
   decode: (v) => v === 'true',
 });
+
+export type SearchMode = 'auto' | 'device';
+export const $searchMode = persistentAtom<SearchMode>('bibleit_search_mode', 'auto');

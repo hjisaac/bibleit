@@ -20,14 +20,6 @@ export default defineConfig(async ({ command, mode }) => {
       }
     })();
 
-  if (command === 'build') {
-    const requiredVars = ['VITE_FEEDBACK_EMAIL', 'VITE_CLOUDFLARE_R2_URL'];
-    const missing = requiredVars.filter((key) => !env[key]?.trim());
-    if (missing.length > 0) {
-      throw new Error(`[Build Failure] Missing required environment variables: ${missing.join(', ')}`);
-    }
-  }
-
   const isDev = command === 'serve' && mode === 'development';
   let sslPlugin: any[] = [];
   if (isDev) {
@@ -101,6 +93,7 @@ export default defineConfig(async ({ command, mode }) => {
     env: {
       VITE_FEEDBACK_EMAIL: 'test-feedback@example.com',
       VITE_CLOUDFLARE_R2_URL: 'https://test-r2.dev/',
+      VITE_BACKEND_API_URL: 'http://localhost:7860',
     },
     exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
   },

@@ -1,9 +1,10 @@
 import { pipeline, env } from '@huggingface/transformers';
+import { env as appEnv } from '../env';
 
 // Configure transformers.js for browser execution
 env.allowLocalModels = false;
 
-const r2Base = import.meta.env.VITE_CLOUDFLARE_R2_URL.trim().replace(/\/+$/, '');
+const r2Base = appEnv.r2Url;
 if (env.backends?.onnx?.wasm) {
   env.backends.onnx.wasm.wasmPaths = {
     mjs: `${r2Base}/ort-wasm-simd-threaded.asyncify.mjs`,

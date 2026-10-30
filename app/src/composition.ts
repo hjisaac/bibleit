@@ -35,11 +35,13 @@ export function createDefaultEmbedder(): WorkerQueryEmbedder {
   return defaultEmbedder;
 }
 
+import { env } from './env';
 import { HybridEngine } from './adapters/hybrid-engine';
 
 export function createDefaultEngine(
   store: ArtifactStore = createDefaultArtifactStore(),
   embedder: QueryEmbedder = createDefaultEmbedder(),
+  isDeviceOnly?: () => boolean,
 ): SearchEngine {
   const localEngine = buildLocalEngine({
     store,
@@ -51,11 +53,7 @@ export function createDefaultEngine(
     answers: new NullAnswerProvider(),
   });
 
-  const backendUrl = import.meta.env.VITE_BACKEND_API_URL?.trim();
-  if (backendUrl) {
-    return new HybridEngine(localEngine, backendUrl);
-  }
-  return localEngine;
+  return new HybridEngine(localEngine, env.backendApiUrl, isDeviceOnly);
 }
 
 export function createDefaultNarrator(): AudioNarrator {

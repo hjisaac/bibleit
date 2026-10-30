@@ -42,10 +42,10 @@ export interface SearchEngine {
 export interface ArtifactStore {
   /** Resolve the manifest (network-or-cache); single source of truth for versions. */
   manifest(): Promise<Manifest>;
-  verses(onProgress?: (progressPercent: number) => void): Promise<VerseCorpusData>;
-  chunks(onProgress?: (progressPercent: number) => void): Promise<RawChunk[]>;
+  verses(onProgress?: (progressPercent: number) => void, signal?: AbortSignal): Promise<VerseCorpusData>;
+  chunks(onProgress?: (progressPercent: number) => void, signal?: AbortSignal): Promise<RawChunk[]>;
   /** Raw embedding matrix as stored (quantized); interpretation is VectorIndex's job. */
-  embeddings(onProgress?: (progressPercent: number) => void): Promise<{ data: ArrayBuffer; scales?: ArrayBuffer }>;
+  embeddings(onProgress?: (progressPercent: number) => void, signal?: AbortSignal): Promise<{ data: ArrayBuffer; scales?: ArrayBuffer }>;
   /** Check if verses are already installed in local storage without parsing. */
   hasVerses?(): Promise<boolean>;
   /** Check if embeddings are already installed in local storage without parsing. */
@@ -83,6 +83,8 @@ export interface QueryEmbedder {
   readonly dim: number;
   /** Idempotent; may download the model on first call (report via onProgress). */
   load(onProgress?: (fraction: number) => void): Promise<void>;
+  /** Cancels an in-progress model download, releasing worker memory and connections. */
+  cancelLoad?(): void;
   embed(query: string): Promise<Float32Array>;
 }
 

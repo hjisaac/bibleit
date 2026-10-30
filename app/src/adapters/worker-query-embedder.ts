@@ -29,20 +29,25 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
     return this.worker;
   }
 
+  private loadReject: ((err: Error) => void) | null = null;
+
   async load(onProgress?: (fraction: number) => void): Promise<void> {
     if (onProgress) this.progressListeners.add(onProgress);
     if (this.loadPromise) return this.loadPromise;
 
     const worker = this.getWorker();
     this.loadPromise = new Promise<void>((resolve, reject) => {
+      this.loadReject = reject;
       const handler = (e: MessageEvent) => {
         if (!e.data) return;
         if (e.data.type === 'loaded') {
           worker.removeEventListener('message', handler);
+          this.loadReject = null;
           resolve();
         } else if (e.data.type === 'load_error') {
           worker.removeEventListener('message', handler);
           this.loadPromise = null;
+          this.loadReject = null;
           reject(new Error(e.data.error));
         }
       };
@@ -51,6 +56,19 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
     });
 
     return this.loadPromise;
+  }
+
+  cancelLoad(): void {
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
+    const reject = this.loadReject;
+    this.loadPromise = null;
+    this.loadReject = null;
+    if (reject) {
+      reject(new DOMException('The user aborted a request.', 'AbortError'));
+    }
   }
 
   async embed(query: string): Promise<Float32Array> {

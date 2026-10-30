@@ -1,4 +1,4 @@
-.PHONY: dev build install test test-app test-ingest
+.PHONY: dev dev-front dev-back install install-front install-back build build-front build-back test test-front test-back test-ingest test-e2e
 
 SHELL := /bin/bash
 
@@ -8,25 +8,45 @@ ifneq ($(NVM_NODE_BIN),)
   export PATH := $(NVM_NODE_BIN):$(PATH)
 endif
 
-# Run the frontend PWA dev server (exposed on local network)
-dev:
+# Development
+dev: dev-front
+
+dev-front:
 	pnpm --prefix app dev --host
 
-# Install frontend dependencies
+dev-back:
+	pnpm --filter @bibleit/api dev
+
+# Dependencies
 install:
+	pnpm install
+
+install-front:
 	pnpm --prefix app install
 
-# Typecheck and build production bundle
-build:
+install-back:
+	pnpm --filter @bibleit/api install
+
+# Production builds
+build: build-front build-back
+
+build-front:
 	pnpm --prefix app build
 
-# Run all test suites (frontend and ingest)
-test: test-app test-ingest
+build-back:
+	pnpm --filter @bibleit/api build
 
-# Run frontend UI and component tests (Vitest)
-test-app:
+# Testing
+test: test-front test-back test-ingest
+
+test-front:
 	pnpm --prefix app test
 
-# Run python ingest pipeline test suite
+test-back:
+	pnpm --filter @bibleit/api build
+
 test-ingest:
 	cd ingest && uv run pytest -q
+
+test-e2e:
+	pnpm --prefix app test:e2e
