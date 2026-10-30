@@ -274,6 +274,7 @@ app/.env
 app/.env.*
 app/.env.local
 !app/.env.example
+!app/.env.test
 
 # Uncommitted white paper draft and assets
 paper/

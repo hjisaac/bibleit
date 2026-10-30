@@ -90,11 +90,6 @@ export default defineConfig(async ({ command, mode }) => {
   test: {
     environment: 'jsdom',
     globals: true,
-    env: {
-      VITE_FEEDBACK_EMAIL: 'test-feedback@example.com',
-      VITE_CLOUDFLARE_R2_URL: 'https://test-r2.dev/',
-      VITE_BACKEND_API_URL: 'http://localhost:7860',
-    },
     exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
   },
 };
