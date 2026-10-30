@@ -19,6 +19,7 @@ export interface SearchEngine {
   ready: Promise<void>;
   retrieve(query: string, k?: number): Promise<RetrievalResult>;
   answers: AnswerProvider;
+  sync?(): Promise<void>;
 }
 
 export interface ArtifactStore {
@@ -45,6 +46,7 @@ export interface QueryEmbedder {
   readonly dim: number;
   load(onProgress?: (fraction: number) => void): Promise<void>;
   embed(query: string): Promise<Float32Array>;
+  hasModel?(): Promise<boolean>;
 }
 
 export interface VectorIndex {

@@ -32,6 +32,7 @@ export interface SearchEngine {
   ready: Promise<void>;
   retrieve(query: string, k?: number): Promise<RetrievalResult>;
   answers: AnswerProvider;
+  sync?(): Promise<void>;
 }
 
 /**
@@ -86,6 +87,7 @@ export interface QueryEmbedder {
   /** Cancels an in-progress model download, releasing worker memory and connections. */
   cancelLoad?(): void;
   embed(query: string): Promise<Float32Array>;
+  hasModel?(): Promise<boolean>;
 }
 
 /**

@@ -23,6 +23,10 @@ export class HybridEngine implements SearchEngine {
     this.answers = localEngine.answers;
   }
 
+  async sync(): Promise<void> {
+    await this.localEngine.sync?.();
+  }
+
   async retrieve(query: string, k = 10): Promise<RetrievalResult> {
     if (this.isDeviceOnly?.()) {
       return this.localEngine.retrieve(query, k);

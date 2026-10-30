@@ -20,6 +20,10 @@ export class NodeQueryEmbedder implements QueryEmbedder {
     env.cacheDir = process.env.HF_HOME || path.join(os.homedir(), '.cache', 'huggingface', 'transformers');
   }
 
+  async hasModel(): Promise<boolean> {
+    return true;
+  }
+
   async load(): Promise<void> {
     if (!this.extractorPromise) {
       this.extractorPromise = pipeline('feature-extraction', this.modelId, {

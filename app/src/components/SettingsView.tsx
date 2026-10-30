@@ -504,7 +504,7 @@ export function SettingsView({
                 ? 'Ready for vector search'
                 : aiPackageStatus === 'downloading'
                 ? 'Downloading vectors...'
-                : 'Optional add-on'}
+                : 'Not stored locally'}
             </span>
             {aiPackageStatus === 'downloading' ? (
               <button
@@ -584,7 +584,7 @@ export function SettingsView({
                 ? 'Ready for on-device inference'
                 : modelPackageStatus === 'downloading'
                 ? 'Downloading model weights...'
-                : 'Downloads on first semantic search'}
+                : 'Not stored locally'}
             </span>
             {modelPackageStatus === 'downloading' ? (
               <button

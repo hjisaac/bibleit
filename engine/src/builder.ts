@@ -31,46 +31,75 @@ export function buildLocalEngine(p: LocalEnginePorts): SearchEngine {
   let lexicalReady = false;
   let semanticReady = false;
 
-  const baseReady = (async () => {
-    try {
-      const [versesData, rawChunks] = await Promise.all([
-        p.store.verses(),
-        p.store.chunks(),
-      ]);
-      verseStore = verseStore ?? new ArrayVerseStore(versesData);
-
-      const chunks: Chunk[] = rawChunks.map((c) => ({
-        ...c,
-        text: verseStore!.getRange(c.book, c.start, c.end),
-      }));
-      await p.lexical.build(chunks);
-      lexicalReady = true;
-      return chunks;
-    } catch (err) {
-      console.warn('[Base Index Init Error]:', err);
+  async function loadBase(): Promise<Chunk[]> {
+    if (p.store.hasVerses && !(await p.store.hasVerses())) {
+      verseStore = p.verseStore ?? null;
+      lexicalReady = false;
       return [];
     }
-  })();
+    const [versesData, rawChunks] = await Promise.all([
+      p.store.verses(),
+      p.store.chunks(),
+    ]);
+    verseStore = verseStore ?? new ArrayVerseStore(versesData);
+
+    const chunks: Chunk[] = rawChunks.map((c) => ({
+      ...c,
+      text: verseStore!.getRange(c.book, c.start, c.end),
+    }));
+    await p.lexical.build(chunks);
+    lexicalReady = true;
+    return chunks;
+  }
+
+  async function loadSemantic(chunks: Chunk[]): Promise<void> {
+    if (chunks.length === 0) {
+      semanticReady = false;
+      return;
+    }
+    if (p.store.hasEmbeddings && !(await p.store.hasEmbeddings())) {
+      semanticReady = false;
+      return;
+    }
+    if (p.embedder.hasModel && !(await p.embedder.hasModel())) {
+      semanticReady = false;
+      return;
+    }
+    const manifest = await p.store.manifest();
+    // INVARIANT: query model must match corpus model (see QueryEmbedder docs).
+    if (p.embedder.modelId !== manifest.embeddings.model) {
+      throw new Error(
+        `Embedder/corpus mismatch: engine has "${p.embedder.modelId}", ` +
+          `artifacts were built with "${manifest.embeddings.model}". ` +
+          `Update the app or re-run ingest.`,
+      );
+    }
+    const [emb] = await Promise.all([
+      p.store.embeddings(),
+      p.embedder.load(),
+    ]);
+    await p.vectors.build(manifest, chunks, emb.data, emb.scales);
+    semanticReady = true;
+  }
+
+  async function sync(): Promise<void> {
+    try {
+      const chunks = await loadBase();
+      await loadSemantic(chunks);
+    } catch (err) {
+      console.warn('[Local Engine Sync Error]:', err);
+    }
+  }
+
+  const baseReady = loadBase().catch((err) => {
+    console.warn('[Base Index Init Error]:', err);
+    return [];
+  });
 
   void (async () => {
     try {
       const chunks = await baseReady;
-      if (chunks.length === 0) return;
-      const manifest = await p.store.manifest();
-      // INVARIANT: query model must match corpus model (see QueryEmbedder docs).
-      if (p.embedder.modelId !== manifest.embeddings.model) {
-        throw new Error(
-          `Embedder/corpus mismatch: engine has "${p.embedder.modelId}", ` +
-            `artifacts were built with "${manifest.embeddings.model}". ` +
-            `Update the app or re-run ingest.`,
-        );
-      }
-      const [emb] = await Promise.all([
-        p.store.embeddings(),
-        p.embedder.load(),
-      ]);
-      await p.vectors.build(manifest, chunks, emb.data, emb.scales);
-      semanticReady = true;
+      await loadSemantic(chunks);
     } catch (err) {
       console.warn('[Semantic Index Init Error]:', err);
       if (err instanceof Error && err.message.startsWith('Embedder/corpus mismatch:')) {
@@ -84,6 +113,7 @@ export function buildLocalEngine(p: LocalEnginePorts): SearchEngine {
   return {
     ready,
     answers: p.answers,
+    sync,
     async retrieve(query, k = 10): Promise<RetrievalResult> {
       await ready;
       const parsedRefs = p.refParser.parse(query);

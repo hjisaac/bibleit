@@ -71,7 +71,16 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
     }
   }
 
+  async hasModel(): Promise<boolean> {
+    return isQueryModelCached();
+  }
+
   async embed(query: string): Promise<Float32Array> {
+    if (!(await this.hasModel())) {
+      throw new Error(
+        'Neural query model is not installed. Download it in Settings before running on-device vector search.',
+      );
+    }
     await this.load();
     const worker = this.getWorker();
     const id = this.nextId++;
