@@ -77,7 +77,7 @@ jobs:
         if: steps.check-app.outputs.has_app == 'true'
         working-directory: app
         env:
-          VITE_CLOUDFLARE_R2_URL: ${{ vars.VITE_CLOUDFLARE_R2_URL }}
-          VITE_FEEDBACK_EMAIL: ${{ vars.VITE_FEEDBACK_EMAIL }}
-          VITE_BACKEND_API_URL: ${{ vars.VITE_BACKEND_API_URL }}
+          VITE_CLOUDFLARE_R2_URL: ${{ vars.VITE_CLOUDFLARE_R2_URL || secrets.VITE_CLOUDFLARE_R2_URL }}
+          VITE_FEEDBACK_EMAIL: ${{ vars.VITE_FEEDBACK_EMAIL || secrets.VITE_FEEDBACK_EMAIL }}
+          VITE_BACKEND_API_URL: ${{ vars.VITE_BACKEND_API_URL || secrets.VITE_BACKEND_API_URL }}
         run: pnpm build

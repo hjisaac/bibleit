@@ -32,21 +32,18 @@ jobs:
       - name: Build app
         working-directory: app
         env:
-          VITE_CLOUDFLARE_R2_URL: ${{ vars.VITE_CLOUDFLARE_R2_URL }}
-          VITE_FEEDBACK_EMAIL: ${{ vars.VITE_FEEDBACK_EMAIL }}
-          VITE_BACKEND_API_URL: ${{ vars.VITE_BACKEND_API_URL }}
+          VITE_CLOUDFLARE_R2_URL: ${{ vars.VITE_CLOUDFLARE_R2_URL || secrets.VITE_CLOUDFLARE_R2_URL }}
+          VITE_FEEDBACK_EMAIL: ${{ vars.VITE_FEEDBACK_EMAIL || secrets.VITE_FEEDBACK_EMAIL }}
+          VITE_BACKEND_API_URL: ${{ vars.VITE_BACKEND_API_URL || secrets.VITE_BACKEND_API_URL }}
         run: |
           export VITE_CLOUDFLARE_R2_URL=$(echo "$VITE_CLOUDFLARE_R2_URL" | tr -d '[:space:]')
           export VITE_FEEDBACK_EMAIL=$(echo "$VITE_FEEDBACK_EMAIL" | tr -d '[:space:]')
           export VITE_BACKEND_API_URL=$(echo "$VITE_BACKEND_API_URL" | tr -d '[:space:]')
           if [ -z "$VITE_CLOUDFLARE_R2_URL" ]; then
-            echo "Error: vars.VITE_CLOUDFLARE_R2_URL is missing or empty" && exit 1
+            echo "Error: VITE_CLOUDFLARE_R2_URL is missing or empty" && exit 1
           fi
           if [ -z "$VITE_FEEDBACK_EMAIL" ]; then
-            echo "Error: vars.VITE_FEEDBACK_EMAIL is missing or empty" && exit 1
-          fi
-          if [ -z "$VITE_BACKEND_API_URL" ]; then
-            echo "Error: vars.VITE_BACKEND_API_URL is missing or empty" && exit 1
+            echo "Error: VITE_FEEDBACK_EMAIL is missing or empty" && exit 1
           fi
           pnpm build
 
