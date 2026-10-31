@@ -121,16 +121,19 @@ describe('SearchView Result Cards & User Actions', () => {
     const listenButton = screen.getByLabelText('Listen to Philippians 4:4–7');
     fireEvent.click(listenButton);
 
-    expect(playSpy).toHaveBeenCalledWith([
-      expect.objectContaining({
-        id: 'chunk-PHP:4:4-4:7',
-        citation: 'Philippians 4:4–7',
-        book: 'PHP',
-        chapter: 4,
-        verse: 4,
-        text: samplePassages[0]!.chunk.text,
-      }),
-    ]);
+    expect(playSpy).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          id: 'chunk-PHP:4:4-4:7',
+          citation: 'Philippians 4:4–7',
+          book: 'PHP',
+          chapter: 4,
+          verse: 4,
+          text: samplePassages[0]!.chunk.text,
+        }),
+      ],
+      0,
+    );
   });
 
   it('triggers onSaveVerse when bookmark button is clicked', () => {
@@ -322,6 +325,46 @@ describe('SearchView Result Cards & User Actions', () => {
     const activeCard = document.getElementById('search-active-narrating-card');
     expect(activeCard).not.toBeNull();
     expect(activeCard?.className).toContain('ring-amber-500/50');
+  });
+
+  it('queues all search result cards and sets clicked card index when clicking listen', () => {
+    const passage2: ScoredPassage = {
+      chunk: {
+        id: 43,
+        book: 'PHP',
+        start: [4, 8],
+        end: [4, 9],
+        headings: [[4, 8, 'Think on These Things']],
+        text: 'Finally, brothers, whatever things are true...',
+      },
+      score: 0.9,
+      source: 'semantic',
+    };
+
+    localStorage.setItem(
+      'bibleit_last_search',
+      JSON.stringify({
+        query: 'peace and joy',
+        passages: [samplePassages[0]!, passage2],
+        answerText: '',
+      }),
+    );
+
+    renderSearchView();
+
+    const listenButtons = screen.getAllByTitle('Listen to passage');
+    expect(listenButtons).toHaveLength(2);
+
+    // Click listen on second card (index 1)
+    fireEvent.click(listenButtons[1]!);
+
+    expect(playSpy).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'chunk-PHP:4:4-4:7' }),
+        expect.objectContaining({ id: 'chunk-PHP:4:8-4:9' }),
+      ]),
+      1,
+    );
   });
 });
 

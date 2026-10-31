@@ -1,7 +1,7 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { AudioNarrator, SearchEngine } from '../core/ports';
-import { getChunkKey, type NarrationState, type NarrationWordBoundary, type ScoredPassage } from '../core/types';
+import { getChunkKey, type NarrationSegment, type NarrationState, type NarrationWordBoundary, type ScoredPassage } from '../core/types';
 import { BIBLE_BOOKS_BY_ID, findBookByPrefix } from '../core/bible-books';
 import { resolveVerseText } from '../adapters/book-store';
 import { POPULAR_TOPICS, SEARCH_SUGGESTIONS } from '../core/starter-topics';
@@ -68,6 +68,21 @@ function formatCitation(bookId: string, start: [number, number], end: [number, n
   }
   return `${bookName} ${startCh}:${startV}–${endCh}:${endV}`;
 }
+
+function buildPassageSegments(passageList: ScoredPassage[]): NarrationSegment[] {
+  return passageList.map((p) => {
+    const key = getChunkKey(p.chunk);
+    return {
+      id: `chunk-${key}`,
+      citation: formatCitation(p.chunk.book, p.chunk.start, p.chunk.end),
+      text: p.chunk.text,
+      book: p.chunk.book,
+      chapter: p.chunk.start[0],
+      verse: p.chunk.start[1],
+    };
+  });
+}
+
 
 interface ChunkSectionView {
   heading?: string;
@@ -329,6 +344,18 @@ export function SearchView({
       isSubscribed = false;
     };
   }, [passages, splitPoints]);
+
+  useEffect(() => {
+    const activeId = narrationState?.activeSegment?.id;
+    if (activeId?.startsWith('chunk-')) {
+      const activeChunkKey = activeId.slice(6);
+      setExpandedCardKey(activeChunkKey);
+      const activeCard = document.getElementById('search-active-narrating-card');
+      if (activeCard && typeof activeCard.scrollIntoView === 'function') {
+        activeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [narrationState?.activeSegment?.id]);
 
   const toggleContext = (key: string) => {
     setExpandedCardKey((prev) => (prev === key ? null : key));
@@ -859,7 +886,7 @@ export function SearchView({
 
       {/* Results Stream */}
       <div class="flex flex-col space-y-3 pb-4">
-        {passages.map((p) => {
+        {passages.map((p, cardIdx) => {
           const chunkKey = getChunkKey(p.chunk);
           const isExpanded = expandedCardKey === chunkKey;
           const refString = formatCitation(p.chunk.book, p.chunk.start, p.chunk.end);
@@ -946,16 +973,8 @@ export function SearchView({
                           return;
                         }
                         setExpandedCardKey(chunkKey);
-                        narrator.play([
-                          {
-                            id: segmentId,
-                            citation: refString,
-                            text: p.chunk.text,
-                            book: p.chunk.book,
-                            chapter: p.chunk.start[0],
-                            verse: p.chunk.start[1],
-                          },
-                        ]);
+                        const segments = buildPassageSegments(passages);
+                        narrator.play(segments, cardIdx);
                       }}
                       title={isCardPlaying ? 'Pause narration' : 'Listen to passage'}
                       aria-label={isCardPlaying ? `Pause ${refString}` : `Listen to ${refString}`}

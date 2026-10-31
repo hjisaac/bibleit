@@ -104,7 +104,7 @@ export function AudioPlayerBar({
           </span>
           <span class="text-[10px] font-sans truncate max-w-full" style={{ color: 'var(--text-muted)' }}>
             {hasMultiple
-              ? `Verse ${currentIndex + 1} of ${queue.length} · ${isPlaying ? 'Reading aloud' : 'Paused'}`
+              ? `${activeSegment.id.startsWith('chunk-') ? 'Passage' : 'Verse'} ${currentIndex + 1} of ${queue.length} · ${isPlaying ? 'Reading aloud' : 'Paused'}`
               : isPlaying
               ? 'Reading passage aloud'
               : 'Paused'}
@@ -123,8 +123,8 @@ export function AudioPlayerBar({
                 narrator.prev();
               }}
               disabled={currentIndex <= 0}
-              aria-label="Previous verse"
-              title="Previous verse"
+              aria-label={activeSegment.id.startsWith('chunk-') ? 'Previous passage' : 'Previous verse'}
+              title={activeSegment.id.startsWith('chunk-') ? 'Previous passage' : 'Previous verse'}
               class="p-1.5 rounded-lg transition-opacity hover:opacity-80 disabled:opacity-30"
               style={{ color: 'var(--text-main)' }}
             >
@@ -140,8 +140,8 @@ export function AudioPlayerBar({
                 narrator.next();
               }}
               disabled={currentIndex >= queue.length - 1}
-              aria-label="Next verse"
-              title="Next verse"
+              aria-label={activeSegment.id.startsWith('chunk-') ? 'Next passage' : 'Next verse'}
+              title={activeSegment.id.startsWith('chunk-') ? 'Next passage' : 'Next verse'}
               class="p-1.5 rounded-lg transition-opacity hover:opacity-80 disabled:opacity-30"
               style={{ color: 'var(--text-main)' }}
             >
