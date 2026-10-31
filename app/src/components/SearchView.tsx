@@ -1,11 +1,22 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { useStore } from '@nanostores/preact';
 import type { AudioNarrator, SearchEngine } from '../core/ports';
 import { getChunkKey, type NarrationSegment, type NarrationState, type NarrationWordBoundary, type ScoredPassage } from '../core/types';
 import { BIBLE_BOOKS_BY_ID, findBookByPrefix } from '../core/bible-books';
 import { resolveVerseText } from '../adapters/book-store';
 import { POPULAR_TOPICS, SEARCH_SUGGESTIONS } from '../core/starter-topics';
 import type { SavedVerse } from './SavedView';
+import {
+  $searchHistory,
+  $lastSearch,
+  addSearchHistory,
+  MAX_HISTORY_ITEMS,
+  SEARCH_HISTORY_KEY,
+  SEARCH_STORAGE_KEY,
+} from '../stores/search';
+
+export { MAX_HISTORY_ITEMS, SEARCH_HISTORY_KEY, SEARCH_STORAGE_KEY };
 
 interface SearchViewProps {
   engine: SearchEngine;
@@ -151,62 +162,6 @@ function isQuestionQuery(text: string): boolean {
   return questionWords.some((word) => lower.startsWith(`${word} `) || lower.startsWith(`${word}'`));
 }
 
-export const SEARCH_STORAGE_KEY = 'bibleit_last_search';
-export const SEARCH_HISTORY_KEY = 'bibleit_search_history';
-export const MAX_HISTORY_ITEMS = 3;
-
-function loadSearchHistory(): string[] {
-  if (typeof localStorage === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(SEARCH_HISTORY_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveSearchHistory(history: string[]): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
-  } catch {
-    // Ignore storage errors
-  }
-}
-
-interface StoredSearch {
-  query: string;
-  passages: ScoredPassage[];
-  answerText: string;
-}
-
-function getInitialSearchState(): StoredSearch {
-  if (typeof localStorage !== 'undefined') {
-    try {
-      const stored = localStorage.getItem(SEARCH_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as StoredSearch;
-        if (parsed && typeof parsed.query === 'string') {
-          return {
-            query: parsed.query,
-            passages: Array.isArray(parsed.passages) ? parsed.passages : [],
-            answerText: typeof parsed.answerText === 'string' ? parsed.answerText : '',
-          };
-        }
-      }
-    } catch {
-      // Storage unavailable or invalid JSON
-    }
-  }
-  return {
-    query: '',
-    passages: [],
-    answerText: '',
-  };
-}
-
 export function SearchView({
   engine,
   narrator,
@@ -224,7 +179,7 @@ export function SearchView({
   onSaveVerse,
   onToast,
 }: SearchViewProps): JSX.Element {
-  const [initialSearch] = useState(getInitialSearchState);
+  const [initialSearch] = useState(() => $lastSearch.get());
   const [query, setQuery] = useState(initialSearch.query);
   const [passages, setPassages] = useState<ScoredPassage[]>(initialSearch.passages);
   const [isPanelOpen, setIsPanelOpen] = useState(initialSearch.query.trim().length === 0);
@@ -238,7 +193,7 @@ export function SearchView({
   const [answerText, setAnswerText] = useState<string>(initialSearch.answerText);
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
   const [isSynthesisCollapsed, setIsSynthesisCollapsed] = useState<boolean>(false);
-  const [searchHistory, setSearchHistory] = useState<string[]>(loadSearchHistory);
+  const searchHistory = useStore($searchHistory);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const searchRunIdRef = useRef(0);
@@ -258,14 +213,7 @@ export function SearchView({
   };
 
   const addQueryToHistory = (rawQuery: string) => {
-    const trimmed = rawQuery.trim();
-    if (trimmed.length < 2) return;
-    setSearchHistory((prev) => {
-      const filtered = prev.filter((item) => item.toLowerCase() !== trimmed.toLowerCase());
-      const next = [trimmed, ...filtered].slice(0, MAX_HISTORY_ITEMS);
-      saveSearchHistory(next);
-      return next;
-    });
+    addSearchHistory(rawQuery);
   };
 
   const handleSelectQuery = (text: string) => {
@@ -281,15 +229,7 @@ export function SearchView({
   const matchedBook = findBookByPrefix(query);
 
   useEffect(() => {
-    if (typeof localStorage === 'undefined') return;
-    try {
-      localStorage.setItem(
-        SEARCH_STORAGE_KEY,
-        JSON.stringify({ query, passages, answerText }),
-      );
-    } catch {
-      // Ignore storage errors
-    }
+    $lastSearch.set({ query, passages, answerText });
   }, [query, passages, answerText]);
 
   useEffect(() => {
