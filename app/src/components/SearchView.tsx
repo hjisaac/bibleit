@@ -205,11 +205,17 @@ export function SearchView({
       setPassages([]);
       return;
     }
-    void engine.retrieve(trimmed).then((res) => {
-      if (searchRunIdRef.current === runId) {
-        setPassages(res.passages);
-      }
-    });
+    void engine
+      .retrieve(trimmed)
+      .then((res) => {
+        if (searchRunIdRef.current === runId) {
+          setPassages(res.passages);
+        }
+      })
+      .catch((err) => {
+        console.error('[Search Error]:', err);
+        onToast('Search failed: ' + (err instanceof Error ? err.message : String(err)));
+      });
   };
 
   const addQueryToHistory = (rawQuery: string) => {

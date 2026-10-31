@@ -9,7 +9,7 @@ import type {
   VectorIndex,
 } from './core/ports';
 import { ArrayVerseStore } from './adapters/array-verse-store';
-import type { Chunk, RetrievalResult, VerseStore } from './core/types';
+import type { Chunk, RetrievalResult, ScoredPassage, VerseStore } from './core/types';
 
 export interface LocalEnginePorts {
   store: ArtifactStore;
@@ -130,9 +130,19 @@ export function buildLocalEngine(p: LocalEnginePorts): SearchEngine {
           })
         : [];
       const lexical = lexicalReady ? p.lexical.search(query, k) : [];
-      const semantic = semanticReady
-        ? p.vectors.search(await p.embedder.embed(query), k)
-        : [];
+      let semantic: ScoredPassage[] = [];
+      if (semanticReady) {
+        try {
+          const vectorPromise = p.embedder.embed(query);
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Embedding timed out')), 5000),
+          );
+          const vector = await Promise.race([vectorPromise, timeoutPromise]);
+          semantic = p.vectors.search(vector, k);
+        } catch (err) {
+          console.warn('[Semantic Search Error, degrading to lexical/ref]:', err);
+        }
+      }
       return {
         parsedRefs,
         passages: p.ranker.merge(refPassages, lexical, semantic, k),
