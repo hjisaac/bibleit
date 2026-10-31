@@ -13,14 +13,32 @@ if (env.backends?.onnx?.wasm) {
 }
 
 let extractorPromise: Promise<any> | null = null;
+let lastReportedProgress = 0;
+const fileProgress: Record<string, { loaded: number; total: number }> = {};
 
 async function getExtractor() {
   if (!extractorPromise) {
+    lastReportedProgress = 0;
     extractorPromise = pipeline('feature-extraction', 'nomic-ai/nomic-embed-text-v1.5', {
       dtype: 'q8',
-      progress_callback: (item: { status: string; progress?: number }) => {
-        if (item.status === 'progress' && typeof item.progress === 'number') {
-          self.postMessage({ type: 'progress', progress: item.progress / 100 });
+      progress_callback: (item: any) => {
+        if (item.status === 'progress_total' && typeof item.progress === 'number') {
+          const frac = item.progress / 100;
+          if (frac >= lastReportedProgress) {
+            lastReportedProgress = frac;
+            self.postMessage({ type: 'progress', progress: frac });
+          }
+        } else if (item.status === 'progress' && typeof item.loaded === 'number' && typeof item.total === 'number') {
+          fileProgress[item.file] = { loaded: item.loaded, total: item.total };
+          const loaded = Object.values(fileProgress).reduce((acc, f) => acc + f.loaded, 0);
+          const total = Object.values(fileProgress).reduce((acc, f) => acc + f.total, 0);
+          if (total > 0) {
+            const frac = loaded / total;
+            if (frac >= lastReportedProgress) {
+              lastReportedProgress = frac;
+              self.postMessage({ type: 'progress', progress: frac });
+            }
+          }
         }
       },
     });
