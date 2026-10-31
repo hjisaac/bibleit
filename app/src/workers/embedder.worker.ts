@@ -14,7 +14,6 @@ if (env.backends?.onnx?.wasm) {
 
 let extractorPromise: Promise<any> | null = null;
 let lastReportedProgress = 0;
-const fileProgress: Record<string, { loaded: number; total: number }> = {};
 
 async function getExtractor() {
   if (!extractorPromise) {
@@ -22,22 +21,19 @@ async function getExtractor() {
     extractorPromise = pipeline('feature-extraction', 'nomic-ai/nomic-embed-text-v1.5', {
       dtype: 'q8',
       progress_callback: (item: any) => {
-        if (item.status === 'progress_total' && typeof item.progress === 'number') {
-          const frac = item.progress / 100;
-          if (frac >= lastReportedProgress) {
-            lastReportedProgress = frac;
-            self.postMessage({ type: 'progress', progress: frac });
-          }
-        } else if (item.status === 'progress' && typeof item.loaded === 'number' && typeof item.total === 'number') {
-          fileProgress[item.file] = { loaded: item.loaded, total: item.total };
-          const loaded = Object.values(fileProgress).reduce((acc, f) => acc + f.loaded, 0);
-          const total = Object.values(fileProgress).reduce((acc, f) => acc + f.total, 0);
-          if (total > 0) {
-            const frac = loaded / total;
-            if (frac >= lastReportedProgress) {
-              lastReportedProgress = frac;
-              self.postMessage({ type: 'progress', progress: frac });
-            }
+        if (item.status === 'progress') {
+          const isModel = Boolean(item.file && item.file.includes('.onnx'));
+          const fileFrac =
+            typeof item.progress === 'number'
+              ? Math.min(Math.max(item.progress / 100, 0), 1)
+              : item.total > 0
+              ? Math.min(Math.max(item.loaded / item.total, 0), 1)
+              : 0;
+          // Tokenizer/config files represent ~3% of package; ONNX model weights represent ~97%.
+          const totalFrac = isModel ? 0.03 + fileFrac * 0.96 : fileFrac * 0.03;
+          if (totalFrac > lastReportedProgress) {
+            lastReportedProgress = totalFrac;
+            self.postMessage({ type: 'progress', progress: totalFrac });
           }
         }
       },
@@ -53,8 +49,11 @@ self.onmessage = async (e: MessageEvent) => {
   if (data.type === 'load') {
     try {
       await getExtractor();
+      self.postMessage({ type: 'progress', progress: 1.0 });
       self.postMessage({ type: 'loaded' });
     } catch (err) {
+      extractorPromise = null;
+      lastReportedProgress = 0;
       self.postMessage({
         type: 'load_error',
         error: err instanceof Error ? err.message : String(err),
