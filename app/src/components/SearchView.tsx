@@ -193,6 +193,8 @@ export function SearchView({
   const [answerText, setAnswerText] = useState<string>(initialSearch.answerText);
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
   const [isSynthesisCollapsed, setIsSynthesisCollapsed] = useState<boolean>(false);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [hasSearched, setHasSearched] = useState<boolean>(initialSearch.query.trim().length > 0);
   const searchHistory = useStore($searchHistory);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -203,8 +205,12 @@ export function SearchView({
     const runId = ++searchRunIdRef.current;
     if (!trimmed) {
       setPassages([]);
+      setIsSearching(false);
+      setHasSearched(false);
       return;
     }
+    setIsSearching(true);
+    setHasSearched(true);
     void engine
       .retrieve(trimmed)
       .then((res) => {
@@ -215,6 +221,11 @@ export function SearchView({
       .catch((err) => {
         console.error('[Search Error]:', err);
         onToast('Search failed: ' + (err instanceof Error ? err.message : String(err)));
+      })
+      .finally(() => {
+        if (searchRunIdRef.current === runId) {
+          setIsSearching(false);
+        }
       });
   };
 
@@ -228,6 +239,21 @@ export function SearchView({
     if (el) {
       el.focus();
       el.setSelectionRange(text.length, text.length);
+    }
+  };
+
+  const handleSubmit = (e?: Event) => {
+    e?.preventDefault();
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    addQueryToHistory(trimmed);
+    lastSubmittedQueryRef.current = trimmed;
+    setIsPanelOpen(false);
+    inputRef.current?.blur();
+    if (isQuestion && isAiEnabled && engine.answers.available && isOnline && !isSynthesizing) {
+      void handleSynthesize();
+    } else {
+      runSearch(trimmed);
     }
   };
 
@@ -418,7 +444,7 @@ export function SearchView({
       )}
 
       {/* Search & Question Prompt Box */}
-      <div class="relative mb-2 shrink-0">
+      <form onSubmit={handleSubmit} action="javascript:void(0)" class="relative mb-2 shrink-0">
         <div
           onClick={() => inputRef.current?.focus()}
           class="relative flex items-center rounded-2xl border px-3 py-2.5 transition-all focus-within:ring-2 focus-within:ring-amber-500/30 shadow-sm cursor-text"
@@ -427,20 +453,30 @@ export function SearchView({
             borderColor: 'var(--border-subtle)',
           }}
         >
-          <svg
-            class="w-4 h-4 shrink-0 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-opacity duration-150"
+          <button
+            type="submit"
+            aria-label="Search"
+            class="w-5 h-5 shrink-0 flex items-center justify-center mr-2 hover:opacity-80 transition-opacity cursor-pointer"
             style={{ color: 'var(--text-muted)' }}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
+            {isSearching ? (
+              <div class="w-3.5 h-3.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            )}
+          </button>
           <input
             ref={inputRef}
             type="text"
@@ -448,7 +484,7 @@ export function SearchView({
             enterKeyHint="search"
             value={query}
             placeholder="Search verses, topics, or questions..."
-            class="w-full bg-transparent text-sm font-medium outline-none leading-normal pl-7 pr-2"
+            class="w-full bg-transparent text-sm font-medium outline-none leading-normal pl-0 pr-2"
             style={{
               color: 'var(--text-main)',
             }}
@@ -460,18 +496,8 @@ export function SearchView({
               setIsPanelOpen(true);
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                const trimmed = query.trim();
-                if (!trimmed) return;
-                addQueryToHistory(trimmed);
-                lastSubmittedQueryRef.current = trimmed;
-                setIsPanelOpen(false);
-                (e.target as HTMLInputElement).blur();
-                if (isQuestion && isAiEnabled && engine.answers.available && isOnline && !isSynthesizing) {
-                  void handleSynthesize();
-                } else {
-                  runSearch(trimmed);
-                }
+              if (e.key === 'Enter' || e.keyCode === 13) {
+                handleSubmit(e);
               }
             }}
             onBlur={() => {
@@ -503,7 +529,7 @@ export function SearchView({
             </button>
           )}
         </div>
-      </div>
+      </form>
 
       {/* Scripture Navigator Strip (Compact: appears only when query is purely a book name) */}
       {matchedBook && (
@@ -653,8 +679,18 @@ export function SearchView({
         </div>
       )}
 
+      {/* Active Search Loading State */}
+      {isSearching && (
+        <div class="py-12 flex flex-col items-center justify-center text-center animate-fadeIn">
+          <div class="w-6 h-6 border-2 border-amber-600 border-t-transparent rounded-full animate-spin mb-2" />
+          <p class="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+            Searching scripture...
+          </p>
+        </div>
+      )}
+
       {/* No Results State */}
-      {!isPanelOpen && query.trim().length > 0 && passages.length === 0 && (
+      {!isPanelOpen && !isSearching && hasSearched && query.trim().length > 0 && passages.length === 0 && (
         <div class="py-16 flex flex-col items-center justify-center text-center animate-fadeIn">
           <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
             No matching passages found
