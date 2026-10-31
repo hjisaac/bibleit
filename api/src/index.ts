@@ -18,6 +18,9 @@ import { fileURLToPath } from 'node:url';
 import { FsArtifactStore } from './adapters/fs-artifact-store';
 import { HttpArtifactStore } from './adapters/http-artifact-store';
 import { NodeQueryEmbedder } from './adapters/node-query-embedder';
+import { logger, initSentry, captureCrash } from './logger';
+
+initSentry();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.PORT) || 7860;
@@ -45,10 +48,10 @@ let isReady = false;
 engine.ready
   .then(() => {
     isReady = true;
-    console.log('[Bibleit API] Search engine initialized and ready');
+    logger.info('Search engine initialized and ready');
   })
   .catch((err) => {
-    console.error('[Bibleit API] Initialization error:', err);
+    captureCrash(err, { subsystem: 'engine.ready' });
   });
 
 function renderPage(title: string, bodyContent = ''): string {
@@ -166,6 +169,26 @@ const app = new Hono();
 
 app.use('*', cors({ origin: '*', allowMethods: ['GET', 'OPTIONS'] }));
 
+app.use('*', async (c, next) => {
+  const start = performance.now();
+  await next();
+  const elapsedMs = Math.round(performance.now() - start);
+  logger.info(
+    {
+      method: c.req.method,
+      path: c.req.path,
+      status: c.res.status,
+      elapsedMs,
+    },
+    'HTTP request',
+  );
+});
+
+app.onError((err, c) => {
+  captureCrash(err, { method: c.req.method, path: c.req.path });
+  return c.json({ error: 'Internal server error' }, 500);
+});
+
 app.get('/', (c) => {
   return c.html(
     renderPage(
@@ -242,12 +265,22 @@ app.get('/api/v1/search', async (c) => {
 
   try {
     const result = await engine.retrieve(q, k);
+    logger.debug({ q, k, hits: result.passages.length }, 'Search executed');
     return c.json(result);
   } catch (err) {
-    console.error('[Search Error]:', err);
+    captureCrash(err, { endpoint: '/api/v1/search', q, k });
     return c.json({ error: 'Search failed' }, 500);
   }
 });
 
-console.log(`[Bibleit API] Server starting on http://0.0.0.0:${port}`);
+process.on('uncaughtException', (err) => {
+  captureCrash(err, { origin: 'uncaughtException' });
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  captureCrash(reason, { origin: 'unhandledRejection' });
+});
+
+logger.info({ port }, 'Server starting');
 serve({ fetch: app.fetch, port });
