@@ -1,5 +1,6 @@
 import { gunzipSync } from 'node:zlib';
 import type { ArtifactStore, Manifest, RawChunk, VerseCorpusData } from '@bibleit/engine';
+import { DEFAULT_ENCODING } from '../constants';
 
 export class HttpArtifactStore implements ArtifactStore {
   private baseUrl: string;
@@ -23,7 +24,7 @@ export class HttpArtifactStore implements ArtifactStore {
     if (!res.ok) throw new Error(`[HttpArtifactStore] Failed to fetch verses: ${res.status}`);
     const buf = Buffer.from(await res.arrayBuffer());
     const decompressed = m.corpus.verses.endsWith('.gz') ? gunzipSync(buf) : buf;
-    return JSON.parse(decompressed.toString('utf-8')) as VerseCorpusData;
+    return JSON.parse(decompressed.toString(DEFAULT_ENCODING)) as VerseCorpusData;
   }
 
   async chunks(): Promise<RawChunk[]> {
@@ -32,7 +33,7 @@ export class HttpArtifactStore implements ArtifactStore {
     if (!res.ok) throw new Error(`[HttpArtifactStore] Failed to fetch chunks: ${res.status}`);
     const buf = Buffer.from(await res.arrayBuffer());
     const decompressed = m.chunks.file.endsWith('.gz') ? gunzipSync(buf) : buf;
-    return JSON.parse(decompressed.toString('utf-8')) as RawChunk[];
+    return JSON.parse(decompressed.toString(DEFAULT_ENCODING)) as RawChunk[];
   }
 
   async embeddings(): Promise<{ data: ArrayBuffer; scales?: ArrayBuffer }> {

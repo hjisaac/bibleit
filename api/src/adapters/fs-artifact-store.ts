@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import type { ArtifactStore, Manifest, RawChunk, VerseCorpusData } from '@bibleit/engine';
+import { DEFAULT_ENCODING } from '../constants';
 
 export class FsArtifactStore implements ArtifactStore {
   private baseDir: string;
@@ -14,7 +15,7 @@ export class FsArtifactStore implements ArtifactStore {
   async manifest(): Promise<Manifest> {
     if (this.cachedManifest) return this.cachedManifest;
     const file = path.join(this.baseDir, 'manifest.json');
-    const content = fs.readFileSync(file, 'utf-8');
+    const content = fs.readFileSync(file, DEFAULT_ENCODING);
     this.cachedManifest = JSON.parse(content) as Manifest;
     return this.cachedManifest;
   }
@@ -23,14 +24,14 @@ export class FsArtifactStore implements ArtifactStore {
     const m = await this.manifest();
     const buf = fs.readFileSync(path.join(this.baseDir, m.corpus.verses));
     const decompressed = m.corpus.verses.endsWith('.gz') ? gunzipSync(buf) : buf;
-    return JSON.parse(decompressed.toString('utf-8')) as VerseCorpusData;
+    return JSON.parse(decompressed.toString(DEFAULT_ENCODING)) as VerseCorpusData;
   }
 
   async chunks(): Promise<RawChunk[]> {
     const m = await this.manifest();
     const buf = fs.readFileSync(path.join(this.baseDir, m.chunks.file));
     const decompressed = m.chunks.file.endsWith('.gz') ? gunzipSync(buf) : buf;
-    return JSON.parse(decompressed.toString('utf-8')) as RawChunk[];
+    return JSON.parse(decompressed.toString(DEFAULT_ENCODING)) as RawChunk[];
   }
 
   async embeddings(): Promise<{ data: ArrayBuffer; scales?: ArrayBuffer }> {

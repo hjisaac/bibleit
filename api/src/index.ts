@@ -18,13 +18,14 @@ import { fileURLToPath } from 'node:url';
 import { FsArtifactStore } from './adapters/fs-artifact-store';
 import { HttpArtifactStore } from './adapters/http-artifact-store';
 import { NodeQueryEmbedder } from './adapters/node-query-embedder';
+import { DEFAULT_PORT } from './constants';
 import { logger, initSentry, captureCrash } from './logger';
 import { renderHomeHtml, renderHealthHtml } from './views';
 
 initSentry();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const port = Number(process.env.PORT) || 7860;
+const port = Number(process.env.PORT) || DEFAULT_PORT;
 const artifactBaseUrl = process.env.ARTIFACT_BASE_URL;
 const defaultDataDir = path.resolve(__dirname, '../../app/public/data');
 const fallbackDataDir = path.resolve(process.cwd(), 'data');
