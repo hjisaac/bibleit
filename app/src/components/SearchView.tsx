@@ -724,6 +724,8 @@ export function SearchView({
 
         return (
           <div
+            id={isSynthesisActive ? 'search-active-narrating-card' : undefined}
+            data-segment-id="synthesis:overview"
             class={`mb-4 p-4 rounded-2xl border transition-all animate-fadeIn ${
               isSynthesisActive ? 'ring-2 ring-amber-500/50' : ''
             }`}
@@ -881,6 +883,8 @@ export function SearchView({
           return (
             <article
               key={chunkKey}
+              id={isCardActive ? 'search-active-narrating-card' : undefined}
+              data-segment-id={segmentId}
               class={`p-4 rounded-2xl border transition-all hover:shadow-sm ${
                 isCardActive ? 'ring-2 ring-amber-500/50' : ''
               }`}

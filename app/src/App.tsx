@@ -315,6 +315,34 @@ export function App(): JSX.Element {
     $hasSeenStorageBanner.set(true);
   };
 
+  const handleAudioBarClick = () => {
+    if (activeTab === 'search') {
+      const activeCard = document.getElementById('search-active-narrating-card');
+      if (activeCard) {
+        const container = activeCard.closest('section') || document.documentElement;
+        const containerRect = container.getBoundingClientRect();
+        const cardRect = activeCard.getBoundingClientRect();
+
+        const isOutOfView =
+          cardRect.bottom < containerRect.top + 20 ||
+          cardRect.top > containerRect.bottom - 80;
+
+        if (isOutOfView) {
+          activeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+      return;
+    }
+
+    if (narrationState.activeSegment) {
+      handleOpenReader(
+        narrationState.activeSegment.book,
+        narrationState.activeSegment.chapter,
+        narrationState.activeSegment.verse ?? 1,
+      );
+    }
+  };
+
   // Sync theme class to document body.
   useEffect(() => {
     document.body.className = `antialiased font-sans h-full overflow-hidden theme-${theme}`;
@@ -509,6 +537,8 @@ export function App(): JSX.Element {
         state={narrationState}
         isNavbarVisible={isBarVisible}
         onNavigateToSegment={handleOpenReader}
+        onBarClick={handleAudioBarClick}
+        title={activeTab === 'search' ? 'Scroll to playing card' : 'Jump to passage in Reader'}
       />
 
       <Navbar activeTab={activeTab} onTabChange={handleTabChange} isVisible={isBarVisible} />

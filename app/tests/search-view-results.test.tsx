@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/preact';
 import { SearchView } from '../src/components/SearchView';
 import type { SearchEngine, AudioNarrator } from '../src/core/ports';
 import type { ComponentProps } from 'preact';
-import type { ScoredPassage } from '../src/core/types';
+import { getChunkKey, type ScoredPassage } from '../src/core/types';
 
 type SearchViewProps = ComponentProps<typeof SearchView>;
 
@@ -298,4 +298,30 @@ describe('SearchView Result Cards & User Actions', () => {
     // Section 1 heading is rendered inline above the verses
     expect(screen.getByText('Love Fulfills the Law')).toBeDefined();
   });
+
+  it('marks active narrating card with search-active-narrating-card id and yellow ring', () => {
+    const chunkKey = getChunkKey(samplePassages[0]!.chunk);
+    renderSearchView({
+      narrationState: {
+        status: 'playing',
+        queue: [],
+        currentIndex: 0,
+        activeSegment: {
+          id: `chunk-${chunkKey}`,
+          book: 'PHP',
+          chapter: 4,
+          verse: 4,
+          citation: 'Philippians 4:4–7',
+          text: 'Rejoice in the Lord always.',
+        },
+        wordBoundary: null,
+        rate: 1,
+      },
+    });
+
+    const activeCard = document.getElementById('search-active-narrating-card');
+    expect(activeCard).not.toBeNull();
+    expect(activeCard?.className).toContain('ring-amber-500/50');
+  });
 });
+
