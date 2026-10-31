@@ -24,6 +24,7 @@ interface SettingsViewProps {
   searchMode?: 'auto' | 'device';
   onToggleSearchMode?: (mode: 'auto' | 'device') => void;
   highlightStorage?: boolean;
+  onClearHighlight?: () => void;
   onDownloadText: () => void;
   onCancelDownloadText?: () => void;
   onDownloadAi: () => void;
