@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/preact';
 import { SearchView } from '../src/components/SearchView';
+import { HybridEngine } from '../src/adapters/hybrid-engine';
 import type { SearchEngine, AudioNarrator } from '../src/core/ports';
 import type { ComponentProps } from 'preact';
 import { getChunkKey, type ScoredPassage } from '../src/core/types';
@@ -365,6 +366,22 @@ describe('SearchView Result Cards & User Actions', () => {
       ]),
       1,
     );
+  });
+
+  it('retrieves and displays results seamlessly when backed by HybridEngine with failing remote backend', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Backend Connection Refused'));
+    const hybridEngine = new HybridEngine(mockEngine, 'https://api.bibleit.test');
+
+    renderSearchView({ engine: hybridEngine });
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'peace and joy' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(fetchSpy).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByText(/Rejoice in the Lord always/i)).toBeTruthy();
+    });
   });
 });
 

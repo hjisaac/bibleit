@@ -91,4 +91,60 @@ describe('HybridEngine', () => {
     expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
     expect(result.passages[0]?.chunk.text).toContain('For God so loved the world');
   });
+
+  it('falls back to localEngine when remote API times out after 3000ms', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce((_url, init) => {
+      return new Promise((_, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('The user aborted a request.', 'AbortError'));
+        });
+      });
+    });
+
+    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
+    const retrievePromise = engine.retrieve('love');
+    await vi.advanceTimersByTimeAsync(3100);
+    const result = await retrievePromise;
+
+    expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
+    expect(result.passages[0]?.chunk.text).toContain('For God so loved the world');
+    vi.useRealTimers();
+  });
+
+  it('falls back to localEngine when remote response has no passages array', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ error: 'Service Unavailable' }),
+    } as Response);
+
+    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
+    const result = await engine.retrieve('love');
+
+    expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
+    expect(result.passages[0]?.chunk.text).toContain('For God so loved the world');
+  });
+
+  it('bypasses remote fetch when navigator is offline', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const onLineSpy = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+
+    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
+    const result = await engine.retrieve('love');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
+    expect(result.passages[0]?.chunk.text).toContain('For God so loved the world');
+    onLineSpy.mockRestore();
+  });
+
+  it('calls localEngine directly without network call when remoteUrl is empty string', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const engine = new HybridEngine(mockLocalEngine, '   ');
+    const result = await engine.retrieve('love');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
+    expect(result).toEqual(mockLocalResult);
+  });
 });
