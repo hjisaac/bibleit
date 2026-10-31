@@ -11,6 +11,7 @@ export interface UserProfile {
 interface HeaderProps {
   isOnline: boolean;
   isAiEnabled: boolean;
+  searchMode?: 'auto' | 'device';
   user?: UserProfile | null;
   onOpenHelp: () => void;
   onOpenAccount?: () => void;
@@ -19,11 +20,19 @@ interface HeaderProps {
 export function Header({
   isOnline,
   isAiEnabled,
+  searchMode = 'auto',
   user,
   onOpenHelp,
   onOpenAccount,
 }: HeaderProps): JSX.Element {
-  const aiBadge = !isAiEnabled
+  const aiBadge = searchMode === 'device'
+    ? {
+        label: 'Device Only',
+        colorClass: 'bg-amber-500',
+        textColor: 'var(--text-muted)',
+        tooltip: 'Device-only mode active: Searching locally on-device.',
+      }
+    : !isAiEnabled
     ? {
         label: 'AI Off',
         colorClass: 'bg-stone-400',

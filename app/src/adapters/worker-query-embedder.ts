@@ -29,20 +29,25 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
     return this.worker;
   }
 
+  private loadReject: ((err: Error) => void) | null = null;
+
   async load(onProgress?: (fraction: number) => void): Promise<void> {
     if (onProgress) this.progressListeners.add(onProgress);
     if (this.loadPromise) return this.loadPromise;
 
     const worker = this.getWorker();
     this.loadPromise = new Promise<void>((resolve, reject) => {
+      this.loadReject = reject;
       const handler = (e: MessageEvent) => {
         if (!e.data) return;
         if (e.data.type === 'loaded') {
           worker.removeEventListener('message', handler);
+          this.loadReject = null;
           resolve();
         } else if (e.data.type === 'load_error') {
           worker.removeEventListener('message', handler);
           this.loadPromise = null;
+          this.loadReject = null;
           reject(new Error(e.data.error));
         }
       };
@@ -53,7 +58,35 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
     return this.loadPromise;
   }
 
+  cancelLoad(): void {
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
+    const reject = this.loadReject;
+    this.loadPromise = null;
+    this.loadReject = null;
+    if (reject) {
+      reject(new DOMException('The user aborted a request.', 'AbortError'));
+    }
+  }
+
+  async clear(): Promise<void> {
+    this.cancelLoad();
+    this.progressListeners.clear();
+    await clearQueryModelCache();
+  }
+
+  async hasModel(): Promise<boolean> {
+    return isQueryModelCached();
+  }
+
   async embed(query: string): Promise<Float32Array> {
+    if (!(await this.hasModel())) {
+      throw new Error(
+        'Neural query model is not installed. Download it in Settings before running on-device vector search.',
+      );
+    }
     await this.load();
     const worker = this.getWorker();
     const id = this.nextId++;
@@ -88,9 +121,17 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
 export async function isQueryModelCached(): Promise<boolean> {
   if (typeof caches === 'undefined') return false;
   try {
-    const cache = await caches.open('transformers-cache');
-    const keys = await cache.keys();
-    return keys.some((k) => k.url.includes('model_quantized.onnx'));
+    const cacheNames = await caches.keys();
+    for (const name of cacheNames) {
+      if (name.includes('transformers') || name.includes('onnx')) {
+        const cache = await caches.open(name);
+        const keys = await cache.keys();
+        if (keys.some((k) => k.url.includes('model_quantized.onnx'))) {
+          return true;
+        }
+      }
+    }
+    return false;
   } catch {
     return false;
   }
@@ -99,6 +140,12 @@ export async function isQueryModelCached(): Promise<boolean> {
 export async function clearQueryModelCache(): Promise<void> {
   if (typeof caches === 'undefined') return;
   try {
+    const cacheNames = await caches.keys();
+    for (const name of cacheNames) {
+      if (name.includes('transformers') || name.includes('onnx')) {
+        await caches.delete(name);
+      }
+    }
     await caches.delete('transformers-cache');
   } catch {
     // Ignore cache deletion errors

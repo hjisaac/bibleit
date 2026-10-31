@@ -72,8 +72,9 @@ async function verifySha256(bytes: Uint8Array<ArrayBuffer>, expectedHex?: string
 async function fetchWithProgress(
   url: string,
   onProgress?: (progressPercent: number) => void,
+  signal?: AbortSignal,
 ): Promise<Uint8Array<ArrayBuffer>> {
-  const res = await fetch(url);
+  const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`Failed to fetch ${url}: HTTP ${res.status}`);
 
   const contentLength = res.headers.get('content-length');
@@ -89,14 +90,25 @@ async function fetchWithProgress(
   const chunks: Uint8Array[] = [];
   let loaded = 0;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) {
-      chunks.push(value);
-      loaded += value.length;
-      onProgress(Math.min(99, Math.round((loaded / total) * 100)));
+  try {
+    while (true) {
+      if (signal?.aborted) {
+        await reader.cancel();
+        throw new DOMException('The user aborted a request.', 'AbortError');
+      }
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        chunks.push(value);
+        loaded += value.length;
+        onProgress(Math.min(99, Math.round((loaded / total) * 100)));
+      }
     }
+  } catch (err) {
+    if (signal?.aborted) {
+      throw new DOMException('The user aborted a request.', 'AbortError');
+    }
+    throw err;
   }
 
   const merged = new Uint8Array(loaded);
@@ -192,6 +204,7 @@ export class OpfsArtifactStore implements ArtifactStore {
     parse: (bytes: Uint8Array<ArrayBuffer>) => Promise<T> | T,
     onProgress?: (progressPercent: number) => void,
     onCachedToOpfs?: () => void,
+    signal?: AbortSignal,
   ): Promise<T> {
     const isGz = remoteFile.endsWith('.gz');
     const cached = root ? await readOpfsFile(root, filename) : null;
@@ -208,7 +221,7 @@ export class OpfsArtifactStore implements ArtifactStore {
       }
     }
 
-    const downloaded = await fetchWithProgress(getDataUrl(remoteFile), onProgress);
+    const downloaded = await fetchWithProgress(getDataUrl(remoteFile), onProgress, signal);
     let uncompressed: Uint8Array<ArrayBuffer>;
     let toStore: Uint8Array<ArrayBuffer>;
 
@@ -235,7 +248,7 @@ export class OpfsArtifactStore implements ArtifactStore {
     return parsed;
   }
 
-  async verses(onProgress?: (progressPercent: number) => void): Promise<VerseCorpusData> {
+  async verses(onProgress?: (progressPercent: number) => void, signal?: AbortSignal): Promise<VerseCorpusData> {
     const m = await this.manifest();
     const root = await getOpfsRoot();
     return this.loadVerifiedArtifact(
@@ -246,10 +259,11 @@ export class OpfsArtifactStore implements ArtifactStore {
       (bytes) => JSON.parse(new TextDecoder().decode(bytes)) as VerseCorpusData,
       onProgress,
       () => void clearBookCache(),
+      signal,
     );
   }
 
-  async chunks(onProgress?: (progressPercent: number) => void): Promise<RawChunk[]> {
+  async chunks(onProgress?: (progressPercent: number) => void, signal?: AbortSignal): Promise<RawChunk[]> {
     const m = await this.manifest();
     const root = await getOpfsRoot();
     return this.loadVerifiedArtifact(
@@ -259,11 +273,14 @@ export class OpfsArtifactStore implements ArtifactStore {
       m.chunks.sha256,
       (bytes) => JSON.parse(new TextDecoder().decode(bytes)) as RawChunk[],
       onProgress,
+      undefined,
+      signal,
     );
   }
 
   async embeddings(
     onProgress?: (progressPercent: number) => void,
+    signal?: AbortSignal,
   ): Promise<{ data: ArrayBuffer; scales?: ArrayBuffer }> {
     const m = await this.manifest();
     const root = await getOpfsRoot();
@@ -276,6 +293,8 @@ export class OpfsArtifactStore implements ArtifactStore {
       m.embeddings.sha256,
       (bytes) => toExactArrayBuffer(bytes),
       onProgress,
+      undefined,
+      signal,
     );
 
     if (isInt8) {
@@ -286,6 +305,9 @@ export class OpfsArtifactStore implements ArtifactStore {
         scalesMeta.scales,
         scalesMeta.scales_sha256,
         (bytes) => toExactArrayBuffer(bytes),
+        undefined,
+        undefined,
+        signal,
       );
       return { data, scales };
     }

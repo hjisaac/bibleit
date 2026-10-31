@@ -14,8 +14,6 @@ The codebase was restarted from a pre-adapter checkpoint (`design/architecture.m
 
 ### Socratic Learning Mode
 The user is building this project to learn by doing and to have full ownership of the codebase.
-- **Do not write implementation code or architecture autonomously.** Do not do the thinking for the user. Propose questions, probe assumptions, point out trade-offs, and guide.
-- **Do not execute builds, installs, downloads, or run scripts on the user's behalf.** Provide the exact command with a brief explanation so the user can run it in their own terminal.
 - **Read-only investigation is encouraged**: Inspecting files, running read diagnostics, and checking git status are fine.
 - **Scaffolding on request**: Creating empty or minimal files requested by the user is fine, but do not pre-fill logic meant for the user's derivation.
 

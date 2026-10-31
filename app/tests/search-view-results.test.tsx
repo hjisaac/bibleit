@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/preact';
 import { SearchView } from '../src/components/SearchView';
+import { HybridEngine } from '../src/adapters/hybrid-engine';
 import type { SearchEngine, AudioNarrator } from '../src/core/ports';
 import type { ComponentProps } from 'preact';
-import type { ScoredPassage } from '../src/core/types';
+import { getChunkKey, type ScoredPassage } from '../src/core/types';
 
 type SearchViewProps = ComponentProps<typeof SearchView>;
 
@@ -121,16 +122,19 @@ describe('SearchView Result Cards & User Actions', () => {
     const listenButton = screen.getByLabelText('Listen to Philippians 4:4–7');
     fireEvent.click(listenButton);
 
-    expect(playSpy).toHaveBeenCalledWith([
-      expect.objectContaining({
-        id: 'chunk-PHP:4:4-4:7',
-        citation: 'Philippians 4:4–7',
-        book: 'PHP',
-        chapter: 4,
-        verse: 4,
-        text: samplePassages[0]!.chunk.text,
-      }),
-    ]);
+    expect(playSpy).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          id: 'chunk-PHP:4:4-4:7',
+          citation: 'Philippians 4:4–7',
+          book: 'PHP',
+          chapter: 4,
+          verse: 4,
+          text: samplePassages[0]!.chunk.text,
+        }),
+      ],
+      0,
+    );
   });
 
   it('triggers onSaveVerse when bookmark button is clicked', () => {
@@ -298,4 +302,86 @@ describe('SearchView Result Cards & User Actions', () => {
     // Section 1 heading is rendered inline above the verses
     expect(screen.getByText('Love Fulfills the Law')).toBeDefined();
   });
+
+  it('marks active narrating card with search-active-narrating-card id and yellow ring', () => {
+    const chunkKey = getChunkKey(samplePassages[0]!.chunk);
+    renderSearchView({
+      narrationState: {
+        status: 'playing',
+        queue: [],
+        currentIndex: 0,
+        activeSegment: {
+          id: `chunk-${chunkKey}`,
+          book: 'PHP',
+          chapter: 4,
+          verse: 4,
+          citation: 'Philippians 4:4–7',
+          text: 'Rejoice in the Lord always.',
+        },
+        wordBoundary: null,
+        rate: 1,
+      },
+    });
+
+    const activeCard = document.getElementById('search-active-narrating-card');
+    expect(activeCard).not.toBeNull();
+    expect(activeCard?.className).toContain('ring-amber-500/50');
+  });
+
+  it('queues all search result cards and sets clicked card index when clicking listen', () => {
+    const passage2: ScoredPassage = {
+      chunk: {
+        id: 43,
+        book: 'PHP',
+        start: [4, 8],
+        end: [4, 9],
+        headings: [[4, 8, 'Think on These Things']],
+        text: 'Finally, brothers, whatever things are true...',
+      },
+      score: 0.9,
+      source: 'semantic',
+    };
+
+    localStorage.setItem(
+      'bibleit_last_search',
+      JSON.stringify({
+        query: 'peace and joy',
+        passages: [samplePassages[0]!, passage2],
+        answerText: '',
+      }),
+    );
+
+    renderSearchView();
+
+    const listenButtons = screen.getAllByTitle('Listen to passage');
+    expect(listenButtons).toHaveLength(2);
+
+    // Click listen on second card (index 1)
+    fireEvent.click(listenButtons[1]!);
+
+    expect(playSpy).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'chunk-PHP:4:4-4:7' }),
+        expect.objectContaining({ id: 'chunk-PHP:4:8-4:9' }),
+      ]),
+      1,
+    );
+  });
+
+  it('retrieves and displays results seamlessly when backed by HybridEngine with failing remote backend', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Backend Connection Refused'));
+    const hybridEngine = new HybridEngine(mockEngine, 'https://api.bibleit.test');
+
+    renderSearchView({ engine: hybridEngine });
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'peace and joy' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(fetchSpy).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByText(/Rejoice in the Lord always/i)).toBeTruthy();
+    });
+  });
 });
+

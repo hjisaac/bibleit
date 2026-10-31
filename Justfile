@@ -7,24 +7,53 @@ export PATH := if nvm_node_bin != "" { nvm_node_bin + ":" + env_var('PATH') } el
 default:
     @just --list
 
-# Run the frontend PWA dev server (exposed on local network)
-dev:
+# --- Development ---
+dev: dev-front
+
+# Run frontend PWA dev server (exposed on local network)
+dev-front:
     pnpm --prefix app dev --host
 
-# Install frontend dependencies
+# Run backend search API dev server
+dev-back:
+    pnpm --filter @bibleit/api dev
+
+# --- Dependencies ---
+# Install all workspace dependencies
 install:
+    pnpm install
+
+# Install frontend dependencies
+install-front:
     pnpm --prefix app install
 
+# Install backend dependencies
+install-back:
+    pnpm --filter @bibleit/api install
+
+# --- Production Builds ---
+# Build both frontend and backend
+build: build-front build-back
+
 # Typecheck and build production bundle
-build:
+build-front:
     pnpm --prefix app build
 
-# Run all test suites (frontend and ingest)
-test: test-app test-ingest
+# Build backend API
+build-back:
+    pnpm --filter @bibleit/api build
+
+# --- Testing ---
+# Run all test suites
+test: test-front test-back test-ingest
 
 # Run frontend UI and component tests (Vitest)
-test-app:
+test-front:
     pnpm --prefix app test
+
+# Typecheck backend API
+test-back:
+    pnpm --filter @bibleit/api build
 
 # Run frontend end-to-end tests (Playwright)
 test-e2e:

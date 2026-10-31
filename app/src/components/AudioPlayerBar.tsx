@@ -9,6 +9,8 @@ interface AudioPlayerBarProps {
   state: NarrationState;
   isNavbarVisible: boolean;
   onNavigateToSegment: (book: string, chapter: number, verse: number) => void;
+  onBarClick?: () => void;
+  title?: string;
 }
 
 export function AudioPlayerBar({
@@ -16,6 +18,8 @@ export function AudioPlayerBar({
   state,
   isNavbarVisible,
   onNavigateToSegment,
+  onBarClick,
+  title,
 }: AudioPlayerBarProps): JSX.Element | null {
   if (state.status === 'idle' || !state.activeSegment) {
     return null;
@@ -43,7 +47,10 @@ export function AudioPlayerBar({
     <div
       role="region"
       aria-label="Audio playback controls"
+      onClick={onBarClick}
       class={`fixed left-3 right-3 max-w-2xl mx-auto z-30 px-3.5 py-2.5 rounded-2xl border shadow-lg flex items-center justify-between gap-2 transition-all duration-300 ease-in-out ${
+        onBarClick ? 'cursor-pointer' : ''
+      } ${
         isNavbarVisible ? 'bottom-[4.5rem]' : 'bottom-3'
       }`}
       style={{
@@ -56,7 +63,10 @@ export function AudioPlayerBar({
       <div class="flex items-center gap-2.5 min-w-0 flex-1">
         <button
           type="button"
-          onClick={handleTogglePlay}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleTogglePlay();
+          }}
           aria-label={isPlaying ? 'Pause narration' : 'Resume narration'}
           class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white transition-transform active:scale-95"
           style={{ backgroundColor: 'var(--accent)' }}
@@ -74,14 +84,19 @@ export function AudioPlayerBar({
 
         <button
           type="button"
-          onClick={() =>
-            onNavigateToSegment(
-              activeSegment.book,
-              activeSegment.chapter,
-              activeSegment.verse ?? 1,
-            )
-          }
-          title="Jump to passage in Reader"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onBarClick) {
+              onBarClick();
+            } else {
+              onNavigateToSegment(
+                activeSegment.book,
+                activeSegment.chapter,
+                activeSegment.verse ?? 1,
+              );
+            }
+          }}
+          title={title || 'Jump to passage in Reader'}
           class="flex flex-col items-start min-w-0 text-left hover:opacity-80 transition-opacity"
         >
           <span class="text-xs font-semibold font-serif truncate max-w-full">
@@ -89,7 +104,7 @@ export function AudioPlayerBar({
           </span>
           <span class="text-[10px] font-sans truncate max-w-full" style={{ color: 'var(--text-muted)' }}>
             {hasMultiple
-              ? `Verse ${currentIndex + 1} of ${queue.length} · ${isPlaying ? 'Reading aloud' : 'Paused'}`
+              ? `${activeSegment.id.startsWith('chunk-') ? 'Passage' : 'Verse'} ${currentIndex + 1} of ${queue.length} · ${isPlaying ? 'Reading aloud' : 'Paused'}`
               : isPlaying
               ? 'Reading passage aloud'
               : 'Paused'}
@@ -103,10 +118,13 @@ export function AudioPlayerBar({
           <>
             <button
               type="button"
-              onClick={() => narrator.prev()}
+              onClick={(e) => {
+                e.stopPropagation();
+                narrator.prev();
+              }}
               disabled={currentIndex <= 0}
-              aria-label="Previous verse"
-              title="Previous verse"
+              aria-label={activeSegment.id.startsWith('chunk-') ? 'Previous passage' : 'Previous verse'}
+              title={activeSegment.id.startsWith('chunk-') ? 'Previous passage' : 'Previous verse'}
               class="p-1.5 rounded-lg transition-opacity hover:opacity-80 disabled:opacity-30"
               style={{ color: 'var(--text-main)' }}
             >
@@ -117,10 +135,13 @@ export function AudioPlayerBar({
 
             <button
               type="button"
-              onClick={() => narrator.next()}
+              onClick={(e) => {
+                e.stopPropagation();
+                narrator.next();
+              }}
               disabled={currentIndex >= queue.length - 1}
-              aria-label="Next verse"
-              title="Next verse"
+              aria-label={activeSegment.id.startsWith('chunk-') ? 'Next passage' : 'Next verse'}
+              title={activeSegment.id.startsWith('chunk-') ? 'Next passage' : 'Next verse'}
               class="p-1.5 rounded-lg transition-opacity hover:opacity-80 disabled:opacity-30"
               style={{ color: 'var(--text-main)' }}
             >
@@ -133,7 +154,10 @@ export function AudioPlayerBar({
 
         <button
           type="button"
-          onClick={handleCycleRate}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleCycleRate();
+          }}
           aria-label={`Playback speed ${rate}x`}
           title="Change playback speed"
           class="px-2 py-1 rounded-lg border text-[11px] font-mono font-semibold transition-opacity hover:opacity-80"
@@ -148,7 +172,10 @@ export function AudioPlayerBar({
 
         <button
           type="button"
-          onClick={() => narrator.stop()}
+          onClick={(e) => {
+            e.stopPropagation();
+            narrator.stop();
+          }}
           aria-label="Stop narration"
           title="Stop narration"
           class="p-1.5 rounded-lg transition-opacity hover:opacity-80"

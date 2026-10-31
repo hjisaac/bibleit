@@ -21,13 +21,24 @@ import { useHeadroom } from './core/headroom';
 import type { Manifest, NarrationState } from './core/types';
 import { useStore } from '@nanostores/preact';
 import { $textPackageStatus, $aiPackageStatus, $modelPackageStatus } from './stores/packages';
-import { $theme, $activeTab, $isAiEnabled, $showHeadings, $hasSeenStorageBanner } from './stores/preferences';
+import {
+  $theme,
+  $activeTab,
+  $isAiEnabled,
+  $showHeadings,
+  $hasSeenStorageBanner,
+  $searchMode,
+  type SearchMode,
+} from './stores/preferences';
 import { $readerLocation, $savedVerses, type ReaderLocation } from './stores/reader';
 
 export function App(): JSX.Element {
   const store = useMemo(() => createDefaultArtifactStore(), []);
   const embedder = useMemo(() => createDefaultEmbedder(), []);
-  const engine = useMemo(() => createDefaultEngine(store, embedder), [store, embedder]);
+  const engine = useMemo(
+    () => createDefaultEngine(store, embedder, () => $searchMode.get() === 'device'),
+    [store, embedder],
+  );
   const narrator = useMemo(() => createDefaultNarrator(), []);
   const [narrationState, setNarrationState] = useState<NarrationState>(() => narrator.getState());
   const [manifest, setManifest] = useState<Manifest | null>(null);
@@ -115,6 +126,16 @@ export function App(): JSX.Element {
     showToast(enabled ? 'Pericope headings enabled' : 'Pericope headings hidden');
   };
 
+  const searchMode = useStore($searchMode);
+  const handleToggleSearchMode = (mode: SearchMode) => {
+    $searchMode.set(mode);
+    showToast(
+      mode === 'device'
+        ? 'Device-only search enabled: Searching locally'
+        : 'Auto mode: Cloud search with offline fallback',
+    );
+  };
+
   // Reconcile in-memory state if page was reloaded mid-download
   useEffect(() => {
     if ($textPackageStatus.get() === 'downloading') $textPackageStatus.set('not_downloaded');
@@ -162,16 +183,30 @@ export function App(): JSX.Element {
     }).catch(() => {});
   }, [engine]);
 
+  const textAbortRef = useRef<AbortController | null>(null);
+  const aiAbortRef = useRef<AbortController | null>(null);
+
   const handleDownloadText = async () => {
+    textAbortRef.current?.abort();
+    const controller = new AbortController();
+    textAbortRef.current = controller;
+
     $textPackageStatus.set('downloading');
     setTextProgress(0);
     try {
-      await store.verses((pct) => setTextProgress(Math.round(pct * 0.8)));
-      await store.chunks((pct) => setTextProgress(80 + Math.round(pct * 0.2)));
+      await store.verses((pct) => setTextProgress(Math.round(pct * 0.8)), controller.signal);
+      await store.chunks((pct) => setTextProgress(80 + Math.round(pct * 0.2)), controller.signal);
       $textPackageStatus.set('ready');
       setTextProgress(100);
+      await engine.sync?.();
       showToast('Scripture text verified & installed in OPFS (1.2 MB)');
     } catch (err) {
+      if (controller.signal.aborted) {
+        $textPackageStatus.set('not_downloaded');
+        setTextProgress(0);
+        showToast('Scripture download cancelled.');
+        return;
+      }
       console.error('Download failed:', err);
       showToast(
         err instanceof Error && err.name === 'CorruptArtifactError'
@@ -179,18 +214,37 @@ export function App(): JSX.Element {
           : 'Download interrupted. Check network and try again.',
       );
       $textPackageStatus.set('not_downloaded');
+    } finally {
+      if (textAbortRef.current === controller) {
+        textAbortRef.current = null;
+      }
     }
   };
 
+  const handleCancelDownloadText = () => {
+    textAbortRef.current?.abort();
+  };
+
   const handleDownloadAi = async () => {
+    aiAbortRef.current?.abort();
+    const controller = new AbortController();
+    aiAbortRef.current = controller;
+
     $aiPackageStatus.set('downloading');
     setAiProgress(0);
     try {
-      await store.embeddings((pct) => setAiProgress(pct));
+      await store.embeddings((pct) => setAiProgress(pct), controller.signal);
       $aiPackageStatus.set('ready');
       setAiProgress(100);
+      await engine.sync?.();
       showToast('Verse vectors verified & installed in OPFS (2.1 MB)');
     } catch (err) {
+      if (controller.signal.aborted) {
+        $aiPackageStatus.set('not_downloaded');
+        setAiProgress(0);
+        showToast('AI vectors download cancelled.');
+        return;
+      }
       console.error('Download failed:', err);
       showToast(
         err instanceof Error && err.name === 'CorruptArtifactError'
@@ -198,27 +252,52 @@ export function App(): JSX.Element {
           : 'AI download interrupted. Check network and try again.',
       );
       $aiPackageStatus.set('not_downloaded');
+    } finally {
+      if (aiAbortRef.current === controller) {
+        aiAbortRef.current = null;
+      }
     }
   };
 
+  const handleCancelDownloadAi = () => {
+    aiAbortRef.current?.abort();
+  };
+
+  const isModelAbortedRef = useRef(false);
+
   const handleDownloadModel = async () => {
+    isModelAbortedRef.current = false;
     $modelPackageStatus.set('downloading');
     setModelProgress(0);
     try {
       await embedder.load((fraction) => setModelProgress(Math.round(fraction * 100)));
       $modelPackageStatus.set('ready');
       setModelProgress(100);
+      await engine.sync?.();
       showToast('Neural query model installed in browser cache (137 MB)');
     } catch (err) {
+      if (isModelAbortedRef.current || (err instanceof DOMException && err.name === 'AbortError')) {
+        $modelPackageStatus.set('not_downloaded');
+        setModelProgress(0);
+        showToast('Model download cancelled.');
+        return;
+      }
       console.error('Model download failed:', err);
       showToast('Model download interrupted. Check network and try again.');
       $modelPackageStatus.set('not_downloaded');
     }
   };
 
+  const handleCancelDownloadModel = () => {
+    isModelAbortedRef.current = true;
+    embedder.cancelLoad?.();
+  };
+
   const handleClearStorage = async () => {
     await store.clear();
+    await embedder.clear?.();
     await clearQueryModelCache();
+    await engine.sync?.();
     $textPackageStatus.set('not_downloaded');
     $aiPackageStatus.set('not_downloaded');
     $modelPackageStatus.set('not_downloaded');
@@ -235,6 +314,24 @@ export function App(): JSX.Element {
 
   const handleDismissOnboarding = () => {
     $hasSeenStorageBanner.set(true);
+  };
+
+  const handleAudioBarClick = () => {
+    if (activeTab === 'search') {
+      const activeCard = document.getElementById('search-active-narrating-card');
+      if (activeCard) {
+        activeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+
+    if (narrationState.activeSegment) {
+      handleOpenReader(
+        narrationState.activeSegment.book,
+        narrationState.activeSegment.chapter,
+        narrationState.activeSegment.verse ?? 1,
+      );
+    }
   };
 
   // Sync theme class to document body.
@@ -345,6 +442,7 @@ export function App(): JSX.Element {
       <Header
         isOnline={isOnline}
         isAiEnabled={isAiEnabled}
+        searchMode={searchMode}
         onOpenHelp={() => setIsHelpOpen(true)}
         onOpenAccount={() => showToast('Guest mode')}
       />
@@ -353,7 +451,6 @@ export function App(): JSX.Element {
         <div class={activeTab === 'search' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
           <SearchView
             engine={engine}
-            manifest={manifest}
             narrator={narrator}
             narrationState={narrationState}
             isOnline={isOnline}
@@ -412,11 +509,15 @@ export function App(): JSX.Element {
             textProgress={textProgress}
             aiProgress={aiProgress}
             modelProgress={modelProgress}
+            searchMode={searchMode}
+            onToggleSearchMode={handleToggleSearchMode}
             highlightStorage={highlightStorage}
-            onClearHighlight={() => setHighlightStorage(false)}
             onDownloadText={handleDownloadText}
+            onCancelDownloadText={handleCancelDownloadText}
             onDownloadAi={handleDownloadAi}
+            onCancelDownloadAi={handleCancelDownloadAi}
             onDownloadModel={handleDownloadModel}
+            onCancelDownloadModel={handleCancelDownloadModel}
             onClearStorage={handleClearStorage}
           />
         )}
@@ -427,6 +528,8 @@ export function App(): JSX.Element {
         state={narrationState}
         isNavbarVisible={isBarVisible}
         onNavigateToSegment={handleOpenReader}
+        onBarClick={handleAudioBarClick}
+        title={activeTab === 'search' ? 'Scroll to playing card' : 'Jump to passage in Reader'}
       />
 
       <Navbar activeTab={activeTab} onTabChange={handleTabChange} isVisible={isBarVisible} />

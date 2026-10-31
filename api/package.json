@@ -1,0 +1,25 @@
+{
+  "name": "@bibleit/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@bibleit/engine": "workspace:*",
+    "@hono/node-server": "^1.13.7",
+    "@huggingface/transformers": "^4.3.2",
+    "@sentry/node": "^11.10.0",
+    "hono": "^4.6.14",
+    "pino": "^10.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "pino-pretty": "^13.2.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.3.3"
+  }
+}

@@ -44,18 +44,10 @@ const SECTIONS: HelpSection[] = [
 export function HelpModal({ isOpen, onClose, onOpenFeedback }: HelpModalProps): JSX.Element | null {
   if (!isOpen) return null;
 
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(['install']));
+  const [expandedSectionId, setExpandedSectionId] = useState<string | null>('install');
 
   const toggleSection = (id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+    setExpandedSectionId((prev) => (prev === id ? null : id));
   };
 
   return (
@@ -98,7 +90,7 @@ export function HelpModal({ isOpen, onClose, onOpenFeedback }: HelpModalProps): 
         {/* Expandable Accordion List */}
         <div class="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain space-y-2 pr-1">
           {SECTIONS.map((sec) => {
-            const isExpanded = expandedIds.has(sec.id);
+            const isExpanded = expandedSectionId === sec.id;
 
             return (
               <div

@@ -4,6 +4,7 @@ import {
   submitFeedback,
   type FeedbackCategory,
 } from '../adapters/feedback-client';
+import { env } from '../env';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -246,10 +247,10 @@ export function FeedbackModal({
               <p class="text-[11px] opacity-90">
                 You can email us directly at{' '}
                 <a
-                  href={`mailto:${import.meta.env.VITE_FEEDBACK_EMAIL.trim()}`}
+                  href={`mailto:${env.feedbackEmail}`}
                   class="underline font-semibold hover:opacity-80"
                 >
-                  {import.meta.env.VITE_FEEDBACK_EMAIL.trim()}
+                  {env.feedbackEmail}
                 </a>{' '}
                 or create an issue on{' '}
                 <a

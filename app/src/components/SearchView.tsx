@@ -1,15 +1,25 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { useStore } from '@nanostores/preact';
 import type { AudioNarrator, SearchEngine } from '../core/ports';
-import { getChunkKey, type Manifest, type NarrationState, type NarrationWordBoundary, type ScoredPassage } from '../core/types';
+import { getChunkKey, type NarrationSegment, type NarrationState, type NarrationWordBoundary, type ScoredPassage } from '../core/types';
 import { BIBLE_BOOKS_BY_ID, findBookByPrefix } from '../core/bible-books';
 import { resolveVerseText } from '../adapters/book-store';
-import { getRandomStarterTopic, POPULAR_TOPICS, SEARCH_SUGGESTIONS, STARTER_TOPICS, type StarterTopic } from '../core/starter-topics';
+import { POPULAR_TOPICS, SEARCH_SUGGESTIONS } from '../core/starter-topics';
 import type { SavedVerse } from './SavedView';
+import {
+  $searchHistory,
+  $lastSearch,
+  addSearchHistory,
+  MAX_HISTORY_ITEMS,
+  SEARCH_HISTORY_KEY,
+  SEARCH_STORAGE_KEY,
+} from '../stores/search';
+
+export { MAX_HISTORY_ITEMS, SEARCH_HISTORY_KEY, SEARCH_STORAGE_KEY };
 
 interface SearchViewProps {
   engine: SearchEngine;
-  manifest?: Manifest | null;
   narrator?: AudioNarrator;
   narrationState?: NarrationState;
   isOnline: boolean;
@@ -69,6 +79,21 @@ function formatCitation(bookId: string, start: [number, number], end: [number, n
   }
   return `${bookName} ${startCh}:${startV}–${endCh}:${endV}`;
 }
+
+function buildPassageSegments(passageList: ScoredPassage[]): NarrationSegment[] {
+  return passageList.map((p) => {
+    const key = getChunkKey(p.chunk);
+    return {
+      id: `chunk-${key}`,
+      citation: formatCitation(p.chunk.book, p.chunk.start, p.chunk.end),
+      text: p.chunk.text,
+      book: p.chunk.book,
+      chapter: p.chunk.start[0],
+      verse: p.chunk.start[1],
+    };
+  });
+}
+
 
 interface ChunkSectionView {
   heading?: string;
@@ -137,66 +162,8 @@ function isQuestionQuery(text: string): boolean {
   return questionWords.some((word) => lower.startsWith(`${word} `) || lower.startsWith(`${word}'`));
 }
 
-const SEARCH_STORAGE_KEY = 'bibleit_last_search';
-const SEARCH_HISTORY_KEY = 'bibleit_search_history';
-const MAX_HISTORY_ITEMS = 6;
-
-function loadSearchHistory(): string[] {
-  if (typeof localStorage === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(SEARCH_HISTORY_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveSearchHistory(history: string[]): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
-  } catch {
-    // Ignore storage errors
-  }
-}
-
-interface StoredSearch {
-  query: string;
-  passages: ScoredPassage[];
-  answerText: string;
-}
-
-function getInitialSearchState(): StoredSearch {
-  if (typeof localStorage !== 'undefined') {
-    try {
-      const stored = localStorage.getItem(SEARCH_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as StoredSearch;
-        if (parsed && typeof parsed.query === 'string') {
-          return {
-            query: parsed.query,
-            passages: Array.isArray(parsed.passages) ? parsed.passages : [],
-            answerText: typeof parsed.answerText === 'string' ? parsed.answerText : '',
-          };
-        }
-      }
-    } catch {
-      // Storage unavailable or invalid JSON
-    }
-  }
-  const topic = getRandomStarterTopic();
-  return {
-    query: topic.query,
-    passages: topic.passages,
-    answerText: topic.answerText,
-  };
-}
-
 export function SearchView({
   engine,
-  manifest,
   narrator,
   narrationState,
   isOnline,
@@ -212,10 +179,11 @@ export function SearchView({
   onSaveVerse,
   onToast,
 }: SearchViewProps): JSX.Element {
-  const [initialSearch] = useState(getInitialSearchState);
+  const [initialSearch] = useState(() => $lastSearch.get());
   const [query, setQuery] = useState(initialSearch.query);
   const [passages, setPassages] = useState<ScoredPassage[]>(initialSearch.passages);
-  const [latencyMs, setLatencyMs] = useState(38);
+  const [isPanelOpen, setIsPanelOpen] = useState(initialSearch.query.trim().length === 0);
+  const lastSubmittedQueryRef = useRef(initialSearch.query);
   const [expandedCardKey, setExpandedCardKey] = useState<string | null>(null);
   const [surroundingVerses, setSurroundingVerses] = useState<
     Record<string, { prev?: string; next?: string }>
@@ -225,7 +193,9 @@ export function SearchView({
   const [answerText, setAnswerText] = useState<string>(initialSearch.answerText);
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
   const [isSynthesisCollapsed, setIsSynthesisCollapsed] = useState<boolean>(false);
-  const [searchHistory, setSearchHistory] = useState<string[]>(loadSearchHistory);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [hasSearched, setHasSearched] = useState<boolean>(initialSearch.query.trim().length > 0);
+  const searchHistory = useStore($searchHistory);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const searchRunIdRef = useRef(0);
@@ -235,64 +205,55 @@ export function SearchView({
     const runId = ++searchRunIdRef.current;
     if (!trimmed) {
       setPassages([]);
+      setIsSearching(false);
+      setHasSearched(false);
       return;
     }
-    const startTime = performance.now();
-    void engine.retrieve(trimmed).then((res) => {
-      if (searchRunIdRef.current === runId) {
-        setPassages(res.passages);
-        setLatencyMs(Math.round(performance.now() - startTime));
-      }
-    });
+    setIsSearching(true);
+    setHasSearched(true);
+    void engine
+      .retrieve(trimmed)
+      .then((res) => {
+        if (searchRunIdRef.current === runId) {
+          setPassages(res.passages);
+        }
+      })
+      .catch((err) => {
+        console.error('[Search Error]:', err);
+        onToast('Search failed: ' + (err instanceof Error ? err.message : String(err)));
+      })
+      .finally(() => {
+        if (searchRunIdRef.current === runId) {
+          setIsSearching(false);
+        }
+      });
   };
 
   const addQueryToHistory = (rawQuery: string) => {
-    const trimmed = rawQuery.trim();
-    if (trimmed.length < 2) return;
-    setSearchHistory((prev) => {
-      const filtered = prev.filter((item) => item.toLowerCase() !== trimmed.toLowerCase());
-      const next = [trimmed, ...filtered].slice(0, MAX_HISTORY_ITEMS);
-      saveSearchHistory(next);
-      return next;
-    });
-  };
-
-  const handleClearHistory = () => {
-    setSearchHistory([]);
-    saveSearchHistory([]);
-  };
-
-  const handleApplyTopic = (topic: StarterTopic) => {
-    searchRunIdRef.current++;
-    addQueryToHistory(topic.query);
-    setQuery(topic.query);
-    setPassages(topic.passages);
-    setAnswerText(topic.answerText);
-    setIsSynthesisCollapsed(false);
-    const el = inputRef.current;
-    if (el) {
-      el.focus();
-      el.setSelectionRange(topic.query.length, topic.query.length);
-    }
+    addSearchHistory(rawQuery);
   };
 
   const handleSelectQuery = (text: string) => {
-    addQueryToHistory(text);
-    const matchedStarter = STARTER_TOPICS.find(
-      (t) => t.query.toLowerCase() === text.trim().toLowerCase(),
-    );
-    if (matchedStarter) {
-      handleApplyTopic(matchedStarter);
+    setQuery(text);
+    const el = inputRef.current;
+    if (el) {
+      el.focus();
+      el.setSelectionRange(text.length, text.length);
+    }
+  };
+
+  const handleSubmit = (e?: Event) => {
+    e?.preventDefault();
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    addQueryToHistory(trimmed);
+    lastSubmittedQueryRef.current = trimmed;
+    setIsPanelOpen(false);
+    inputRef.current?.blur();
+    if (isQuestion && isAiEnabled && engine.answers.available && isOnline && !isSynthesizing) {
+      void handleSynthesize();
     } else {
-      setQuery(text);
-      setAnswerText('');
-      setIsSynthesizing(false);
-      runSearch(text);
-      const el = inputRef.current;
-      if (el) {
-        el.focus();
-        el.setSelectionRange(text.length, text.length);
-      }
+      runSearch(trimmed);
     }
   };
 
@@ -300,15 +261,7 @@ export function SearchView({
   const matchedBook = findBookByPrefix(query);
 
   useEffect(() => {
-    if (typeof localStorage === 'undefined') return;
-    try {
-      localStorage.setItem(
-        SEARCH_STORAGE_KEY,
-        JSON.stringify({ query, passages, answerText }),
-      );
-    } catch {
-      // Ignore storage errors
-    }
+    $lastSearch.set({ query, passages, answerText });
   }, [query, passages, answerText]);
 
   useEffect(() => {
@@ -364,6 +317,18 @@ export function SearchView({
     };
   }, [passages, splitPoints]);
 
+  useEffect(() => {
+    const activeId = narrationState?.activeSegment?.id;
+    if (activeId?.startsWith('chunk-')) {
+      const activeChunkKey = activeId.slice(6);
+      setExpandedCardKey(activeChunkKey);
+      const activeCard = document.getElementById('search-active-narrating-card');
+      if (activeCard && typeof activeCard.scrollIntoView === 'function') {
+        activeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [narrationState?.activeSegment?.id]);
+
   const toggleContext = (key: string) => {
     setExpandedCardKey((prev) => (prev === key ? null : key));
   };
@@ -376,15 +341,15 @@ export function SearchView({
   const handleSynthesize = async () => {
     const trimmed = query.trim();
     if (!trimmed || isSynthesizing) return;
+    lastSubmittedQueryRef.current = trimmed;
+    setIsPanelOpen(false);
     setIsSynthesizing(true);
     setAnswerText('');
     setIsSynthesisCollapsed(false);
 
     try {
-      const startTime = performance.now();
       const res = await engine.retrieve(trimmed);
       setPassages(res.passages);
-      setLatencyMs(Math.round(performance.now() - startTime));
       const stream = engine.answers.answer(trimmed, res);
       for await (const chunk of stream) {
         setAnswerText((prev) => prev + chunk);
@@ -479,7 +444,7 @@ export function SearchView({
       )}
 
       {/* Search & Question Prompt Box */}
-      <div class="relative mb-2 shrink-0">
+      <form onSubmit={handleSubmit} action="javascript:void(0)" class="relative mb-2 shrink-0">
         <div
           onClick={() => inputRef.current?.focus()}
           class="relative flex items-center rounded-2xl border px-3 py-2.5 transition-all focus-within:ring-2 focus-within:ring-amber-500/30 shadow-sm cursor-text"
@@ -488,20 +453,30 @@ export function SearchView({
             borderColor: 'var(--border-subtle)',
           }}
         >
-          <svg
-            class="w-4 h-4 shrink-0 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-opacity duration-150"
+          <button
+            type="submit"
+            aria-label="Search"
+            class="w-5 h-5 shrink-0 flex items-center justify-center mr-2 hover:opacity-80 transition-opacity cursor-pointer"
             style={{ color: 'var(--text-muted)' }}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
+            {isSearching ? (
+              <div class="w-3.5 h-3.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            )}
+          </button>
           <input
             ref={inputRef}
             type="text"
@@ -509,24 +484,20 @@ export function SearchView({
             enterKeyHint="search"
             value={query}
             placeholder="Search verses, topics, or questions..."
-            class="w-full bg-transparent text-sm font-medium outline-none leading-normal pl-7 pr-2"
+            class="w-full bg-transparent text-sm font-medium outline-none leading-normal pl-0 pr-2"
             style={{
               color: 'var(--text-main)',
             }}
+            onFocus={() => {
+              setIsPanelOpen(true);
+            }}
             onInput={(e) => {
               setQuery((e.target as HTMLInputElement).value);
-              setAnswerText('');
-              setIsSynthesizing(false);
+              setIsPanelOpen(true);
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                addQueryToHistory(query);
-                (e.target as HTMLInputElement).blur();
-                if (isQuestion && isAiEnabled && engine.answers.available && isOnline && !isSynthesizing) {
-                  void handleSynthesize();
-                } else {
-                  runSearch(query);
-                }
+              if (e.key === 'Enter' || e.keyCode === 13) {
+                handleSubmit(e);
               }
             }}
             onBlur={() => {
@@ -540,8 +511,7 @@ export function SearchView({
                 e.stopPropagation();
                 searchRunIdRef.current++;
                 setQuery('');
-                setPassages([]);
-                setAnswerText('');
+                setIsPanelOpen(true);
                 inputRef.current?.focus();
               }}
               class="text-xs p-1 rounded-full hover:opacity-75 shrink-0 ml-1.5"
@@ -559,7 +529,7 @@ export function SearchView({
             </button>
           )}
         </div>
-      </div>
+      </form>
 
       {/* Scripture Navigator Strip (Compact: appears only when query is purely a book name) */}
       {matchedBook && (
@@ -620,69 +590,17 @@ export function SearchView({
         </div>
       )}
 
-      {/* Mixed Suggestion Chips (Shown when a search is active) */}
-      {query.trim().length > 0 && (
-        <div class="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2 text-xs shrink-0 no-scrollbar">
-          <span class="text-[10px] shrink-0 font-medium tracking-wide uppercase" style={{ color: 'var(--text-subtle)' }}>
-            Try:
-          </span>
-          {STARTER_TOPICS.map((topic) => (
-            <button
-              key={topic.id}
-              type="button"
-              onClick={() => handleApplyTopic(topic)}
-              class="shrink-0 px-2 py-0.5 rounded-md border text-[11px] transition-opacity hover:opacity-80"
-              style={{
-                borderColor: 'var(--border-subtle)',
-                backgroundColor: 'var(--bg-surface-elevated)',
-                color: 'var(--text-muted)',
-              }}
-            >
-              {topic.query}
-            </button>
-          ))}
-        </div>
-      )}
 
-      {/* Technical Diagnostics Bar (Shown only in Inspector Mode when a query has run) */}
-      {isInspectorMode && query.trim().length > 0 && (
-        <div
-          class="flex items-center justify-between text-[10px] sm:text-[11px] mb-2.5 px-1 py-1 border-b border-dashed font-mono shrink-0"
-          style={{
-            borderColor: 'var(--border-subtle)',
-            color: 'var(--text-subtle)',
-          }}
-        >
-          <div class="flex items-center gap-1.5">
-            <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-            <span>
-              {manifest
-                ? `${manifest.embeddings.model.split('/').pop()} (${manifest.embeddings.quantization.type}) · ${manifest.corpus.count.toLocaleString()} verses`
-                : 'nomic-embed-text-v1.5 (int8) · 31,095 verses'}
-            </span>
-          </div>
-          <span class="text-emerald-600 dark:text-emerald-400 font-semibold">{latencyMs}ms latency</span>
-        </div>
-      )}
-
-      {/* Empty Guidance State */}
-      {query.trim().length === 0 && (
-        <div class="py-4 flex flex-col gap-6 animate-fadeIn">
+      {/* Guidance Panel P (Shown on cold start or when search is focused/empty) */}
+      {isPanelOpen && (
+        <div class="py-3 mb-2 flex flex-col gap-4 animate-fadeIn">
           {/* Recent Searches */}
           {searchHistory.length > 0 && (
             <div>
-              <div class="flex items-center justify-between mb-2">
+              <div class="mb-2">
                 <span class="text-[11px] font-semibold tracking-wider uppercase" style={{ color: 'var(--text-subtle)' }}>
                   Recent Searches
                 </span>
-                <button
-                  type="button"
-                  onClick={handleClearHistory}
-                  class="text-[11px] transition-opacity hover:opacity-75"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  Clear
-                </button>
               </div>
               <div class="flex flex-wrap gap-1.5">
                 {searchHistory.map((item) => (
@@ -758,21 +676,21 @@ export function SearchView({
               ))}
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Guidance Footer */}
-          <div class="py-6 flex flex-col items-center justify-center text-center">
-            <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
-              Search Scripture
-            </p>
-            <p class="text-xs max-w-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-              Search by book & verse reference (e.g. <i>John 3:16</i>), topic, or question. Switch to the <b>Reader</b> tab to browse full chapters.
-            </p>
-          </div>
+      {/* Active Search Loading State */}
+      {isSearching && (
+        <div class="py-12 flex flex-col items-center justify-center text-center animate-fadeIn">
+          <div class="w-6 h-6 border-2 border-amber-600 border-t-transparent rounded-full animate-spin mb-2" />
+          <p class="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+            Searching scripture...
+          </p>
         </div>
       )}
 
       {/* No Results State */}
-      {query.trim().length > 0 && passages.length === 0 && (
+      {!isPanelOpen && !isSearching && hasSearched && query.trim().length > 0 && passages.length === 0 && (
         <div class="py-16 flex flex-col items-center justify-center text-center animate-fadeIn">
           <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
             No matching passages found
@@ -815,6 +733,8 @@ export function SearchView({
 
         return (
           <div
+            id={isSynthesisActive ? 'search-active-narrating-card' : undefined}
+            data-segment-id="synthesis:overview"
             class={`mb-4 p-4 rounded-2xl border transition-all animate-fadeIn ${
               isSynthesisActive ? 'ring-2 ring-amber-500/50' : ''
             }`}
@@ -948,7 +868,7 @@ export function SearchView({
 
       {/* Results Stream */}
       <div class="flex flex-col space-y-3 pb-4">
-        {passages.map((p) => {
+        {passages.map((p, cardIdx) => {
           const chunkKey = getChunkKey(p.chunk);
           const isExpanded = expandedCardKey === chunkKey;
           const refString = formatCitation(p.chunk.book, p.chunk.start, p.chunk.end);
@@ -972,6 +892,8 @@ export function SearchView({
           return (
             <article
               key={chunkKey}
+              id={isCardActive ? 'search-active-narrating-card' : undefined}
+              data-segment-id={segmentId}
               class={`p-4 rounded-2xl border transition-all hover:shadow-sm ${
                 isCardActive ? 'ring-2 ring-amber-500/50' : ''
               }`}
@@ -1033,16 +955,8 @@ export function SearchView({
                           return;
                         }
                         setExpandedCardKey(chunkKey);
-                        narrator.play([
-                          {
-                            id: segmentId,
-                            citation: refString,
-                            text: p.chunk.text,
-                            book: p.chunk.book,
-                            chapter: p.chunk.start[0],
-                            verse: p.chunk.start[1],
-                          },
-                        ]);
+                        const segments = buildPassageSegments(passages);
+                        narrator.play(segments, cardIdx);
                       }}
                       title={isCardPlaying ? 'Pause narration' : 'Listen to passage'}
                       aria-label={isCardPlaying ? `Pause ${refString}` : `Listen to ${refString}`}
