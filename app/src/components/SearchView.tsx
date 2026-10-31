@@ -182,10 +182,7 @@ export function SearchView({
   const [initialSearch] = useState(() => $lastSearch.get());
   const [query, setQuery] = useState(initialSearch.query);
   const [passages, setPassages] = useState<ScoredPassage[]>(initialSearch.passages);
-  const [isPanelOpen, setIsPanelOpen] = useState(
-    initialSearch.query.trim().length === 0 ||
-      (initialSearch.passages.length === 0 && initialSearch.answerText.trim().length === 0),
-  );
+  const [isPanelOpen, setIsPanelOpen] = useState(initialSearch.query.trim().length === 0);
   const lastSubmittedQueryRef = useRef(initialSearch.query);
   const [expandedCardKey, setExpandedCardKey] = useState<string | null>(null);
   const [surroundingVerses, setSurroundingVerses] = useState<
@@ -197,7 +194,7 @@ export function SearchView({
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
   const [isSynthesisCollapsed, setIsSynthesisCollapsed] = useState<boolean>(false);
   const [isSearching, setIsSearching] = useState<boolean>(false);
-  const [hasSearched, setHasSearched] = useState<boolean>(initialSearch.passages.length > 0);
+  const [hasSearched, setHasSearched] = useState<boolean>(initialSearch.query.trim().length > 0);
   const searchHistory = useStore($searchHistory);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -514,7 +511,6 @@ export function SearchView({
                 e.stopPropagation();
                 searchRunIdRef.current++;
                 setQuery('');
-                setHasSearched(false);
                 setIsPanelOpen(true);
                 inputRef.current?.focus();
               }}
