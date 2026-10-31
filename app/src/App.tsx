@@ -295,6 +295,7 @@ export function App(): JSX.Element {
 
   const handleClearStorage = async () => {
     await store.clear();
+    await embedder.clear?.();
     await clearQueryModelCache();
     await engine.sync?.();
     $textPackageStatus.set('not_downloaded');

@@ -88,6 +88,7 @@ export interface QueryEmbedder {
   cancelLoad?(): void;
   embed(query: string): Promise<Float32Array>;
   hasModel?(): Promise<boolean>;
+  clear?(): Promise<void>;
 }
 
 /**

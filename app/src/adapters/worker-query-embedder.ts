@@ -71,6 +71,12 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
     }
   }
 
+  async clear(): Promise<void> {
+    this.cancelLoad();
+    this.progressListeners.clear();
+    await clearQueryModelCache();
+  }
+
   async hasModel(): Promise<boolean> {
     return isQueryModelCached();
   }
@@ -115,9 +121,17 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
 export async function isQueryModelCached(): Promise<boolean> {
   if (typeof caches === 'undefined') return false;
   try {
-    const cache = await caches.open('transformers-cache');
-    const keys = await cache.keys();
-    return keys.some((k) => k.url.includes('model_quantized.onnx'));
+    const cacheNames = await caches.keys();
+    for (const name of cacheNames) {
+      if (name.includes('transformers') || name.includes('onnx')) {
+        const cache = await caches.open(name);
+        const keys = await cache.keys();
+        if (keys.some((k) => k.url.includes('model_quantized.onnx'))) {
+          return true;
+        }
+      }
+    }
+    return false;
   } catch {
     return false;
   }
@@ -126,6 +140,12 @@ export async function isQueryModelCached(): Promise<boolean> {
 export async function clearQueryModelCache(): Promise<void> {
   if (typeof caches === 'undefined') return;
   try {
+    const cacheNames = await caches.keys();
+    for (const name of cacheNames) {
+      if (name.includes('transformers') || name.includes('onnx')) {
+        await caches.delete(name);
+      }
+    }
     await caches.delete('transformers-cache');
   } catch {
     // Ignore cache deletion errors
