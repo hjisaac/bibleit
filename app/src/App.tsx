@@ -319,17 +319,7 @@ export function App(): JSX.Element {
     if (activeTab === 'search') {
       const activeCard = document.getElementById('search-active-narrating-card');
       if (activeCard) {
-        const container = activeCard.closest('section') || document.documentElement;
-        const containerRect = container.getBoundingClientRect();
-        const cardRect = activeCard.getBoundingClientRect();
-
-        const isOutOfView =
-          cardRect.bottom < containerRect.top + 20 ||
-          cardRect.top > containerRect.bottom - 80;
-
-        if (isOutOfView) {
-          activeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+        activeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
       return;
     }

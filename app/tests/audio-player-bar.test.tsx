@@ -85,54 +85,20 @@ describe('AudioPlayerBar', () => {
     expect(onBarClick).not.toHaveBeenCalled();
   });
 
-  it('scrolls active narrating card into view when out of bounds', () => {
+  it('scrolls active narrating card into view when clicked', () => {
     const activeCard = document.createElement('article');
     activeCard.id = 'search-active-narrating-card';
     const scrollIntoViewMock = vi.fn();
     activeCard.scrollIntoView = scrollIntoViewMock;
+    document.body.appendChild(activeCard);
 
-    const container = document.createElement('section');
-    container.appendChild(activeCard);
-    document.body.appendChild(container);
-
-    // Mock getBoundingClientRect: container height 500, active card scrolled off top
-    vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({
-      top: 100,
-      bottom: 600,
-      left: 0,
-      right: 400,
-      width: 400,
-      height: 500,
-      x: 0,
-      y: 100,
-      toJSON: () => {},
-    });
-
-    vi.spyOn(activeCard, 'getBoundingClientRect').mockReturnValue({
-      top: 50,
-      bottom: 90, // bottom < container.top + 20 (90 < 120 => true, out of view)
-      left: 0,
-      right: 400,
-      width: 400,
-      height: 40,
-      x: 0,
-      y: 50,
-      toJSON: () => {},
-    });
-
-    // Emulate handleAudioBarClick scroll logic
+    // Emulate simplified handleAudioBarClick logic
     const foundCard = document.getElementById('search-active-narrating-card');
     if (foundCard) {
-      const scrollParent = foundCard.closest('section') || document.documentElement;
-      const cRect = scrollParent.getBoundingClientRect();
-      const elRect = foundCard.getBoundingClientRect();
-      const isOutOfView = elRect.bottom < cRect.top + 20 || elRect.top > cRect.bottom - 80;
-      if (isOutOfView) {
-        foundCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+      foundCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' });
-    document.body.removeChild(container);
+    document.body.removeChild(activeCard);
   });
 });
