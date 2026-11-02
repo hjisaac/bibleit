@@ -32,9 +32,9 @@ jobs:
       - name: Build app
         working-directory: app
         env:
-          VITE_CLOUDFLARE_R2_URL: ${{ vars.VITE_CLOUDFLARE_R2_URL || secrets.VITE_CLOUDFLARE_R2_URL }}
-          VITE_FEEDBACK_EMAIL: ${{ vars.VITE_FEEDBACK_EMAIL || secrets.VITE_FEEDBACK_EMAIL }}
-          VITE_BACKEND_API_URL: ${{ vars.VITE_BACKEND_API_URL || secrets.VITE_BACKEND_API_URL }}
+          VITE_CLOUDFLARE_R2_URL: ${{ vars.VITE_CLOUDFLARE_R2_URL }}
+          VITE_FEEDBACK_EMAIL: ${{ vars.VITE_FEEDBACK_EMAIL }}
+          VITE_BACKEND_API_URL: ${{ vars.VITE_BACKEND_API_URL }}
         run: |
           export VITE_CLOUDFLARE_R2_URL=$(echo "$VITE_CLOUDFLARE_R2_URL" | tr -d '[:space:]')
           export VITE_FEEDBACK_EMAIL=$(echo "$VITE_FEEDBACK_EMAIL" | tr -d '[:space:]')
