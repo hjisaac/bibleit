@@ -126,8 +126,8 @@ export interface NarrationState {
 }
 
 export enum PackageStatus {
-  NotDownloaded = 'not_downloaded',
-  Downloading = 'downloading',
-  Downloaded = 'downloaded',
+  NOT_DOWNLOADED = 'not_downloaded',
+  DOWNLOADING = 'downloading',
+  DOWNLOADED = 'downloaded',
 }
 
