@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   LocalEngine,
-  buildLocalEngine,
   SearchOriginEnum,
   type ArtifactStore,
   type RefParser,
@@ -12,10 +11,11 @@ import {
   type AnswerProvider,
   type Chunk,
   type ScoredPassage,
+  type LocalEnginePorts,
 } from '@bibleit/engine';
 
 describe('LocalEngine', () => {
-  function createMockPorts(overrides: Partial<Parameters<typeof buildLocalEngine>[0]> = {}) {
+  function createMockPorts(overrides: Partial<LocalEnginePorts> = {}): LocalEnginePorts {
     const mockStore: ArtifactStore = {
       manifest: vi.fn().mockResolvedValue({
         schema_version: '1.0.0',
@@ -81,13 +81,11 @@ describe('LocalEngine', () => {
     };
   }
 
-  it('instantiates via constructor and factory with identical behavior', async () => {
+  it('instantiates via constructor', async () => {
     const ports = createMockPorts();
-    const engine1 = new LocalEngine(ports);
-    const engine2 = buildLocalEngine(ports);
+    const engine = new LocalEngine(ports);
 
-    expect(engine1).toBeInstanceOf(LocalEngine);
-    expect(engine2).toBeInstanceOf(LocalEngine);
+    expect(engine).toBeInstanceOf(LocalEngine);
   });
 
   it('returns SearchOriginEnum.LOCAL on retrieve', async () => {

@@ -156,7 +156,3 @@ export class LocalEngine implements SearchEngine {
     };
   }
 }
-
-export function buildLocalEngine(p: LocalEnginePorts): LocalEngine {
-  return new LocalEngine(p);
-}

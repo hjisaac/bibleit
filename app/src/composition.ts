@@ -10,7 +10,6 @@ import type {
 } from './core/ports';
 import {
   LocalEngine,
-  buildLocalEngine,
   RegexRefParser,
   MiniSearchLexicalIndex,
   BruteForceVectorIndex,
@@ -22,7 +21,7 @@ import { OpfsArtifactStore } from './adapters/opfs-artifact-store';
 import { WorkerQueryEmbedder } from './adapters/worker-query-embedder';
 import { WebSpeechNarrator } from './adapters/web-speech-narrator';
 
-export { buildLocalEngine, LocalEngine };
+export { LocalEngine };
 
 export function createDefaultArtifactStore(): ArtifactStore {
   return new OpfsArtifactStore();
@@ -44,7 +43,7 @@ export function createDefaultEngine(
   embedder: QueryEmbedder = createDefaultEmbedder(),
   isDeviceOnly?: () => boolean,
 ): SearchEngine {
-  const localEngine = buildLocalEngine({
+  const localEngine = new LocalEngine({
     store,
     refParser: new RegexRefParser(),
     lexical: new MiniSearchLexicalIndex(),
