@@ -60,7 +60,10 @@ export interface ScoredPassage {
   source: RetrievalSource;
 }
 
-export type SearchExecutionOrigin = 'local' | 'remote';
+export enum SearchOriginEnum {
+  LOCAL = 'local',
+  REMOTE = 'remote',
+}
 
 /** Final, merged result the UI renders. */
 export interface RetrievalResult {
@@ -68,7 +71,7 @@ export interface RetrievalResult {
   /** References parsed out of the query, if any (always shown first). */
   parsedRefs: RefRange[];
   /** Execution origin declared by the engine resolving the query. */
-  origin?: SearchExecutionOrigin;
+  origin?: SearchOriginEnum;
 }
 
 // ---------------------------------------------------------------------------
@@ -129,32 +132,37 @@ export interface NarrationState {
   rate: number;
 }
 
-export enum PackageStatus {
+export enum PackageStatusEnum {
   NOT_DOWNLOADED = 'not_downloaded',
   DOWNLOADING = 'downloading',
   DOWNLOADED = 'downloaded',
 }
+export { PackageStatusEnum as PackageStatus };
 
-export enum ViewTab {
+export enum ViewTabEnum {
   SEARCH = 'search',
   READER = 'reader',
   SAVED = 'saved',
   SETTINGS = 'settings',
 }
+export { ViewTabEnum as ViewTab };
 
-export enum SearchMode {
+export enum SearchModeEnum {
   AUTO = 'auto',
   DEVICE = 'device',
 }
+export { SearchModeEnum as SearchMode };
 
-export enum NetworkStatus {
+export enum NetworkStatusEnum {
   ONLINE = 'online',
   OFFLINE = 'offline',
 }
+export { NetworkStatusEnum as NetworkStatus };
 
-export enum Theme {
+export enum ThemeEnum {
   PAPER = 'paper',
   SEPIA = 'sepia',
   OBSIDIAN = 'obsidian',
 }
+export { ThemeEnum as Theme };
 

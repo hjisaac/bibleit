@@ -60,7 +60,10 @@ export interface ScoredPassage {
   source: RetrievalSource;
 }
 
-export type SearchExecutionOrigin = 'local' | 'remote';
+export enum SearchOriginEnum {
+  LOCAL = 'local',
+  REMOTE = 'remote',
+}
 
 /** Final, merged result the UI renders. */
 export interface RetrievalResult {
@@ -68,7 +71,7 @@ export interface RetrievalResult {
   /** References parsed out of the query, if any (always shown first). */
   parsedRefs: RefRange[];
   /** Execution origin declared by the engine resolving the query. */
-  origin?: SearchExecutionOrigin;
+  origin?: SearchOriginEnum;
 }
 
 // ---------------------------------------------------------------------------

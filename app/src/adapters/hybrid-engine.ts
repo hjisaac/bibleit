@@ -1,4 +1,4 @@
-import type { AnswerProvider, RetrievalResult, SearchEngine } from '@bibleit/engine';
+import { SearchOriginEnum, type AnswerProvider, type RetrievalResult, type SearchEngine } from '@bibleit/engine';
 
 /**
  * HybridEngine: Tiered search engine delegating to remote API when online,
@@ -58,7 +58,7 @@ export class HybridEngine implements SearchEngine {
             this.remoteDownUntil = 0;
             return {
               ...result,
-              origin: 'remote',
+              origin: SearchOriginEnum.REMOTE,
             };
           }
         }

@@ -9,7 +9,7 @@ import type {
   VectorIndex,
 } from './core/ports';
 import { ArrayVerseStore } from './adapters/array-verse-store';
-import type { Chunk, RetrievalResult, ScoredPassage, VerseStore } from './core/types';
+import { SearchOriginEnum, type Chunk, type RetrievalResult, type ScoredPassage, type VerseStore } from './core/types';
 
 export interface LocalEnginePorts {
   store: ArtifactStore;
@@ -146,7 +146,7 @@ export function buildLocalEngine(p: LocalEnginePorts): SearchEngine {
       return {
         parsedRefs,
         passages: p.ranker.merge(refPassages, lexical, semantic, k),
-        origin: 'local',
+        origin: SearchOriginEnum.LOCAL,
       };
     },
   };
