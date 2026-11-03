@@ -762,7 +762,7 @@ export function SearchView({
               You're currently offline
             </p>
             <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-              An internet connection is required to search online. You can also save scripture to this device in Settings to search anytime offline.
+              An internet connection is required to search online. You can use 'Set Up' above or visit Settings to save scripture for offline search.
             </p>
           </div>
         ) : provenance?.fallbackFromRemote && offlineTextStatus !== PackageStatus.DOWNLOADED ? (
