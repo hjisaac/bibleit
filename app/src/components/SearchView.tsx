@@ -192,7 +192,7 @@ export function SearchView({
   const [initialSearch] = useState(() => $lastSearch.get());
   const [query, setQuery] = useState(initialSearch.query);
   const [passages, setPassages] = useState<ScoredPassage[]>(initialSearch.passages);
-  const [searchOrigin, setSearchOrigin] = useState<SearchOriginEnum | undefined>();
+  const [searchOrigin, setSearchOrigin] = useState<SearchOriginEnum | undefined>(() => initialSearch.origin);
   const [isPanelOpen, setIsPanelOpen] = useState(initialSearch.query.trim().length === 0);
   const lastSubmittedQueryRef = useRef(initialSearch.query);
   const [expandedCardKey, setExpandedCardKey] = useState<string | null>(null);
@@ -287,8 +287,8 @@ export function SearchView({
   const matchedBook = findBookByPrefix(query);
 
   useEffect(() => {
-    $lastSearch.set({ query, passages, answerText });
-  }, [query, passages, answerText]);
+    $lastSearch.set({ query, passages, answerText, origin: searchOrigin });
+  }, [query, passages, answerText, searchOrigin]);
 
   useEffect(() => {
     if (expandedCardKey === null) return;
@@ -765,7 +765,7 @@ export function SearchView({
               An internet connection is required to search online. You can use 'Set Up' above or visit Settings to save scripture for offline search.
             </p>
           </div>
-        ) : searchOrigin === SearchOriginEnum.LOCAL && offlineTextStatus !== PackageStatus.DOWNLOADED ? (
+        ) : searchOrigin !== SearchOriginEnum.REMOTE && offlineTextStatus !== PackageStatus.DOWNLOADED ? (
           <div class="py-12 sm:py-16 flex flex-col items-center justify-center text-center animate-fadeIn max-w-sm mx-auto px-4">
             <div class="w-10 h-10 rounded-full flex items-center justify-center mb-3 bg-amber-500/10 text-amber-600">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -776,7 +776,7 @@ export function SearchView({
               Search service currently unavailable
             </p>
             <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-              We couldn't connect to the search server. Check your connection or try again later.
+              We couldn't connect to the search server. Try again later, or use 'Set Up' above to save scripture to your device for offline search.
             </p>
           </div>
         ) : (
