@@ -131,3 +131,26 @@ export enum PackageStatus {
   DOWNLOADED = 'downloaded',
 }
 
+export enum ViewTab {
+  SEARCH = 'search',
+  READER = 'reader',
+  SAVED = 'saved',
+  SETTINGS = 'settings',
+}
+
+export enum SearchMode {
+  AUTO = 'auto',
+  DEVICE = 'device',
+}
+
+export enum NetworkStatus {
+  ONLINE = 'online',
+  OFFLINE = 'offline',
+}
+
+export enum Theme {
+  PAPER = 'paper',
+  SEPIA = 'sepia',
+  OBSIDIAN = 'obsidian',
+}
+

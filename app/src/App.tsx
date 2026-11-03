@@ -7,8 +7,8 @@ import {
   createDefaultNarrator,
 } from './composition';
 import { isQueryModelCached, clearQueryModelCache } from './adapters/worker-query-embedder';
-import { Header, type Theme } from './components/Header';
-import { Navbar, type ViewTab } from './components/Navbar';
+import { Header } from './components/Header';
+import { Navbar } from './components/Navbar';
 import { SearchView } from './components/SearchView';
 import { ReaderView } from './components/ReaderView';
 import { SavedView, type SavedVerse } from './components/SavedView';
@@ -18,7 +18,15 @@ import { HelpModal } from './components/HelpModal';
 import { FeedbackModal } from './components/FeedbackModal';
 import { AudioPlayerBar } from './components/AudioPlayerBar';
 import { useHeadroom } from './core/headroom';
-import { PackageStatus, type Manifest, type NarrationState } from './core/types';
+import {
+  PackageStatus,
+  ViewTab,
+  SearchMode,
+  NetworkStatus,
+  Theme,
+  type Manifest,
+  type NarrationState,
+} from './core/types';
 import { useStore } from '@nanostores/preact';
 import { $textPackageStatus, $aiPackageStatus, $modelPackageStatus } from './stores/packages';
 import {
@@ -28,7 +36,6 @@ import {
   $showHeadings,
   $hasSeenStorageBanner,
   $searchMode,
-  type SearchMode,
 } from './stores/preferences';
 import { $readerLocation, $savedVerses, type ReaderLocation } from './stores/reader';
 
@@ -36,7 +43,7 @@ export function App(): JSX.Element {
   const store = useMemo(() => createDefaultArtifactStore(), []);
   const embedder = useMemo(() => createDefaultEmbedder(), []);
   const engine = useMemo(
-    () => createDefaultEngine(store, embedder, () => $searchMode.get() === 'device'),
+    () => createDefaultEngine(store, embedder, () => $searchMode.get() === SearchMode.DEVICE),
     [store, embedder],
   );
   const narrator = useMemo(() => createDefaultNarrator(), []);
@@ -130,7 +137,7 @@ export function App(): JSX.Element {
   const handleToggleSearchMode = (mode: SearchMode) => {
     $searchMode.set(mode);
     showToast(
-      mode === 'device'
+      mode === SearchMode.DEVICE
         ? 'Device-only search enabled: Searching locally'
         : 'Auto mode: Cloud search with offline fallback',
     );
@@ -308,7 +315,7 @@ export function App(): JSX.Element {
   };
 
   const handleOpenStorage = () => {
-    handleTabChange('settings');
+    handleTabChange(ViewTab.SETTINGS);
     setHighlightStorage(true);
   };
 
@@ -317,7 +324,7 @@ export function App(): JSX.Element {
   };
 
   const handleAudioBarClick = () => {
-    if (activeTab === 'search') {
+    if (activeTab === ViewTab.SEARCH) {
       const activeCard = document.getElementById('search-active-narrating-card');
       if (activeCard) {
         activeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -350,8 +357,8 @@ export function App(): JSX.Element {
       showToast('Offline: Local search & reader active');
     };
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener(NetworkStatus.ONLINE, handleOnline);
+    window.addEventListener(NetworkStatus.OFFLINE, handleOffline);
 
     const interval = setInterval(() => {
       if (typeof navigator !== 'undefined') {
@@ -367,8 +374,8 @@ export function App(): JSX.Element {
     }, 800);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener(NetworkStatus.ONLINE, handleOnline);
+      window.removeEventListener(NetworkStatus.OFFLINE, handleOffline);
       clearInterval(interval);
     };
   }, []);
@@ -388,7 +395,7 @@ export function App(): JSX.Element {
 
   const handleOpenReader = (book: string, chapter: number, verse: number) => {
     setReaderLocation({ book, chapter, targetVerse: verse, scrollKey: Date.now() });
-    handleTabChange('reader');
+    handleTabChange(ViewTab.READER);
   };
 
   const handleSaveVerse = (verse: {
@@ -420,13 +427,6 @@ export function App(): JSX.Element {
         ];
         showToast(`Saved ${verse.citation} to bookmarks`);
       }
-      if (typeof localStorage !== 'undefined') {
-        try {
-          localStorage.setItem('bibleit_saved_verses', JSON.stringify(next));
-        } catch {
-          // Ignore quota errors
-        }
-      }
       return next;
     });
   };
@@ -448,7 +448,7 @@ export function App(): JSX.Element {
       />
 
       <main class="flex-1 flex flex-col overflow-hidden">
-        <div class={activeTab === 'search' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
+        <div class={activeTab === ViewTab.SEARCH ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
           <SearchView
             engine={engine}
             narrator={narrator}
@@ -468,7 +468,7 @@ export function App(): JSX.Element {
           />
         </div>
 
-        <div class={activeTab === 'reader' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
+        <div class={activeTab === ViewTab.READER ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
           <ReaderView
             book={readerLocation.book}
             chapter={readerLocation.chapter}
@@ -483,7 +483,7 @@ export function App(): JSX.Element {
           />
         </div>
 
-        {activeTab === 'saved' && (
+        {activeTab === ViewTab.SAVED && (
           <SavedView
             savedVerses={savedVerses}
             onOpenVerse={(item) => {
@@ -492,7 +492,7 @@ export function App(): JSX.Element {
           />
         )}
 
-        {activeTab === 'settings' && (
+        {activeTab === ViewTab.SETTINGS && (
           <SettingsView
             manifest={manifest}
             currentTheme={theme}
@@ -529,7 +529,7 @@ export function App(): JSX.Element {
         isNavbarVisible={isBarVisible}
         onNavigateToSegment={handleOpenReader}
         onBarClick={handleAudioBarClick}
-        title={activeTab === 'search' ? 'Scroll to playing card' : 'Jump to passage in Reader'}
+        title={activeTab === ViewTab.SEARCH ? 'Scroll to playing card' : 'Jump to passage in Reader'}
       />
 
       <Navbar activeTab={activeTab} onTabChange={handleTabChange} isVisible={isBarVisible} />

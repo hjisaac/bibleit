@@ -1,7 +1,6 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type { Theme } from './Header';
-import { PackageStatus, type Manifest } from '../core/types';
+import { PackageStatus, Theme, SearchMode, type Manifest } from '../core/types';
 
 export { PackageStatus };
 
@@ -21,8 +20,8 @@ interface SettingsViewProps {
   textProgress: number;
   aiProgress: number;
   modelProgress: number;
-  searchMode?: 'auto' | 'device';
-  onToggleSearchMode?: (mode: 'auto' | 'device') => void;
+  searchMode?: SearchMode;
+  onToggleSearchMode?: (mode: SearchMode) => void;
   highlightStorage?: boolean;
   onClearHighlight?: () => void;
   onDownloadText: () => void;
@@ -50,7 +49,7 @@ export function SettingsView({
   textProgress,
   aiProgress,
   modelProgress,
-  searchMode = 'auto',
+  searchMode = SearchMode.AUTO,
   onToggleSearchMode,
   highlightStorage,
   onClearHighlight,
@@ -137,9 +136,9 @@ export function SettingsView({
         <div class="grid grid-cols-3 gap-2.5">
           <button
             type="button"
-            onClick={() => onThemeChange('paper')}
+            onClick={() => onThemeChange(Theme.PAPER)}
             class={`p-3 rounded-xl border text-left transition-all ${
-              currentTheme === 'paper' ? 'ring-2 ring-amber-500/60 font-semibold' : 'hover:opacity-80'
+              currentTheme === Theme.PAPER ? 'ring-2 ring-amber-500/60 font-semibold' : 'hover:opacity-80'
             }`}
             style={{
               backgroundColor: '#FFFFFF',
@@ -153,9 +152,9 @@ export function SettingsView({
 
           <button
             type="button"
-            onClick={() => onThemeChange('sepia')}
+            onClick={() => onThemeChange(Theme.SEPIA)}
             class={`p-3 rounded-xl border text-left transition-all ${
-              currentTheme === 'sepia' ? 'ring-2 ring-amber-700/60 font-semibold' : 'hover:opacity-80'
+              currentTheme === Theme.SEPIA ? 'ring-2 ring-amber-700/60 font-semibold' : 'hover:opacity-80'
             }`}
             style={{
               backgroundColor: '#FAF6ED',
@@ -169,9 +168,9 @@ export function SettingsView({
 
           <button
             type="button"
-            onClick={() => onThemeChange('obsidian')}
+            onClick={() => onThemeChange(Theme.OBSIDIAN)}
             class={`p-3 rounded-xl border text-left transition-all ${
-              currentTheme === 'obsidian' ? 'ring-2 ring-stone-400 font-semibold' : 'hover:opacity-80'
+              currentTheme === Theme.OBSIDIAN ? 'ring-2 ring-stone-400 font-semibold' : 'hover:opacity-80'
             }`}
             style={{
               backgroundColor: '#171412',
@@ -334,9 +333,9 @@ export function SettingsView({
             <input
               type="checkbox"
               disabled={textPackageStatus !== PackageStatus.DOWNLOADED}
-              checked={searchMode === 'device'}
+              checked={searchMode === SearchMode.DEVICE}
               onChange={(e) =>
-                onToggleSearchMode?.((e.target as HTMLInputElement).checked ? 'device' : 'auto')
+                onToggleSearchMode?.((e.target as HTMLInputElement).checked ? SearchMode.DEVICE : SearchMode.AUTO)
               }
               class="sr-only peer"
             />

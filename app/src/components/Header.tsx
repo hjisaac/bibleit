@@ -1,6 +1,7 @@
 import type { JSX } from 'preact';
+import { Theme, SearchMode } from '../core/types';
 
-export type Theme = 'paper' | 'sepia' | 'obsidian';
+export { Theme, SearchMode };
 
 export interface UserProfile {
   name: string;
@@ -11,7 +12,7 @@ export interface UserProfile {
 interface HeaderProps {
   isOnline: boolean;
   isAiEnabled: boolean;
-  searchMode?: 'auto' | 'device';
+  searchMode?: SearchMode;
   user?: UserProfile | null;
   onOpenHelp: () => void;
   onOpenAccount?: () => void;
@@ -20,12 +21,12 @@ interface HeaderProps {
 export function Header({
   isOnline,
   isAiEnabled,
-  searchMode = 'auto',
+  searchMode = SearchMode.AUTO,
   user,
   onOpenHelp,
   onOpenAccount,
 }: HeaderProps): JSX.Element {
-  const aiBadge = searchMode === 'device'
+  const aiBadge = searchMode === SearchMode.DEVICE
     ? {
         label: 'Device Only',
         colorClass: 'bg-amber-500',
