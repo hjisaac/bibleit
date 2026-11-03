@@ -5,7 +5,7 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import {
-  buildLocalEngine,
+  LocalEngine,
   RegexRefParser,
   MiniSearchLexicalIndex,
   BruteForceVectorIndex,
@@ -36,7 +36,7 @@ const store: ArtifactStore = artifactBaseUrl
   : new FsArtifactStore(dataDir);
 const embedder = new NodeQueryEmbedder();
 
-const engine: SearchEngine = buildLocalEngine({
+const engine: SearchEngine = new LocalEngine({
   store,
   refParser: new RegexRefParser(),
   lexical: new MiniSearchLexicalIndex(),
