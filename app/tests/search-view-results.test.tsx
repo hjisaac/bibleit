@@ -105,7 +105,8 @@ describe('SearchView Result Cards & User Actions', () => {
       onToast: onToastSpy,
       ...overrides,
     };
-    return render(<SearchView {...props} />);
+    const rendered = render(<SearchView {...props} />);
+    return { ...rendered, props };
   }
 
   it('renders passage citation, heading badge, and passage text', () => {
@@ -441,5 +442,33 @@ describe('SearchView Result Cards & User Actions', () => {
     expect(screen.getByText(/Saving scripture to this device…/i)).toBeTruthy();
     expect(screen.getByText('42%')).toBeTruthy();
   });
+
+  it('automatically refreshes and retrieves passages when offlineTextStatus transitions to DOWNLOADED', async () => {
+    localStorage.setItem(
+      'bibleit_last_search',
+      JSON.stringify({ query: 'love your neighbor', passages: [], answerText: '' })
+    );
+
+    retrieveSpy.mockResolvedValueOnce({
+      query: 'love your neighbor',
+      passages: samplePassages,
+      sources: { reference: [], lexical: samplePassages, semantic: [] },
+      parsedRefs: [],
+      origin: 'local',
+    });
+
+    const { rerender, props } = renderSearchView({
+      offlineTextStatus: PackageStatus.DOWNLOADING,
+    });
+
+    // Simulate download completing and transitioning to DOWNLOADED
+    rerender(<SearchView {...props} offlineTextStatus={PackageStatus.DOWNLOADED} />);
+
+    await waitFor(() => {
+      expect(retrieveSpy).toHaveBeenCalledWith('love your neighbor');
+      expect(screen.getByText(/Rejoice in the Lord always/i)).toBeTruthy();
+    });
+  });
 });
+
 

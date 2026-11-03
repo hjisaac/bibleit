@@ -214,7 +214,7 @@ export function SearchView({
   const prevOfflineTextStatusRef = useRef(offlineTextStatus);
   useEffect(() => {
     if (
-      prevOfflineTextStatusRef.current === PackageStatus.DOWNLOADING &&
+      prevOfflineTextStatusRef.current !== PackageStatus.DOWNLOADED &&
       offlineTextStatus === PackageStatus.DOWNLOADED
     ) {
       if (passages.length === 0 && query.trim().length > 0) {
@@ -223,6 +223,12 @@ export function SearchView({
     }
     prevOfflineTextStatusRef.current = offlineTextStatus;
   }, [offlineTextStatus, passages.length, query]);
+
+  useEffect(() => {
+    if (offlineTextStatus === PackageStatus.DOWNLOADED && passages.length === 0 && query.trim().length > 0) {
+      runSearch(query);
+    }
+  }, []);
 
   const runSearch = (targetQuery: string) => {
     const trimmed = targetQuery.trim();

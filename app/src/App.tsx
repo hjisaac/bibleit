@@ -203,9 +203,9 @@ export function App(): JSX.Element {
     try {
       await store.verses((pct) => setTextProgress(Math.round(pct * 0.8)), controller.signal);
       await store.chunks((pct) => setTextProgress(80 + Math.round(pct * 0.2)), controller.signal);
-      $textPackageStatus.set(PackageStatus.DOWNLOADED);
       setTextProgress(100);
       await engine.sync?.();
+      $textPackageStatus.set(PackageStatus.DOWNLOADED);
       showToast('Scripture text verified & installed in OPFS (1.2 MB)');
     } catch (err) {
       if (controller.signal.aborted) {
@@ -241,9 +241,9 @@ export function App(): JSX.Element {
     setAiProgress(0);
     try {
       await store.embeddings((pct) => setAiProgress(pct), controller.signal);
-      $aiPackageStatus.set(PackageStatus.DOWNLOADED);
       setAiProgress(100);
       await engine.sync?.();
+      $aiPackageStatus.set(PackageStatus.DOWNLOADED);
       showToast('Verse vectors verified & installed in OPFS (2.1 MB)');
     } catch (err) {
       if (controller.signal.aborted) {
@@ -278,9 +278,9 @@ export function App(): JSX.Element {
     setModelProgress(0);
     try {
       await embedder.load((fraction) => setModelProgress(Math.round(fraction * 100)));
-      $modelPackageStatus.set(PackageStatus.DOWNLOADED);
       setModelProgress(100);
       await engine.sync?.();
+      $modelPackageStatus.set(PackageStatus.DOWNLOADED);
       showToast('Neural query model installed in browser cache (137 MB)');
     } catch (err) {
       if (isModelAbortedRef.current || (err instanceof DOMException && err.name === 'AbortError')) {

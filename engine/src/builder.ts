@@ -34,6 +34,7 @@ export class LocalEngine implements SearchEngine {
   private verseStore: VerseStore | null;
   private lexicalReady = false;
   private semanticReady = false;
+  private currentSync: Promise<void> | null = null;
 
   constructor(ports: LocalEnginePorts) {
     this.ports = ports;
@@ -112,16 +113,29 @@ export class LocalEngine implements SearchEngine {
   }
 
   public async sync(): Promise<void> {
+    const syncOp = (async () => {
+      try {
+        const chunks = await this.loadBase();
+        await this.loadSemantic(chunks);
+      } catch (err) {
+        console.warn('[Local Engine Sync Error]:', err);
+      }
+    })();
+    this.currentSync = syncOp;
     try {
-      const chunks = await this.loadBase();
-      await this.loadSemantic(chunks);
-    } catch (err) {
-      console.warn('[Local Engine Sync Error]:', err);
+      await syncOp;
+    } finally {
+      if (this.currentSync === syncOp) {
+        this.currentSync = null;
+      }
     }
   }
 
   public async retrieve(query: string, k = 10): Promise<RetrievalResult> {
     await this.ready;
+    if (this.currentSync) {
+      await this.currentSync;
+    }
     const parsedRefs = this.ports.refParser.parse(query);
     const refPassages = this.verseStore
       ? parsedRefs.flatMap((r) => {

@@ -146,4 +146,86 @@ describe('LocalEngine', () => {
     await engine.ready;
     await expect(engine.sync()).resolves.toBeUndefined();
   });
+
+  it('transitions from uninstalled to installed text and returns lexical results on retrieve', async () => {
+    let hasVerses = false;
+    const testVerses = {
+      ROM: [
+        [], [], [], [], [], [], [], [], [], [], [], [],
+        [
+          'Let every soul be in subjection to the higher authorities.',
+          'Therefore he who resists the authority, withstands the ordinance of God.',
+          'For rulers are not a terror to good work, but to evil.',
+          'for he is a servant of God to you for good.',
+          'Therefore you need to be in subjection, not only because of the wrath, but also for conscience’ sake.',
+          'For this reason you also pay taxes, for they are servants of God’s service, attending continually on this very thing.',
+          'Give therefore to everyone what you owe: taxes to whom taxes are due; customs to whom customs; respect to whom respect; honor to whom honor.',
+          'Owe no one anything, except to love one another; for he who loves his neighbor has fulfilled the law.',
+          'For this, "You shall not commit adultery," "You shall not murder," "You shall not steal," "You shall not give false testimony," "You shall not covet," and whatever other commandments there are, are all summed up in this saying, namely, "You shall love your neighbor as yourself."',
+          'Love doesn’t harm a neighbor. Love therefore is the fulfillment of the law.',
+        ],
+      ],
+    };
+
+    const testChunks: Chunk[] = [
+      {
+        book: 'ROM',
+        start: [13, 8],
+        end: [13, 10],
+        text: '',
+      },
+    ];
+
+    const store: ArtifactStore = {
+      manifest: vi.fn().mockResolvedValue({
+        schema_version: '3.0.0',
+        text: { translation: 'WEB', total_verses: 10 },
+        chunks: { strategy: 'pericope', count: 1 },
+        embeddings: { model: 'mock-model', dim: 4, dtype: 'int8', count: 1 },
+      }),
+      hasVerses: vi.fn(async () => hasVerses),
+      hasEmbeddings: vi.fn(async () => false),
+      verses: vi.fn(async () => testVerses),
+      chunks: vi.fn(async () => testChunks),
+      embeddings: vi.fn(async () => ({ data: new ArrayBuffer(0) })),
+      clear: vi.fn(async () => {}),
+    };
+
+    const { MiniSearchLexicalIndex, RegexRefParser, RrfRanker, NullAnswerProvider } = await import('@bibleit/engine');
+
+    const engine = new LocalEngine({
+      store,
+      refParser: new RegexRefParser(),
+      lexical: new MiniSearchLexicalIndex(),
+      embedder: {
+        modelId: 'mock-model',
+        dim: 4,
+        load: vi.fn().mockResolvedValue(undefined),
+        embed: vi.fn().mockResolvedValue(new Float32Array([0, 0, 0, 0])),
+      },
+      vectors: {
+        build: vi.fn().mockResolvedValue(undefined),
+        search: vi.fn().mockReturnValue([]),
+      },
+      ranker: new RrfRanker(),
+      answers: new NullAnswerProvider(),
+    });
+
+    await engine.ready;
+
+    // 1. Cold start with no text installed -> 0 passages
+    const coldResult = await engine.retrieve('love your neighbor');
+    expect(coldResult.passages).toHaveLength(0);
+
+    // 2. User installs text -> sync engine
+    hasVerses = true;
+    await engine.sync();
+
+    // 3. Search again -> should return the matching passage!
+    const warmResult = await engine.retrieve('love your neighbor');
+    expect(warmResult.passages.length).toBeGreaterThan(0);
+    expect(warmResult.passages[0]?.chunk.book).toBe('ROM');
+    expect(warmResult.passages[0]?.chunk.text).toContain('You shall love your neighbor as yourself');
+  });
 });
+
