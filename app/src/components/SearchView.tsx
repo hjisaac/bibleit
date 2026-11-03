@@ -762,7 +762,7 @@ export function SearchView({
               You're currently offline
             </p>
             <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-              An internet connection is required to search online. You can use 'Set Up' above or visit Settings to save scripture for offline search.
+              An internet connection is required to search online. Tap above to set up scripture, or visit Settings to save it for offline search.
             </p>
           </div>
         ) : searchOrigin !== SearchOriginEnum.REMOTE && offlineTextStatus !== PackageStatus.DOWNLOADED ? (
@@ -776,7 +776,7 @@ export function SearchView({
               Search service currently unavailable
             </p>
             <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-              We couldn't connect to the search server. Try again later, or use 'Set Up' above to save scripture to your device for offline search.
+              We couldn't connect to the search server. Try again later, or tap above to set up scripture for offline search.
             </p>
           </div>
         ) : (
