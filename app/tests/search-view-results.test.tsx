@@ -4,7 +4,7 @@ import { SearchView } from '../src/components/SearchView';
 import { HybridEngine } from '../src/adapters/hybrid-engine';
 import type { SearchEngine, AudioNarrator } from '../src/core/ports';
 import type { ComponentProps } from 'preact';
-import { getChunkKey, type ScoredPassage } from '../src/core/types';
+import { getChunkKey, PackageStatus, type ScoredPassage } from '../src/core/types';
 
 type SearchViewProps = ComponentProps<typeof SearchView>;
 
@@ -97,7 +97,7 @@ describe('SearchView Result Cards & User Actions', () => {
       isAiEnabled: false,
       isInspectorMode: false,
       showHeadings: true,
-      offlineTextStatus: 'ready',
+      offlineTextStatus: PackageStatus.DOWNLOADED,
       hasSeenOnboarding: true,
       savedVerses: [],
       onSaveVerse: onSaveVerseSpy,

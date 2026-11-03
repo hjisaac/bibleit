@@ -125,3 +125,32 @@ export interface NarrationState {
   rate: number;
 }
 
+export enum PackageStatus {
+  NOT_DOWNLOADED = 'not_downloaded',
+  DOWNLOADING = 'downloading',
+  DOWNLOADED = 'downloaded',
+}
+
+export enum ViewTab {
+  SEARCH = 'search',
+  READER = 'reader',
+  SAVED = 'saved',
+  SETTINGS = 'settings',
+}
+
+export enum SearchMode {
+  AUTO = 'auto',
+  DEVICE = 'device',
+}
+
+export enum NetworkStatus {
+  ONLINE = 'online',
+  OFFLINE = 'offline',
+}
+
+export enum Theme {
+  PAPER = 'paper',
+  SEPIA = 'sepia',
+  OBSIDIAN = 'obsidian',
+}
+

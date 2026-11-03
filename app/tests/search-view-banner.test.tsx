@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/preact';
 import { SearchView } from '../src/components/SearchView';
+import { PackageStatus } from '../src/core/types';
 import type { SearchEngine } from '../src/core/ports';
 import type { ComponentProps } from 'preact';
 
@@ -32,7 +33,7 @@ function renderSearchView(overrides: Partial<SearchViewProps> = {}) {
     isAiEnabled: false,
     isInspectorMode: false,
     showHeadings: true,
-    offlineTextStatus: 'not_downloaded',
+    offlineTextStatus: PackageStatus.NOT_DOWNLOADED,
     hasSeenOnboarding: false,
     savedVerses: [],
     onOpenStorage,
@@ -49,7 +50,7 @@ function renderSearchView(overrides: Partial<SearchViewProps> = {}) {
 describe('SearchView Onboarding & Offline Storage Banner', () => {
   describe('Stage 1: Prominent Onboarding Warning (First Visit)', () => {
     it('renders the full warning banner when offline text is not downloaded and hasSeenOnboarding is false', () => {
-      renderSearchView({ offlineTextStatus: 'not_downloaded', hasSeenOnboarding: false });
+      renderSearchView({ offlineTextStatus: PackageStatus.NOT_DOWNLOADED, hasSeenOnboarding: false });
 
       expect(
         screen.getByText(/Save scripture for offline searches/i),
@@ -60,7 +61,7 @@ describe('SearchView Onboarding & Offline Storage Banner', () => {
 
     it('triggers onOpenStorage when clicking the "Set Up →" button in the prominent banner', () => {
       const { props } = renderSearchView({
-        offlineTextStatus: 'not_downloaded',
+        offlineTextStatus: PackageStatus.NOT_DOWNLOADED,
         hasSeenOnboarding: false,
       });
 
@@ -70,7 +71,7 @@ describe('SearchView Onboarding & Offline Storage Banner', () => {
 
     it('triggers onDismissOnboarding when clicking the cross button', () => {
       const { props } = renderSearchView({
-        offlineTextStatus: 'not_downloaded',
+        offlineTextStatus: PackageStatus.NOT_DOWNLOADED,
         hasSeenOnboarding: false,
       });
 
@@ -81,7 +82,7 @@ describe('SearchView Onboarding & Offline Storage Banner', () => {
 
   describe('Stage 2: Discreet Reminder (After Dismissal)', () => {
     it('renders only the discreet single-line reminder once the full banner has been dismissed', () => {
-      renderSearchView({ offlineTextStatus: 'not_downloaded', hasSeenOnboarding: true });
+      renderSearchView({ offlineTextStatus: PackageStatus.NOT_DOWNLOADED, hasSeenOnboarding: true });
 
       // Prominent banner elements should NOT exist
       expect(screen.queryByRole('button', { name: /^Set Up →$/ })).toBeNull();
@@ -95,7 +96,7 @@ describe('SearchView Onboarding & Offline Storage Banner', () => {
 
     it('triggers onOpenStorage when tapping the discreet reminder', () => {
       const { props } = renderSearchView({
-        offlineTextStatus: 'not_downloaded',
+        offlineTextStatus: PackageStatus.NOT_DOWNLOADED,
         hasSeenOnboarding: true,
       });
 
@@ -105,16 +106,16 @@ describe('SearchView Onboarding & Offline Storage Banner', () => {
   });
 
   describe('Stage 3: Offline Storage Ready', () => {
-    it('renders neither the prominent banner nor the discreet reminder when offline text is ready', () => {
-      renderSearchView({ offlineTextStatus: 'ready', hasSeenOnboarding: false });
+    it('renders neither the prominent banner nor the discreet reminder when offline text is downloaded', () => {
+      renderSearchView({ offlineTextStatus: PackageStatus.DOWNLOADED, hasSeenOnboarding: false });
 
       expect(
         screen.queryByText(/Save scripture for offline searches/i),
       ).toBeNull();
     });
 
-    it('remains hidden when offline text is ready even if hasSeenOnboarding is true', () => {
-      renderSearchView({ offlineTextStatus: 'ready', hasSeenOnboarding: true });
+    it('remains hidden when offline text is downloaded even if hasSeenOnboarding is true', () => {
+      renderSearchView({ offlineTextStatus: PackageStatus.DOWNLOADED, hasSeenOnboarding: true });
 
       expect(
         screen.queryByText(/Save scripture for offline searches/i),

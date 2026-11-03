@@ -1,6 +1,7 @@
 import type { JSX } from 'preact';
+import { ViewTab } from '../core/types';
 
-export type ViewTab = 'search' | 'reader' | 'saved' | 'settings';
+export { ViewTab };
 
 interface NavbarProps {
   activeTab: ViewTab;
@@ -21,12 +22,12 @@ export function Navbar({ activeTab, onTabChange, isVisible = true }: NavbarProps
     >
       <button
         type="button"
-        onClick={() => onTabChange('search')}
+        onClick={() => onTabChange(ViewTab.SEARCH)}
         class={`flex flex-col items-center gap-1 transition-opacity ${
-          activeTab === 'search' ? 'font-semibold' : 'hover:opacity-75'
+          activeTab === ViewTab.SEARCH ? 'font-semibold' : 'hover:opacity-75'
         }`}
         style={{
-          color: activeTab === 'search' ? 'var(--text-main)' : 'var(--text-muted)',
+          color: activeTab === ViewTab.SEARCH ? 'var(--text-main)' : 'var(--text-muted)',
         }}
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -42,12 +43,12 @@ export function Navbar({ activeTab, onTabChange, isVisible = true }: NavbarProps
 
       <button
         type="button"
-        onClick={() => onTabChange('reader')}
+        onClick={() => onTabChange(ViewTab.READER)}
         class={`flex flex-col items-center gap-1 transition-opacity ${
-          activeTab === 'reader' ? 'font-semibold' : 'hover:opacity-75'
+          activeTab === ViewTab.READER ? 'font-semibold' : 'hover:opacity-75'
         }`}
         style={{
-          color: activeTab === 'reader' ? 'var(--text-main)' : 'var(--text-muted)',
+          color: activeTab === ViewTab.READER ? 'var(--text-main)' : 'var(--text-muted)',
         }}
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -63,12 +64,12 @@ export function Navbar({ activeTab, onTabChange, isVisible = true }: NavbarProps
 
       <button
         type="button"
-        onClick={() => onTabChange('saved')}
+        onClick={() => onTabChange(ViewTab.SAVED)}
         class={`flex flex-col items-center gap-1 transition-opacity ${
-          activeTab === 'saved' ? 'font-semibold' : 'hover:opacity-75'
+          activeTab === ViewTab.SAVED ? 'font-semibold' : 'hover:opacity-75'
         }`}
         style={{
-          color: activeTab === 'saved' ? 'var(--text-main)' : 'var(--text-muted)',
+          color: activeTab === ViewTab.SAVED ? 'var(--text-main)' : 'var(--text-muted)',
         }}
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -84,12 +85,12 @@ export function Navbar({ activeTab, onTabChange, isVisible = true }: NavbarProps
 
       <button
         type="button"
-        onClick={() => onTabChange('settings')}
+        onClick={() => onTabChange(ViewTab.SETTINGS)}
         class={`flex flex-col items-center gap-1 transition-opacity ${
-          activeTab === 'settings' ? 'font-semibold' : 'hover:opacity-75'
+          activeTab === ViewTab.SETTINGS ? 'font-semibold' : 'hover:opacity-75'
         }`}
         style={{
-          color: activeTab === 'settings' ? 'var(--text-main)' : 'var(--text-muted)',
+          color: activeTab === ViewTab.SETTINGS ? 'var(--text-main)' : 'var(--text-muted)',
         }}
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
