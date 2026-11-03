@@ -384,7 +384,7 @@ describe('SearchView Result Cards & User Actions', () => {
     });
   });
 
-  it('displays offline error state with download action when offline and text not downloaded', async () => {
+  it('displays offline error state when offline and text not downloaded', async () => {
     retrieveSpy.mockResolvedValueOnce({
       query: 'love',
       passages: [],
@@ -392,11 +392,9 @@ describe('SearchView Result Cards & User Actions', () => {
       parsedRefs: [],
     });
 
-    const onDownloadTextSpy = vi.fn();
     renderSearchView({
       isOnline: false,
       offlineTextStatus: PackageStatus.NOT_DOWNLOADED,
-      onDownloadText: onDownloadTextSpy,
     });
 
     const input = screen.getByRole('textbox') as HTMLInputElement;
@@ -405,12 +403,8 @@ describe('SearchView Result Cards & User Actions', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/You're currently offline/i)).toBeTruthy();
+      expect(screen.getByText(/An internet connection is required to search online/i)).toBeTruthy();
     });
-
-    const saveBtn = screen.getByRole('button', { name: /Save Bible to Device/i });
-    expect(saveBtn).toBeTruthy();
-    fireEvent.click(saveBtn);
-    expect(onDownloadTextSpy).toHaveBeenCalledTimes(1);
   });
 
   it('displays server unavailable error state when remote fails and text not downloaded', async () => {
@@ -426,7 +420,6 @@ describe('SearchView Result Cards & User Actions', () => {
       engine: hybridEngine,
       isOnline: true,
       offlineTextStatus: PackageStatus.NOT_DOWNLOADED,
-      onDownloadText: vi.fn(),
     });
 
     const input = screen.getByRole('textbox') as HTMLInputElement;
@@ -435,8 +428,7 @@ describe('SearchView Result Cards & User Actions', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Search service currently unavailable/i)).toBeTruthy();
-      expect(screen.getByRole('button', { name: /Try Again/i })).toBeTruthy();
-      expect(screen.getByRole('button', { name: /Save Bible to Device/i })).toBeTruthy();
+      expect(screen.getByText(/We couldn't connect to the search server/i)).toBeTruthy();
     });
   });
 

@@ -459,7 +459,6 @@ export function App(): JSX.Element {
             showHeadings={showHeadings}
             offlineTextStatus={textPackageStatus}
             textProgress={textProgress}
-            onDownloadText={handleDownloadText}
             hasSeenOnboarding={hasSeenStorageBanner}
             savedVerses={savedVerses}
             onOpenStorage={handleOpenStorage}

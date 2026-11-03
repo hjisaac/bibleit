@@ -36,7 +36,6 @@ interface SearchViewProps {
   showHeadings?: boolean;
   offlineTextStatus?: PackageStatus;
   textProgress?: number;
-  onDownloadText?: () => void;
   hasSeenOnboarding?: boolean;
   savedVerses?: SavedVerse[];
   onOpenStorage?: () => void;
@@ -182,7 +181,6 @@ export function SearchView({
   showHeadings = true,
   offlineTextStatus = PackageStatus.DOWNLOADED,
   textProgress,
-  onDownloadText,
   hasSeenOnboarding = true,
   savedVerses,
   onOpenStorage,
@@ -763,22 +761,9 @@ export function SearchView({
             <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
               You're currently offline
             </p>
-            <p class="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-              An internet connection is required to search online, or save scripture to this device for offline searches anytime.
+            <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
+              An internet connection is required to search online. You can also save scripture to this device in Settings to search anytime offline.
             </p>
-            {(onDownloadText || onOpenStorage) && (
-              <button
-                type="button"
-                onClick={onDownloadText ?? onOpenStorage}
-                class="px-4 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all hover:opacity-90"
-                style={{
-                  backgroundColor: 'var(--accent)',
-                  color: '#FFFFFF',
-                }}
-              >
-                Save Bible to Device (1.2 MB)
-              </button>
-            )}
           </div>
         ) : provenance?.fallbackFromRemote && offlineTextStatus !== PackageStatus.DOWNLOADED ? (
           <div class="py-12 sm:py-16 flex flex-col items-center justify-center text-center animate-fadeIn max-w-sm mx-auto px-4">
@@ -790,36 +775,9 @@ export function SearchView({
             <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
               Search service currently unavailable
             </p>
-            <p class="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-              We couldn't connect to the search server. Check your connection or try again. You can also save scripture to this device so search always works.
+            <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
+              We couldn't connect to the search server. Check your connection or try again later.
             </p>
-            <div class="flex flex-col sm:flex-row items-center gap-2">
-              <button
-                type="button"
-                onClick={() => runSearch(query)}
-                class="px-4 py-2 rounded-xl text-xs font-semibold border transition-all hover:opacity-85 w-full sm:w-auto"
-                style={{
-                  borderColor: 'var(--border-subtle)',
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                  color: 'var(--text-main)',
-                }}
-              >
-                Try Again
-              </button>
-              {(onDownloadText || onOpenStorage) && (
-                <button
-                  type="button"
-                  onClick={onDownloadText ?? onOpenStorage}
-                  class="px-4 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all hover:opacity-90 w-full sm:w-auto"
-                  style={{
-                    backgroundColor: 'var(--accent)',
-                    color: '#FFFFFF',
-                  }}
-                >
-                  Save Bible to Device (1.2 MB)
-                </button>
-              )}
-            </div>
           </div>
         ) : (
           <div class="py-16 flex flex-col items-center justify-center text-center animate-fadeIn">
