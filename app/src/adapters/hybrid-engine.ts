@@ -1,4 +1,5 @@
-import { SearchOriginEnum, type AnswerProvider, type RetrievalResult, type SearchEngine } from '@bibleit/engine';
+import type { AnswerProvider, SearchEngine } from '../core/ports';
+import { SearchOriginEnum, type RetrievalResult } from '../core/types';
 
 /**
  * HybridEngine: Tiered search engine delegating to remote API when online,

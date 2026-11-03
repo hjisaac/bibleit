@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HybridEngine } from '../src/adapters/hybrid-engine';
-import { SearchOriginEnum, type RetrievalResult, type SearchEngine } from '@bibleit/engine';
+import type { SearchEngine } from '../src/core/ports';
+import { SearchOriginEnum, type RetrievalResult } from '../src/core/types';
 
 describe('HybridEngine', () => {
   const mockLocalResult: RetrievalResult = {
