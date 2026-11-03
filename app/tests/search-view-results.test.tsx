@@ -383,5 +383,71 @@ describe('SearchView Result Cards & User Actions', () => {
       expect(screen.getByText(/Rejoice in the Lord always/i)).toBeTruthy();
     });
   });
+
+  it('displays offline error state with download action when offline and text not downloaded', async () => {
+    retrieveSpy.mockResolvedValueOnce({
+      query: 'love',
+      passages: [],
+      sources: { reference: [], lexical: [], semantic: [] },
+      parsedRefs: [],
+    });
+
+    const onDownloadTextSpy = vi.fn();
+    renderSearchView({
+      isOnline: false,
+      offlineTextStatus: PackageStatus.NOT_DOWNLOADED,
+      onDownloadText: onDownloadTextSpy,
+    });
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'love' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(screen.getByText(/You're currently offline/i)).toBeTruthy();
+    });
+
+    const saveBtn = screen.getByRole('button', { name: /Save Bible to Device/i });
+    expect(saveBtn).toBeTruthy();
+    fireEvent.click(saveBtn);
+    expect(onDownloadTextSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('displays server unavailable error state when remote fails and text not downloaded', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Network error'));
+    const emptyLocalEngine: SearchEngine = {
+      ready: Promise.resolve(),
+      retrieve: vi.fn().mockResolvedValue({ passages: [], parsedRefs: [] }),
+      answers: { available: false, answer: async function* () {} },
+    };
+    const hybridEngine = new HybridEngine(emptyLocalEngine, 'https://api.bibleit.test');
+
+    renderSearchView({
+      engine: hybridEngine,
+      isOnline: true,
+      offlineTextStatus: PackageStatus.NOT_DOWNLOADED,
+      onDownloadText: vi.fn(),
+    });
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'love' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Search service currently unavailable/i)).toBeTruthy();
+      expect(screen.getByRole('button', { name: /Try Again/i })).toBeTruthy();
+      expect(screen.getByRole('button', { name: /Save Bible to Device/i })).toBeTruthy();
+    });
+  });
+
+  it('displays active download progress card when offlineTextStatus is DOWNLOADING', () => {
+    renderSearchView({
+      offlineTextStatus: PackageStatus.DOWNLOADING,
+      textProgress: 42,
+    });
+
+    expect(screen.getByText(/Saving scripture to this device…/i)).toBeTruthy();
+    expect(screen.getByText('42%')).toBeTruthy();
+  });
 });
 

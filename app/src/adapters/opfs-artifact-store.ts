@@ -74,51 +74,68 @@ async function fetchWithProgress(
   onProgress?: (progressPercent: number) => void,
   signal?: AbortSignal,
 ): Promise<Uint8Array<ArrayBuffer>> {
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`Failed to fetch ${url}: HTTP ${res.status}`);
+  const MAX_RETRIES = 2;
+  const RETRY_DELAY_MS = 1000;
 
-  const contentLength = res.headers.get('content-length');
-  const total = contentLength ? parseInt(contentLength, 10) : 0;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch(url, { signal });
+      if (!res.ok) throw new Error(`Failed to fetch ${url}: HTTP ${res.status}`);
 
-  if (!res.body || total === 0 || !onProgress) {
-    const buf = await res.arrayBuffer();
-    onProgress?.(100);
-    return new Uint8Array(buf);
-  }
+      const contentLength = res.headers.get('content-length');
+      const total = contentLength ? parseInt(contentLength, 10) : 0;
 
-  const reader = res.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let loaded = 0;
-
-  try {
-    while (true) {
-      if (signal?.aborted) {
-        await reader.cancel();
-        throw new DOMException('The user aborted a request.', 'AbortError');
+      if (!res.body || total === 0 || !onProgress) {
+        const buf = await res.arrayBuffer();
+        onProgress?.(100);
+        return new Uint8Array(buf) as Uint8Array<ArrayBuffer>;
       }
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value) {
-        chunks.push(value);
-        loaded += value.length;
-        onProgress(Math.min(99, Math.round((loaded / total) * 100)));
+
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let loaded = 0;
+
+      try {
+        while (true) {
+          if (signal?.aborted) {
+            await reader.cancel();
+            throw new DOMException('The user aborted a request.', 'AbortError');
+          }
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) {
+            chunks.push(value);
+            loaded += value.length;
+            onProgress(Math.min(99, Math.round((loaded / total) * 100)));
+          }
+        }
+      } catch (err) {
+        if (signal?.aborted) {
+          throw new DOMException('The user aborted a request.', 'AbortError');
+        }
+        throw err;
       }
+
+      const merged = new Uint8Array(loaded);
+      let offset = 0;
+      for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.length;
+      }
+      onProgress(100);
+      return merged as Uint8Array<ArrayBuffer>;
+    } catch (err) {
+      if (signal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
+        throw err;
+      }
+      if (attempt === MAX_RETRIES) {
+        throw err;
+      }
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
     }
-  } catch (err) {
-    if (signal?.aborted) {
-      throw new DOMException('The user aborted a request.', 'AbortError');
-    }
-    throw err;
   }
 
-  const merged = new Uint8Array(loaded);
-  let offset = 0;
-  for (const chunk of chunks) {
-    merged.set(chunk, offset);
-    offset += chunk.length;
-  }
-  onProgress(100);
-  return merged;
+  throw new Error(`Failed to fetch ${url} after retries`);
 }
 
 function isGzip(bytes: Uint8Array): boolean {

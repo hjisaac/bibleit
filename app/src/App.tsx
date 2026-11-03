@@ -458,6 +458,8 @@ export function App(): JSX.Element {
             isInspectorMode={isInspectorMode}
             showHeadings={showHeadings}
             offlineTextStatus={textPackageStatus}
+            textProgress={textProgress}
+            onDownloadText={handleDownloadText}
             hasSeenOnboarding={hasSeenStorageBanner}
             savedVerses={savedVerses}
             onOpenStorage={handleOpenStorage}

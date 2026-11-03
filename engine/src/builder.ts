@@ -146,6 +146,10 @@ export function buildLocalEngine(p: LocalEnginePorts): SearchEngine {
       return {
         parsedRefs,
         passages: p.ranker.merge(refPassages, lexical, semantic, k),
+        provenance: {
+          origin: 'device',
+          semanticUsed: semantic.length > 0,
+        },
       };
     },
   };

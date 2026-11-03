@@ -8,6 +8,7 @@ import {
   type NarrationSegment,
   type NarrationState,
   type NarrationWordBoundary,
+  type RetrievalProvenance,
   type ScoredPassage,
 } from '../core/types';
 import { BIBLE_BOOKS_BY_ID, findBookByPrefix } from '../core/bible-books';
@@ -34,6 +35,8 @@ interface SearchViewProps {
   isInspectorMode: boolean;
   showHeadings?: boolean;
   offlineTextStatus?: PackageStatus;
+  textProgress?: number;
+  onDownloadText?: () => void;
   hasSeenOnboarding?: boolean;
   savedVerses?: SavedVerse[];
   onOpenStorage?: () => void;
@@ -178,6 +181,8 @@ export function SearchView({
   isInspectorMode,
   showHeadings = true,
   offlineTextStatus = PackageStatus.DOWNLOADED,
+  textProgress,
+  onDownloadText,
   hasSeenOnboarding = true,
   savedVerses,
   onOpenStorage,
@@ -189,6 +194,7 @@ export function SearchView({
   const [initialSearch] = useState(() => $lastSearch.get());
   const [query, setQuery] = useState(initialSearch.query);
   const [passages, setPassages] = useState<ScoredPassage[]>(initialSearch.passages);
+  const [provenance, setProvenance] = useState<RetrievalProvenance | undefined>();
   const [isPanelOpen, setIsPanelOpen] = useState(initialSearch.query.trim().length === 0);
   const lastSubmittedQueryRef = useRef(initialSearch.query);
   const [expandedCardKey, setExpandedCardKey] = useState<string | null>(null);
@@ -207,11 +213,25 @@ export function SearchView({
 
   const searchRunIdRef = useRef(0);
 
+  const prevOfflineTextStatusRef = useRef(offlineTextStatus);
+  useEffect(() => {
+    if (
+      prevOfflineTextStatusRef.current === PackageStatus.DOWNLOADING &&
+      offlineTextStatus === PackageStatus.DOWNLOADED
+    ) {
+      if (passages.length === 0 && query.trim().length > 0) {
+        runSearch(query);
+      }
+    }
+    prevOfflineTextStatusRef.current = offlineTextStatus;
+  }, [offlineTextStatus, passages.length, query]);
+
   const runSearch = (targetQuery: string) => {
     const trimmed = targetQuery.trim();
     const runId = ++searchRunIdRef.current;
     if (!trimmed) {
       setPassages([]);
+      setProvenance(undefined);
       setIsSearching(false);
       setHasSearched(false);
       return;
@@ -223,6 +243,7 @@ export function SearchView({
       .then((res) => {
         if (searchRunIdRef.current === runId) {
           setPassages(res.passages);
+          setProvenance(res.provenance);
         }
       })
       .catch((err) => {
@@ -357,6 +378,7 @@ export function SearchView({
     try {
       const res = await engine.retrieve(trimmed);
       setPassages(res.passages);
+      setProvenance(res.provenance);
       const stream = engine.answers.answer(trimmed, res);
       for await (const chunk of stream) {
         setAnswerText((prev) => prev + chunk);
@@ -696,16 +718,119 @@ export function SearchView({
         </div>
       )}
 
-      {/* No Results State */}
-      {!isPanelOpen && !isSearching && hasSearched && query.trim().length > 0 && passages.length === 0 && (
-        <div class="py-16 flex flex-col items-center justify-center text-center animate-fadeIn">
-          <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
-            No matching passages found
-          </p>
-          <p class="text-xs max-w-sm" style={{ color: 'var(--text-muted)' }}>
-            Try checking spelling, searching for a book name, or using broader keywords.
+      {/* Active Download Progress Card */}
+      {offlineTextStatus === PackageStatus.DOWNLOADING && (
+        <div
+          class="mb-4 p-4 rounded-xl border flex flex-col gap-2 animate-fadeIn"
+          style={{
+            backgroundColor: 'var(--bg-surface-elevated)',
+            borderColor: 'var(--accent)',
+          }}
+        >
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-medium flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
+              <div class="w-3.5 h-3.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+              Saving scripture to this device…
+            </span>
+            <span class="font-mono text-xs font-semibold" style={{ color: 'var(--accent)' }}>
+              {textProgress !== undefined ? `${textProgress}%` : ''}
+            </span>
+          </div>
+          <div class="w-full bg-stone-200 dark:bg-stone-700 h-1.5 rounded-full overflow-hidden">
+            <div
+              class="h-full transition-all duration-300 rounded-full"
+              style={{
+                backgroundColor: 'var(--accent)',
+                width: `${Math.max(5, textProgress ?? 0)}%`,
+              }}
+            />
+          </div>
+          <p class="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            Search will automatically refresh once scripture is saved.
           </p>
         </div>
+      )}
+
+      {/* No Results & Error States */}
+      {!isPanelOpen && !isSearching && hasSearched && query.trim().length > 0 && passages.length === 0 && offlineTextStatus !== PackageStatus.DOWNLOADING && (
+        !isOnline && offlineTextStatus !== PackageStatus.DOWNLOADED ? (
+          <div class="py-12 sm:py-16 flex flex-col items-center justify-center text-center animate-fadeIn max-w-sm mx-auto px-4">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center mb-3 bg-stone-500/10 text-stone-500">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 4.243a9 9 0 01-12.728 0m0 0l2.829-2.829m-2.829 2.829L3 21m2.828-12.536a5 5 0 017.072 0" />
+              </svg>
+            </div>
+            <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
+              You're currently offline
+            </p>
+            <p class="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+              An internet connection is required to search online, or save scripture to this device for offline searches anytime.
+            </p>
+            {(onDownloadText || onOpenStorage) && (
+              <button
+                type="button"
+                onClick={onDownloadText ?? onOpenStorage}
+                class="px-4 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all hover:opacity-90"
+                style={{
+                  backgroundColor: 'var(--accent)',
+                  color: '#FFFFFF',
+                }}
+              >
+                Save Bible to Device (1.2 MB)
+              </button>
+            )}
+          </div>
+        ) : provenance?.fallbackFromRemote && offlineTextStatus !== PackageStatus.DOWNLOADED ? (
+          <div class="py-12 sm:py-16 flex flex-col items-center justify-center text-center animate-fadeIn max-w-sm mx-auto px-4">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center mb-3 bg-amber-500/10 text-amber-600">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
+              Search service currently unavailable
+            </p>
+            <p class="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+              We couldn't connect to the search server. Check your connection or try again. You can also save scripture to this device so search always works.
+            </p>
+            <div class="flex flex-col sm:flex-row items-center gap-2">
+              <button
+                type="button"
+                onClick={() => runSearch(query)}
+                class="px-4 py-2 rounded-xl text-xs font-semibold border transition-all hover:opacity-85 w-full sm:w-auto"
+                style={{
+                  borderColor: 'var(--border-subtle)',
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                  color: 'var(--text-main)',
+                }}
+              >
+                Try Again
+              </button>
+              {(onDownloadText || onOpenStorage) && (
+                <button
+                  type="button"
+                  onClick={onDownloadText ?? onOpenStorage}
+                  class="px-4 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all hover:opacity-90 w-full sm:w-auto"
+                  style={{
+                    backgroundColor: 'var(--accent)',
+                    color: '#FFFFFF',
+                  }}
+                >
+                  Save Bible to Device (1.2 MB)
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div class="py-16 flex flex-col items-center justify-center text-center animate-fadeIn">
+            <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
+              No matching passages found
+            </p>
+            <p class="text-xs max-w-sm" style={{ color: 'var(--text-muted)' }}>
+              Try checking spelling, searching for a book name, or using broader keywords.
+            </p>
+          </div>
+        )
       )}
 
       {/* Synthesized Answer Card */}

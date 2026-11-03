@@ -19,40 +19,12 @@ interface HeaderProps {
 }
 
 export function Header({
-  isOnline,
-  isAiEnabled,
   searchMode = SearchMode.AUTO,
   user,
   onOpenHelp,
   onOpenAccount,
 }: HeaderProps): JSX.Element {
-  const aiBadge = searchMode === SearchMode.DEVICE
-    ? {
-        label: 'Device Only',
-        colorClass: 'bg-amber-500',
-        textColor: 'var(--text-muted)',
-        tooltip: 'Device-only mode active: Searching locally on-device.',
-      }
-    : !isAiEnabled
-    ? {
-        label: 'AI Off',
-        colorClass: 'bg-stone-400',
-        textColor: 'var(--text-muted)',
-        tooltip: 'AI synthesis deactivated in Settings.',
-      }
-    : isOnline
-      ? {
-          label: 'AI Ready',
-          colorClass: 'bg-emerald-500',
-          textColor: 'var(--text-muted)',
-          tooltip: 'Connected. Press Enter on question queries to synthesize answers.',
-        }
-      : {
-          label: 'Offline',
-          colorClass: 'bg-amber-500',
-          textColor: 'var(--text-muted)',
-          tooltip: 'Offline mode: Searching and reading locally on-device.',
-        };
+  const isOnDevice = searchMode === SearchMode.DEVICE;
 
   return (
     <header
@@ -66,17 +38,19 @@ export function Header({
         <span class="font-serif font-semibold text-xl tracking-tight" style={{ color: 'var(--text-main)' }}>
           bible<span class="text-amber-600 font-sans text-sm font-bold ml-0.5">it</span>
         </span>
-        <span
-          class="text-[11px] px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1.5 transition-colors"
-          style={{
-            backgroundColor: 'var(--bg-surface-elevated)',
-            color: aiBadge.textColor,
-          }}
-          title={aiBadge.tooltip}
-        >
-          <span class={`w-1.5 h-1.5 rounded-full transition-colors ${aiBadge.colorClass}`} />
-          <span>{aiBadge.label}</span>
-        </span>
+        {isOnDevice && (
+          <span
+            class="text-[10px] tracking-wide uppercase px-2 py-0.5 rounded-full font-semibold transition-all border"
+            style={{
+              backgroundColor: 'var(--bg-surface-elevated)',
+              borderColor: 'var(--border-subtle)',
+              color: 'var(--text-muted)',
+            }}
+            title="On-device mode active: Searching locally on this device."
+          >
+            On-Device
+          </span>
+        )}
       </div>
 
       {/* Right utility buttons: Help and User Account */}

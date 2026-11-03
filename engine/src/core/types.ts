@@ -60,11 +60,21 @@ export interface ScoredPassage {
   source: RetrievalSource;
 }
 
+export type SearchExecutionOrigin = 'cloud' | 'device';
+
+export interface RetrievalProvenance {
+  origin: SearchExecutionOrigin;
+  semanticUsed: boolean;
+  fallbackFromRemote?: boolean;
+}
+
 /** Final, merged result the UI renders. */
 export interface RetrievalResult {
   passages: ScoredPassage[];
   /** References parsed out of the query, if any (always shown first). */
   parsedRefs: RefRange[];
+  /** Execution provenance indicating where and how search was resolved. */
+  provenance?: RetrievalProvenance;
 }
 
 // ---------------------------------------------------------------------------

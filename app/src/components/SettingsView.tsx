@@ -302,7 +302,7 @@ export function SettingsView({
         </div>
       </div>
 
-      {/* Force Device-Only Search Toggle */}
+      {/* On-Device Only Search Toggle */}
       <div
         class="p-4 rounded-2xl border space-y-3"
         style={{
@@ -313,15 +313,15 @@ export function SettingsView({
         <div class="flex items-center justify-between">
           <div class="pr-3">
             <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-              <span>Force Device-Only Search</span>
+              <span>On-Device Only</span>
               <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono font-medium">
                 Offline
               </span>
             </div>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
               {textPackageStatus === PackageStatus.DOWNLOADED
-                ? 'Search scripture strictly on-device without contacting backend servers.'
-                : 'Download the scripture package below to unlock device-only search.'}
+                ? 'Search scripture strictly on this device without contacting backend servers.'
+                : 'Download the scripture package below to unlock on-device search.'}
             </p>
           </div>
 

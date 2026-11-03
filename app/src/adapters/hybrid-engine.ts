@@ -34,11 +34,10 @@ export class HybridEngine implements SearchEngine {
   }
 
   async retrieve(query: string, k = 10): Promise<RetrievalResult> {
-    if (this.isDeviceOnly?.()) {
+    if (!this.remoteUrl || this.isDeviceOnly?.()) {
       return this.localEngine.retrieve(query, k);
     }
     const canAttemptRemote =
-      this.remoteUrl &&
       Date.now() >= this.remoteDownUntil &&
       typeof navigator !== 'undefined' &&
       navigator.onLine;
@@ -57,7 +56,14 @@ export class HybridEngine implements SearchEngine {
           const result = (await res.json()) as RetrievalResult;
           if (Array.isArray(result?.passages)) {
             this.remoteDownUntil = 0;
-            return result;
+            return {
+              ...result,
+              provenance: {
+                origin: 'cloud',
+                semanticUsed: true,
+                fallbackFromRemote: false,
+              },
+            };
           }
         }
       } catch (err) {
@@ -66,6 +72,15 @@ export class HybridEngine implements SearchEngine {
       }
     }
 
-    return this.localEngine.retrieve(query, k);
+    const localResult = await this.localEngine.retrieve(query, k);
+    const wasRemoteAttempted = Boolean(this.remoteUrl && !this.isDeviceOnly?.());
+    return {
+      ...localResult,
+      provenance: {
+        origin: 'device',
+        semanticUsed: localResult.provenance?.semanticUsed ?? false,
+        fallbackFromRemote: wasRemoteAttempted && Date.now() <= this.remoteDownUntil,
+      },
+    };
   }
 }
