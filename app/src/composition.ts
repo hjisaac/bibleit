@@ -9,6 +9,7 @@ import type {
   SearchEngine,
 } from './core/ports';
 import {
+  LocalEngine,
   buildLocalEngine,
   RegexRefParser,
   MiniSearchLexicalIndex,
@@ -21,7 +22,7 @@ import { OpfsArtifactStore } from './adapters/opfs-artifact-store';
 import { WorkerQueryEmbedder } from './adapters/worker-query-embedder';
 import { WebSpeechNarrator } from './adapters/web-speech-narrator';
 
-export { buildLocalEngine };
+export { buildLocalEngine, LocalEngine };
 
 export function createDefaultArtifactStore(): ArtifactStore {
   return new OpfsArtifactStore();
