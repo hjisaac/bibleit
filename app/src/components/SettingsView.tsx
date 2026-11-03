@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Theme } from './Header';
 import type { Manifest } from '../core/types';
 
-export type PackageStatus = 'not_downloaded' | 'downloading' | 'ready';
+export type PackageStatus = 'not_downloaded' | 'downloading' | 'downloaded';
 
 interface SettingsViewProps {
   manifest?: Manifest | null;
@@ -67,7 +67,7 @@ export function SettingsView({
   const [isConfirmingClear, setIsConfirmingClear] = useState<boolean>(false);
   const [confirmCountdown, setConfirmCountdown] = useState<number>(6);
   const hasDownloadedArtifacts =
-    textPackageStatus === 'ready' || aiPackageStatus === 'ready' || modelPackageStatus === 'ready';
+    textPackageStatus === 'downloaded' || aiPackageStatus === 'downloaded' || modelPackageStatus === 'downloaded';
 
   // Active countdown ticker for auto-disarming clear confirmation
   useEffect(() => {
@@ -318,7 +318,7 @@ export function SettingsView({
               </span>
             </div>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {textPackageStatus === 'ready'
+              {textPackageStatus === 'downloaded'
                 ? 'Search scripture strictly on-device without contacting backend servers.'
                 : 'Download the scripture package below to unlock device-only search.'}
             </p>
@@ -326,12 +326,12 @@ export function SettingsView({
 
           <label
             class={`relative inline-flex items-center shrink-0 ${
-              textPackageStatus === 'ready' ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+              textPackageStatus === 'downloaded' ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
             }`}
           >
             <input
               type="checkbox"
-              disabled={textPackageStatus !== 'ready'}
+              disabled={textPackageStatus !== 'downloaded'}
               checked={searchMode === 'device'}
               onChange={(e) =>
                 onToggleSearchMode?.((e.target as HTMLInputElement).checked ? 'device' : 'auto')
@@ -366,11 +366,11 @@ export function SettingsView({
           <span class="text-xs font-mono font-medium text-emerald-600">
             {(() => {
               let mb = 0;
-              if (textPackageStatus === 'ready') mb += 1.2;
-              if (aiPackageStatus === 'ready') mb += 2.1;
-              if (modelPackageStatus === 'ready') mb += 137;
+              if (textPackageStatus === 'downloaded') mb += 1.2;
+              if (aiPackageStatus === 'downloaded') mb += 2.1;
+              if (modelPackageStatus === 'downloaded') mb += 137;
               if (mb === 0) return '0 MB cached';
-              if (modelPackageStatus === 'ready') return `${mb.toFixed(1)} MB cached`;
+              if (modelPackageStatus === 'downloaded') return `${mb.toFixed(1)} MB cached`;
               return `${mb.toFixed(1)} MB in OPFS`;
             })()}
           </span>
@@ -399,7 +399,7 @@ export function SettingsView({
               </p>
             </div>
 
-            {textPackageStatus === 'ready' ? (
+            {textPackageStatus === 'downloaded' ? (
               <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
                 ✓ Installed
               </span>
@@ -421,7 +421,7 @@ export function SettingsView({
 
           <div class="flex items-center justify-between text-xs pt-1">
             <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
-              {textPackageStatus === 'ready'
+              {textPackageStatus === 'downloaded'
                 ? 'Ready for offline reading'
                 : textPackageStatus === 'downloading'
                 ? 'Downloading verses...'
@@ -440,7 +440,7 @@ export function SettingsView({
               >
                 Cancel
               </button>
-            ) : textPackageStatus !== 'ready' ? (
+            ) : textPackageStatus !== 'downloaded' ? (
               <button
                 type="button"
                 onClick={onDownloadText}
@@ -479,7 +479,7 @@ export function SettingsView({
               </p>
             </div>
 
-            {aiPackageStatus === 'ready' ? (
+            {aiPackageStatus === 'downloaded' ? (
               <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
                 ✓ Installed
               </span>
@@ -501,7 +501,7 @@ export function SettingsView({
 
           <div class="flex items-center justify-between text-xs pt-1">
             <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
-              {aiPackageStatus === 'ready'
+              {aiPackageStatus === 'downloaded'
                 ? 'Ready for vector search'
                 : aiPackageStatus === 'downloading'
                 ? 'Downloading vectors...'
@@ -520,7 +520,7 @@ export function SettingsView({
               >
                 Cancel
               </button>
-            ) : aiPackageStatus !== 'ready' ? (
+            ) : aiPackageStatus !== 'downloaded' ? (
               <button
                 type="button"
                 onClick={onDownloadAi}
@@ -559,7 +559,7 @@ export function SettingsView({
               </p>
             </div>
 
-            {modelPackageStatus === 'ready' ? (
+            {modelPackageStatus === 'downloaded' ? (
               <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
                 ✓ Installed
               </span>
@@ -581,7 +581,7 @@ export function SettingsView({
 
           <div class="flex items-center justify-between text-xs pt-1">
             <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
-              {modelPackageStatus === 'ready'
+              {modelPackageStatus === 'downloaded'
                 ? 'Ready for on-device inference'
                 : modelPackageStatus === 'downloading'
                 ? 'Downloading model weights...'
@@ -600,7 +600,7 @@ export function SettingsView({
               >
                 Cancel
               </button>
-            ) : modelPackageStatus !== 'ready' ? (
+            ) : modelPackageStatus !== 'downloaded' ? (
               <button
                 type="button"
                 onClick={onDownloadModel}

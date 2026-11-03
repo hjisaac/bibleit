@@ -105,16 +105,16 @@ describe('SearchView Onboarding & Offline Storage Banner', () => {
   });
 
   describe('Stage 3: Offline Storage Ready', () => {
-    it('renders neither the prominent banner nor the discreet reminder when offline text is ready', () => {
-      renderSearchView({ offlineTextStatus: 'ready', hasSeenOnboarding: false });
+    it('renders neither the prominent banner nor the discreet reminder when offline text is downloaded', () => {
+      renderSearchView({ offlineTextStatus: 'downloaded', hasSeenOnboarding: false });
 
       expect(
         screen.queryByText(/Save scripture for offline searches/i),
       ).toBeNull();
     });
 
-    it('remains hidden when offline text is ready even if hasSeenOnboarding is true', () => {
-      renderSearchView({ offlineTextStatus: 'ready', hasSeenOnboarding: true });
+    it('remains hidden when offline text is downloaded even if hasSeenOnboarding is true', () => {
+      renderSearchView({ offlineTextStatus: 'downloaded', hasSeenOnboarding: true });
 
       expect(
         screen.queryByText(/Save scripture for offline searches/i),

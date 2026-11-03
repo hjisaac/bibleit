@@ -26,7 +26,7 @@ interface SearchViewProps {
   isAiEnabled: boolean;
   isInspectorMode: boolean;
   showHeadings?: boolean;
-  offlineTextStatus?: 'not_downloaded' | 'downloading' | 'ready';
+  offlineTextStatus?: 'not_downloaded' | 'downloading' | 'downloaded';
   hasSeenOnboarding?: boolean;
   savedVerses?: SavedVerse[];
   onOpenStorage?: () => void;
@@ -170,7 +170,7 @@ export function SearchView({
   isAiEnabled,
   isInspectorMode,
   showHeadings = true,
-  offlineTextStatus = 'ready',
+  offlineTextStatus = 'downloaded',
   hasSeenOnboarding = true,
   savedVerses,
   onOpenStorage,
@@ -364,7 +364,7 @@ export function SearchView({
   return (
     <section class="flex-1 flex flex-col px-4 sm:px-8 pt-4 sm:pt-5 pb-24 sm:pb-24 overflow-y-auto overscroll-y-contain max-w-2xl mx-auto w-full">
       {/* Offline Storage Status Banner / Super Tiny Reminder */}
-      {offlineTextStatus !== 'ready' && (
+      {offlineTextStatus !== 'downloaded' && (
         !hasSeenOnboarding ? (
           <div
             class="mb-3.5 sm:mb-4 px-3 py-1.5 rounded-xl border flex items-center justify-between gap-2.5 animate-fadeIn shrink-0 transition-all bg-amber-500/[0.07] border-amber-500/25"

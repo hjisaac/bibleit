@@ -97,7 +97,7 @@ describe('SearchView Result Cards & User Actions', () => {
       isAiEnabled: false,
       isInspectorMode: false,
       showHeadings: true,
-      offlineTextStatus: 'ready',
+      offlineTextStatus: 'downloaded',
       hasSeenOnboarding: true,
       savedVerses: [],
       onSaveVerse: onSaveVerseSpy,

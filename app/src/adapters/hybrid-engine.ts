@@ -4,6 +4,9 @@ import type { AnswerProvider, RetrievalResult, SearchEngine } from '@bibleit/eng
  * HybridEngine: Tiered search engine delegating to remote API when online,
  * with seamless zero-latency fallback to LocalEngine when offline or on network failure.
  */
+const REMOTE_TIMEOUT_MS = 2000;
+const REMOTE_COOLDOWN_MS = 20_000;
+
 export class HybridEngine implements SearchEngine {
   readonly ready: Promise<void>;
   readonly answers: AnswerProvider;
@@ -11,6 +14,7 @@ export class HybridEngine implements SearchEngine {
   private remoteUrl: string | null;
   private isDeviceOnly?: () => boolean;
 
+  // Timestamp until which remote requests are bypassed after a failure.
   private remoteDownUntil = 0;
 
   constructor(
@@ -29,25 +33,12 @@ export class HybridEngine implements SearchEngine {
     await this.localEngine.sync?.();
   }
 
-  // Rewrite localhost to host IP when accessing app from mobile on LAN.
-  private getResolvedRemoteUrl(): string | null {
-    if (!this.remoteUrl) return null;
-    if (typeof window !== 'undefined' && window.location?.hostname) {
-      const host = window.location.hostname;
-      if (host !== 'localhost' && host !== '127.0.0.1') {
-        return this.remoteUrl.replace(/^(https?:\/\/)(localhost|127\.0\.0\.1)(:\d+)?/, `$1${host}$3`);
-      }
-    }
-    return this.remoteUrl;
-  }
-
   async retrieve(query: string, k = 10): Promise<RetrievalResult> {
     if (this.isDeviceOnly?.()) {
       return this.localEngine.retrieve(query, k);
     }
-    const resolvedUrl = this.getResolvedRemoteUrl();
     const canAttemptRemote =
-      resolvedUrl &&
+      this.remoteUrl &&
       Date.now() >= this.remoteDownUntil &&
       typeof navigator !== 'undefined' &&
       navigator.onLine;
@@ -55,9 +46,9 @@ export class HybridEngine implements SearchEngine {
     if (canAttemptRemote) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 2000);
+        const timeout = setTimeout(() => controller.abort(), REMOTE_TIMEOUT_MS);
         const res = await fetch(
-          `${resolvedUrl}/api/v1/search?q=${encodeURIComponent(query)}&k=${k}`,
+          `${this.remoteUrl}/api/v1/search?q=${encodeURIComponent(query)}&k=${k}`,
           { signal: controller.signal },
         );
         clearTimeout(timeout);
@@ -70,8 +61,7 @@ export class HybridEngine implements SearchEngine {
           }
         }
       } catch (err) {
-        // Cooldown remote calls for 20s on connection failure or timeout
-        this.remoteDownUntil = Date.now() + 20000;
+        this.remoteDownUntil = Date.now() + REMOTE_COOLDOWN_MS;
         console.warn('[HybridEngine] Remote search unavailable; falling back to local engine:', err);
       }
     }

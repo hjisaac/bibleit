@@ -39,7 +39,7 @@ describe('SearchView Cold Start and Search Persistence', () => {
       isAiEnabled: true,
       isInspectorMode: false,
       showHeadings: true,
-      offlineTextStatus: 'ready',
+      offlineTextStatus: 'downloaded',
       hasSeenOnboarding: true,
       savedVerses: [],
       onOpenReader: vi.fn(),

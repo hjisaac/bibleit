@@ -77,13 +77,13 @@ export function App(): JSX.Element {
   const aiPackageStatus = useStore($aiPackageStatus);
   const modelPackageStatus = useStore($modelPackageStatus);
   const [textProgress, setTextProgress] = useState<number>(() =>
-    $textPackageStatus.get() === 'ready' ? 100 : 0,
+    $textPackageStatus.get() === 'downloaded' ? 100 : 0,
   );
   const [aiProgress, setAiProgress] = useState<number>(() =>
-    $aiPackageStatus.get() === 'ready' ? 100 : 0,
+    $aiPackageStatus.get() === 'downloaded' ? 100 : 0,
   );
   const [modelProgress, setModelProgress] = useState<number>(() =>
-    $modelPackageStatus.get() === 'ready' ? 100 : 0,
+    $modelPackageStatus.get() === 'downloaded' ? 100 : 0,
   );
   const hasSeenStorageBanner = useStore($hasSeenStorageBanner);
   const [highlightStorage, setHighlightStorage] = useState<boolean>(false);
@@ -146,16 +146,16 @@ export function App(): JSX.Element {
   // Sync offline packages state with real OPFS and browser cache in background
   useEffect(() => {
     store.hasVerses?.().then((has) => {
-      $textPackageStatus.set(has ? 'ready' : 'not_downloaded');
+      $textPackageStatus.set(has ? 'downloaded' : 'not_downloaded');
       if (has) setTextProgress(100);
     });
     store.hasEmbeddings?.().then((has) => {
-      $aiPackageStatus.set(has ? 'ready' : 'not_downloaded');
+      $aiPackageStatus.set(has ? 'downloaded' : 'not_downloaded');
       if (has) setAiProgress(100);
     });
     isQueryModelCached().then((isCached) => {
       if (isCached) {
-        $modelPackageStatus.set('ready');
+        $modelPackageStatus.set('downloaded');
         setModelProgress(100);
       }
     });
@@ -164,7 +164,7 @@ export function App(): JSX.Element {
   // Subscribe to query embedder progress events
   useEffect(() => {
     const unsub = embedder.onProgress((fraction) => {
-      if ($modelPackageStatus.get() !== 'ready') {
+      if ($modelPackageStatus.get() !== 'downloaded') {
         $modelPackageStatus.set('downloading');
         setModelProgress(Math.round(fraction * 100));
       }
@@ -176,7 +176,7 @@ export function App(): JSX.Element {
     engine.ready.then(() => {
       isQueryModelCached().then((isCached) => {
         if (isCached) {
-          $modelPackageStatus.set('ready');
+          $modelPackageStatus.set('downloaded');
           setModelProgress(100);
         }
       });
@@ -196,7 +196,7 @@ export function App(): JSX.Element {
     try {
       await store.verses((pct) => setTextProgress(Math.round(pct * 0.8)), controller.signal);
       await store.chunks((pct) => setTextProgress(80 + Math.round(pct * 0.2)), controller.signal);
-      $textPackageStatus.set('ready');
+      $textPackageStatus.set('downloaded');
       setTextProgress(100);
       await engine.sync?.();
       showToast('Scripture text verified & installed in OPFS (1.2 MB)');
@@ -234,7 +234,7 @@ export function App(): JSX.Element {
     setAiProgress(0);
     try {
       await store.embeddings((pct) => setAiProgress(pct), controller.signal);
-      $aiPackageStatus.set('ready');
+      $aiPackageStatus.set('downloaded');
       setAiProgress(100);
       await engine.sync?.();
       showToast('Verse vectors verified & installed in OPFS (2.1 MB)');
@@ -271,7 +271,7 @@ export function App(): JSX.Element {
     setModelProgress(0);
     try {
       await embedder.load((fraction) => setModelProgress(Math.round(fraction * 100)));
-      $modelPackageStatus.set('ready');
+      $modelPackageStatus.set('downloaded');
       setModelProgress(100);
       await engine.sync?.();
       showToast('Neural query model installed in browser cache (137 MB)');
