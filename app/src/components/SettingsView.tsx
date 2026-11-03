@@ -1,9 +1,9 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Theme } from './Header';
-import type { Manifest } from '../core/types';
+import { PackageStatus, type Manifest } from '../core/types';
 
-export type PackageStatus = 'not_downloaded' | 'downloading' | 'downloaded';
+export { PackageStatus };
 
 interface SettingsViewProps {
   manifest?: Manifest | null;
@@ -67,7 +67,9 @@ export function SettingsView({
   const [isConfirmingClear, setIsConfirmingClear] = useState<boolean>(false);
   const [confirmCountdown, setConfirmCountdown] = useState<number>(6);
   const hasDownloadedArtifacts =
-    textPackageStatus === 'downloaded' || aiPackageStatus === 'downloaded' || modelPackageStatus === 'downloaded';
+    textPackageStatus === PackageStatus.Downloaded ||
+    aiPackageStatus === PackageStatus.Downloaded ||
+    modelPackageStatus === PackageStatus.Downloaded;
 
   // Active countdown ticker for auto-disarming clear confirmation
   useEffect(() => {
@@ -318,7 +320,7 @@ export function SettingsView({
               </span>
             </div>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {textPackageStatus === 'downloaded'
+              {textPackageStatus === PackageStatus.Downloaded
                 ? 'Search scripture strictly on-device without contacting backend servers.'
                 : 'Download the scripture package below to unlock device-only search.'}
             </p>
@@ -326,12 +328,12 @@ export function SettingsView({
 
           <label
             class={`relative inline-flex items-center shrink-0 ${
-              textPackageStatus === 'downloaded' ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+              textPackageStatus === PackageStatus.Downloaded ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
             }`}
           >
             <input
               type="checkbox"
-              disabled={textPackageStatus !== 'downloaded'}
+              disabled={textPackageStatus !== PackageStatus.Downloaded}
               checked={searchMode === 'device'}
               onChange={(e) =>
                 onToggleSearchMode?.((e.target as HTMLInputElement).checked ? 'device' : 'auto')
@@ -366,11 +368,11 @@ export function SettingsView({
           <span class="text-xs font-mono font-medium text-emerald-600">
             {(() => {
               let mb = 0;
-              if (textPackageStatus === 'downloaded') mb += 1.2;
-              if (aiPackageStatus === 'downloaded') mb += 2.1;
-              if (modelPackageStatus === 'downloaded') mb += 137;
+              if (textPackageStatus === PackageStatus.Downloaded) mb += 1.2;
+              if (aiPackageStatus === PackageStatus.Downloaded) mb += 2.1;
+              if (modelPackageStatus === PackageStatus.Downloaded) mb += 137;
               if (mb === 0) return '0 MB cached';
-              if (modelPackageStatus === 'downloaded') return `${mb.toFixed(1)} MB cached`;
+              if (modelPackageStatus === PackageStatus.Downloaded) return `${mb.toFixed(1)} MB cached`;
               return `${mb.toFixed(1)} MB in OPFS`;
             })()}
           </span>
@@ -399,18 +401,18 @@ export function SettingsView({
               </p>
             </div>
 
-            {textPackageStatus === 'downloaded' ? (
+            {textPackageStatus === PackageStatus.Downloaded ? (
               <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
                 ✓ Installed
               </span>
-            ) : textPackageStatus === 'downloading' ? (
+            ) : textPackageStatus === PackageStatus.Downloading ? (
               <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
                 {textProgress}%
               </span>
             ) : null}
           </div>
 
-          {textPackageStatus === 'downloading' && (
+          {textPackageStatus === PackageStatus.Downloading && (
             <div class="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden">
               <div
                 class="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
@@ -421,13 +423,13 @@ export function SettingsView({
 
           <div class="flex items-center justify-between text-xs pt-1">
             <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
-              {textPackageStatus === 'downloaded'
+              {textPackageStatus === PackageStatus.Downloaded
                 ? 'Ready for offline reading'
-                : textPackageStatus === 'downloading'
+                : textPackageStatus === PackageStatus.Downloading
                 ? 'Downloading verses...'
                 : 'Not stored locally'}
             </span>
-            {textPackageStatus === 'downloading' ? (
+            {textPackageStatus === PackageStatus.Downloading ? (
               <button
                 type="button"
                 onClick={onCancelDownloadText}
@@ -440,7 +442,7 @@ export function SettingsView({
               >
                 Cancel
               </button>
-            ) : textPackageStatus !== 'downloaded' ? (
+            ) : textPackageStatus !== PackageStatus.Downloaded ? (
               <button
                 type="button"
                 onClick={onDownloadText}
@@ -479,18 +481,18 @@ export function SettingsView({
               </p>
             </div>
 
-            {aiPackageStatus === 'downloaded' ? (
+            {aiPackageStatus === PackageStatus.Downloaded ? (
               <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
                 ✓ Installed
               </span>
-            ) : aiPackageStatus === 'downloading' ? (
+            ) : aiPackageStatus === PackageStatus.Downloading ? (
               <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
                 {aiProgress}%
               </span>
             ) : null}
           </div>
 
-          {aiPackageStatus === 'downloading' && (
+          {aiPackageStatus === PackageStatus.Downloading && (
             <div class="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden">
               <div
                 class="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
@@ -501,13 +503,13 @@ export function SettingsView({
 
           <div class="flex items-center justify-between text-xs pt-1">
             <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
-              {aiPackageStatus === 'downloaded'
+              {aiPackageStatus === PackageStatus.Downloaded
                 ? 'Ready for vector search'
-                : aiPackageStatus === 'downloading'
+                : aiPackageStatus === PackageStatus.Downloading
                 ? 'Downloading vectors...'
                 : 'Not stored locally'}
             </span>
-            {aiPackageStatus === 'downloading' ? (
+            {aiPackageStatus === PackageStatus.Downloading ? (
               <button
                 type="button"
                 onClick={onCancelDownloadAi}
@@ -520,7 +522,7 @@ export function SettingsView({
               >
                 Cancel
               </button>
-            ) : aiPackageStatus !== 'downloaded' ? (
+            ) : aiPackageStatus !== PackageStatus.Downloaded ? (
               <button
                 type="button"
                 onClick={onDownloadAi}
@@ -559,18 +561,18 @@ export function SettingsView({
               </p>
             </div>
 
-            {modelPackageStatus === 'downloaded' ? (
+            {modelPackageStatus === PackageStatus.Downloaded ? (
               <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
                 ✓ Installed
               </span>
-            ) : modelPackageStatus === 'downloading' ? (
+            ) : modelPackageStatus === PackageStatus.Downloading ? (
               <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
                 {modelProgress}%
               </span>
             ) : null}
           </div>
 
-          {modelPackageStatus === 'downloading' && (
+          {modelPackageStatus === PackageStatus.Downloading && (
             <div class="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden">
               <div
                 class="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
@@ -581,13 +583,13 @@ export function SettingsView({
 
           <div class="flex items-center justify-between text-xs pt-1">
             <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
-              {modelPackageStatus === 'downloaded'
+              {modelPackageStatus === PackageStatus.Downloaded
                 ? 'Ready for on-device inference'
-                : modelPackageStatus === 'downloading'
+                : modelPackageStatus === PackageStatus.Downloading
                 ? 'Downloading model weights...'
                 : 'Not stored locally'}
             </span>
-            {modelPackageStatus === 'downloading' ? (
+            {modelPackageStatus === PackageStatus.Downloading ? (
               <button
                 type="button"
                 onClick={onCancelDownloadModel}
@@ -600,7 +602,7 @@ export function SettingsView({
               >
                 Cancel
               </button>
-            ) : modelPackageStatus !== 'downloaded' ? (
+            ) : modelPackageStatus !== PackageStatus.Downloaded ? (
               <button
                 type="button"
                 onClick={onDownloadModel}

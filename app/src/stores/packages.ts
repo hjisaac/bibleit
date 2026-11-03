@@ -1,18 +1,18 @@
 import { persistentAtom } from '@nanostores/persistent';
-import type { PackageStatus } from '../components/SettingsView';
+import { PackageStatus } from '../core/types';
 
 export const $textPackageStatus = persistentAtom<PackageStatus>(
   'bibleit_text_status',
-  'not_downloaded',
+  PackageStatus.NotDownloaded,
 );
 
 export const $aiPackageStatus = persistentAtom<PackageStatus>(
   'bibleit_ai_status',
-  'not_downloaded',
+  PackageStatus.NotDownloaded,
 );
 
 export const $modelPackageStatus = persistentAtom<PackageStatus>(
   'bibleit_model_status',
-  'not_downloaded',
+  PackageStatus.NotDownloaded,
 );
 

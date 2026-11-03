@@ -125,3 +125,9 @@ export interface NarrationState {
   rate: number;
 }
 
+export enum PackageStatus {
+  NotDownloaded = 'not_downloaded',
+  Downloading = 'downloading',
+  Downloaded = 'downloaded',
+}
+

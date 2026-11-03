@@ -18,7 +18,7 @@ import { HelpModal } from './components/HelpModal';
 import { FeedbackModal } from './components/FeedbackModal';
 import { AudioPlayerBar } from './components/AudioPlayerBar';
 import { useHeadroom } from './core/headroom';
-import type { Manifest, NarrationState } from './core/types';
+import { PackageStatus, type Manifest, type NarrationState } from './core/types';
 import { useStore } from '@nanostores/preact';
 import { $textPackageStatus, $aiPackageStatus, $modelPackageStatus } from './stores/packages';
 import {
@@ -77,13 +77,13 @@ export function App(): JSX.Element {
   const aiPackageStatus = useStore($aiPackageStatus);
   const modelPackageStatus = useStore($modelPackageStatus);
   const [textProgress, setTextProgress] = useState<number>(() =>
-    $textPackageStatus.get() === 'downloaded' ? 100 : 0,
+    $textPackageStatus.get() === PackageStatus.Downloaded ? 100 : 0,
   );
   const [aiProgress, setAiProgress] = useState<number>(() =>
-    $aiPackageStatus.get() === 'downloaded' ? 100 : 0,
+    $aiPackageStatus.get() === PackageStatus.Downloaded ? 100 : 0,
   );
   const [modelProgress, setModelProgress] = useState<number>(() =>
-    $modelPackageStatus.get() === 'downloaded' ? 100 : 0,
+    $modelPackageStatus.get() === PackageStatus.Downloaded ? 100 : 0,
   );
   const hasSeenStorageBanner = useStore($hasSeenStorageBanner);
   const [highlightStorage, setHighlightStorage] = useState<boolean>(false);
@@ -138,24 +138,24 @@ export function App(): JSX.Element {
 
   // Reconcile in-memory state if page was reloaded mid-download
   useEffect(() => {
-    if ($textPackageStatus.get() === 'downloading') $textPackageStatus.set('not_downloaded');
-    if ($aiPackageStatus.get() === 'downloading') $aiPackageStatus.set('not_downloaded');
-    if ($modelPackageStatus.get() === 'downloading') $modelPackageStatus.set('not_downloaded');
+    if ($textPackageStatus.get() === PackageStatus.Downloading) $textPackageStatus.set(PackageStatus.NotDownloaded);
+    if ($aiPackageStatus.get() === PackageStatus.Downloading) $aiPackageStatus.set(PackageStatus.NotDownloaded);
+    if ($modelPackageStatus.get() === PackageStatus.Downloading) $modelPackageStatus.set(PackageStatus.NotDownloaded);
   }, []);
 
   // Sync offline packages state with real OPFS and browser cache in background
   useEffect(() => {
     store.hasVerses?.().then((has) => {
-      $textPackageStatus.set(has ? 'downloaded' : 'not_downloaded');
+      $textPackageStatus.set(has ? PackageStatus.Downloaded : PackageStatus.NotDownloaded);
       if (has) setTextProgress(100);
     });
     store.hasEmbeddings?.().then((has) => {
-      $aiPackageStatus.set(has ? 'downloaded' : 'not_downloaded');
+      $aiPackageStatus.set(has ? PackageStatus.Downloaded : PackageStatus.NotDownloaded);
       if (has) setAiProgress(100);
     });
     isQueryModelCached().then((isCached) => {
       if (isCached) {
-        $modelPackageStatus.set('downloaded');
+        $modelPackageStatus.set(PackageStatus.Downloaded);
         setModelProgress(100);
       }
     });
@@ -164,8 +164,8 @@ export function App(): JSX.Element {
   // Subscribe to query embedder progress events
   useEffect(() => {
     const unsub = embedder.onProgress((fraction) => {
-      if ($modelPackageStatus.get() !== 'downloaded') {
-        $modelPackageStatus.set('downloading');
+      if ($modelPackageStatus.get() !== PackageStatus.Downloaded) {
+        $modelPackageStatus.set(PackageStatus.Downloading);
         setModelProgress(Math.round(fraction * 100));
       }
     });
@@ -176,7 +176,7 @@ export function App(): JSX.Element {
     engine.ready.then(() => {
       isQueryModelCached().then((isCached) => {
         if (isCached) {
-          $modelPackageStatus.set('downloaded');
+          $modelPackageStatus.set(PackageStatus.Downloaded);
           setModelProgress(100);
         }
       });
@@ -191,18 +191,18 @@ export function App(): JSX.Element {
     const controller = new AbortController();
     textAbortRef.current = controller;
 
-    $textPackageStatus.set('downloading');
+    $textPackageStatus.set(PackageStatus.Downloading);
     setTextProgress(0);
     try {
       await store.verses((pct) => setTextProgress(Math.round(pct * 0.8)), controller.signal);
       await store.chunks((pct) => setTextProgress(80 + Math.round(pct * 0.2)), controller.signal);
-      $textPackageStatus.set('downloaded');
+      $textPackageStatus.set(PackageStatus.Downloaded);
       setTextProgress(100);
       await engine.sync?.();
       showToast('Scripture text verified & installed in OPFS (1.2 MB)');
     } catch (err) {
       if (controller.signal.aborted) {
-        $textPackageStatus.set('not_downloaded');
+        $textPackageStatus.set(PackageStatus.NotDownloaded);
         setTextProgress(0);
         showToast('Scripture download cancelled.');
         return;
@@ -213,7 +213,7 @@ export function App(): JSX.Element {
           ? err.message
           : 'Download interrupted. Check network and try again.',
       );
-      $textPackageStatus.set('not_downloaded');
+      $textPackageStatus.set(PackageStatus.NotDownloaded);
     } finally {
       if (textAbortRef.current === controller) {
         textAbortRef.current = null;
@@ -230,17 +230,17 @@ export function App(): JSX.Element {
     const controller = new AbortController();
     aiAbortRef.current = controller;
 
-    $aiPackageStatus.set('downloading');
+    $aiPackageStatus.set(PackageStatus.Downloading);
     setAiProgress(0);
     try {
       await store.embeddings((pct) => setAiProgress(pct), controller.signal);
-      $aiPackageStatus.set('downloaded');
+      $aiPackageStatus.set(PackageStatus.Downloaded);
       setAiProgress(100);
       await engine.sync?.();
       showToast('Verse vectors verified & installed in OPFS (2.1 MB)');
     } catch (err) {
       if (controller.signal.aborted) {
-        $aiPackageStatus.set('not_downloaded');
+        $aiPackageStatus.set(PackageStatus.NotDownloaded);
         setAiProgress(0);
         showToast('AI vectors download cancelled.');
         return;
@@ -251,7 +251,7 @@ export function App(): JSX.Element {
           ? err.message
           : 'AI download interrupted. Check network and try again.',
       );
-      $aiPackageStatus.set('not_downloaded');
+      $aiPackageStatus.set(PackageStatus.NotDownloaded);
     } finally {
       if (aiAbortRef.current === controller) {
         aiAbortRef.current = null;
@@ -267,24 +267,24 @@ export function App(): JSX.Element {
 
   const handleDownloadModel = async () => {
     isModelAbortedRef.current = false;
-    $modelPackageStatus.set('downloading');
+    $modelPackageStatus.set(PackageStatus.Downloading);
     setModelProgress(0);
     try {
       await embedder.load((fraction) => setModelProgress(Math.round(fraction * 100)));
-      $modelPackageStatus.set('downloaded');
+      $modelPackageStatus.set(PackageStatus.Downloaded);
       setModelProgress(100);
       await engine.sync?.();
       showToast('Neural query model installed in browser cache (137 MB)');
     } catch (err) {
       if (isModelAbortedRef.current || (err instanceof DOMException && err.name === 'AbortError')) {
-        $modelPackageStatus.set('not_downloaded');
+        $modelPackageStatus.set(PackageStatus.NotDownloaded);
         setModelProgress(0);
         showToast('Model download cancelled.');
         return;
       }
       console.error('Model download failed:', err);
       showToast('Model download interrupted. Check network and try again.');
-      $modelPackageStatus.set('not_downloaded');
+      $modelPackageStatus.set(PackageStatus.NotDownloaded);
     }
   };
 
@@ -298,9 +298,9 @@ export function App(): JSX.Element {
     await embedder.clear?.();
     await clearQueryModelCache();
     await engine.sync?.();
-    $textPackageStatus.set('not_downloaded');
-    $aiPackageStatus.set('not_downloaded');
-    $modelPackageStatus.set('not_downloaded');
+    $textPackageStatus.set(PackageStatus.NotDownloaded);
+    $aiPackageStatus.set(PackageStatus.NotDownloaded);
+    $modelPackageStatus.set(PackageStatus.NotDownloaded);
     setTextProgress(0);
     setAiProgress(0);
     setModelProgress(0);
