@@ -12,6 +12,7 @@ describe('HybridEngine', () => {
       },
     ],
     parsedRefs: [],
+    origin: 'local',
   };
 
   const mockRemoteResult: RetrievalResult = {
@@ -46,6 +47,7 @@ describe('HybridEngine', () => {
     const result = await engine.retrieve('love');
 
     expect(result.passages[0]?.chunk.text).toContain('Remote API');
+    expect(result.origin).toBe('remote');
     expect(mockLocalEngine.retrieve).not.toHaveBeenCalled();
   });
 
@@ -56,6 +58,7 @@ describe('HybridEngine', () => {
     const result = await engine.retrieve('love');
 
     expect(result.passages[0]?.chunk.text).toContain('For God so loved the world');
+    expect(result.origin).toBe('local');
     expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
   });
 

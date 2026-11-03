@@ -8,7 +8,7 @@ import {
   type NarrationSegment,
   type NarrationState,
   type NarrationWordBoundary,
-  type RetrievalProvenance,
+  type SearchExecutionOrigin,
   type ScoredPassage,
 } from '../core/types';
 import { BIBLE_BOOKS_BY_ID, findBookByPrefix } from '../core/bible-books';
@@ -192,7 +192,7 @@ export function SearchView({
   const [initialSearch] = useState(() => $lastSearch.get());
   const [query, setQuery] = useState(initialSearch.query);
   const [passages, setPassages] = useState<ScoredPassage[]>(initialSearch.passages);
-  const [provenance, setProvenance] = useState<RetrievalProvenance | undefined>();
+  const [searchOrigin, setSearchOrigin] = useState<SearchExecutionOrigin | undefined>();
   const [isPanelOpen, setIsPanelOpen] = useState(initialSearch.query.trim().length === 0);
   const lastSubmittedQueryRef = useRef(initialSearch.query);
   const [expandedCardKey, setExpandedCardKey] = useState<string | null>(null);
@@ -229,7 +229,7 @@ export function SearchView({
     const runId = ++searchRunIdRef.current;
     if (!trimmed) {
       setPassages([]);
-      setProvenance(undefined);
+      setSearchOrigin(undefined);
       setIsSearching(false);
       setHasSearched(false);
       return;
@@ -241,7 +241,7 @@ export function SearchView({
       .then((res) => {
         if (searchRunIdRef.current === runId) {
           setPassages(res.passages);
-          setProvenance(res.provenance);
+          setSearchOrigin(res.origin);
         }
       })
       .catch((err) => {
@@ -376,7 +376,7 @@ export function SearchView({
     try {
       const res = await engine.retrieve(trimmed);
       setPassages(res.passages);
-      setProvenance(res.provenance);
+      setSearchOrigin(res.origin);
       const stream = engine.answers.answer(trimmed, res);
       for await (const chunk of stream) {
         setAnswerText((prev) => prev + chunk);
@@ -765,7 +765,7 @@ export function SearchView({
               An internet connection is required to search online. You can use 'Set Up' above or visit Settings to save scripture for offline search.
             </p>
           </div>
-        ) : provenance?.fallbackFromRemote && offlineTextStatus !== PackageStatus.DOWNLOADED ? (
+        ) : searchOrigin === 'local' && offlineTextStatus !== PackageStatus.DOWNLOADED ? (
           <div class="py-12 sm:py-16 flex flex-col items-center justify-center text-center animate-fadeIn max-w-sm mx-auto px-4">
             <div class="w-10 h-10 rounded-full flex items-center justify-center mb-3 bg-amber-500/10 text-amber-600">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

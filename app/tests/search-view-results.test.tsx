@@ -411,7 +411,7 @@ describe('SearchView Result Cards & User Actions', () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Network error'));
     const emptyLocalEngine: SearchEngine = {
       ready: Promise.resolve(),
-      retrieve: vi.fn().mockResolvedValue({ passages: [], parsedRefs: [] }),
+      retrieve: vi.fn().mockResolvedValue({ passages: [], parsedRefs: [], origin: 'local' }),
       answers: { available: false, answer: async function* () {} },
     };
     const hybridEngine = new HybridEngine(emptyLocalEngine, 'https://api.bibleit.test');

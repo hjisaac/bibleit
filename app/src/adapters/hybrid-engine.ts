@@ -58,11 +58,7 @@ export class HybridEngine implements SearchEngine {
             this.remoteDownUntil = 0;
             return {
               ...result,
-              provenance: {
-                origin: 'cloud',
-                semanticUsed: true,
-                fallbackFromRemote: false,
-              },
+              origin: 'remote',
             };
           }
         }
@@ -72,15 +68,6 @@ export class HybridEngine implements SearchEngine {
       }
     }
 
-    const localResult = await this.localEngine.retrieve(query, k);
-    const wasRemoteAttempted = Boolean(this.remoteUrl && !this.isDeviceOnly?.());
-    return {
-      ...localResult,
-      provenance: {
-        origin: 'device',
-        semanticUsed: localResult.provenance?.semanticUsed ?? false,
-        fallbackFromRemote: wasRemoteAttempted && Date.now() <= this.remoteDownUntil,
-      },
-    };
+    return this.localEngine.retrieve(query, k);
   }
 }
