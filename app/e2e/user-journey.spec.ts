@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { useSearchCassette } from './fixtures/network';
 
 test.describe('End-to-End User Journey (Unseeded Cold Start)', () => {
   test.beforeEach(async ({ page }) => {
@@ -10,7 +11,8 @@ test.describe('End-to-End User Journey (Unseeded Cold Start)', () => {
   });
 
   test('walks through cold start: search reference -> open in reader -> interact -> settings', async ({ page }) => {
-    // 1. Cold start landing
+    // 1. Cold start landing with network cassette
+    await useSearchCassette(page, 'search-john316');
     await page.goto('/');
     const searchInput = page.getByRole('textbox');
     await expect(searchInput).toBeVisible();

@@ -1,5 +1,5 @@
 import { persistentAtom } from '@nanostores/persistent';
-import type { ScoredPassage } from '../core/types';
+import type { ScoredPassage, SearchOriginEnum } from '../core/types';
 
 export const SEARCH_HISTORY_KEY = 'bibleit_search_history';
 export const SEARCH_STORAGE_KEY = 'bibleit_last_search';
@@ -9,6 +9,7 @@ export interface StoredSearch {
   query: string;
   passages: ScoredPassage[];
   answerText: string;
+  origin?: SearchOriginEnum;
 }
 
 const DEFAULT_STORED_SEARCH: StoredSearch = {
@@ -76,6 +77,7 @@ export const $lastSearch = createPersistentStore<StoredSearch>(
             query: parsed.query,
             passages: Array.isArray(parsed.passages) ? parsed.passages : [],
             answerText: typeof parsed.answerText === 'string' ? parsed.answerText : '',
+            origin: parsed.origin,
           };
         }
       } catch {

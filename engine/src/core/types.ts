@@ -1,6 +1,6 @@
 /**
  * Domain types shared by all ports. Mirrors the artifact contract in
- * design/architecture.md — keep in sync with ingest/bibleit_ingest/artifacts.py.
+ * docs/architecture.md: keep in sync with ingest/bibleit_ingest/artifacts.py.
  */
 
 /** Verse-precise location, e.g. John 3:16 → { book: "JHN", chapter: 3, verse: 16 } */
@@ -60,15 +60,22 @@ export interface ScoredPassage {
   source: RetrievalSource;
 }
 
+export enum SearchOriginEnum {
+  LOCAL = 'local',
+  REMOTE = 'remote',
+}
+
 /** Final, merged result the UI renders. */
 export interface RetrievalResult {
   passages: ScoredPassage[];
   /** References parsed out of the query, if any (always shown first). */
   parsedRefs: RefRange[];
+  /** Execution origin declared by the engine resolving the query. */
+  origin?: SearchOriginEnum;
 }
 
 // ---------------------------------------------------------------------------
-// Artifact manifest (schema_version 3) — the offline/runtime boundary.
+// Artifact manifest (schema_version 3): the offline/runtime boundary.
 // ---------------------------------------------------------------------------
 
 export interface Manifest {
@@ -95,7 +102,7 @@ export interface Manifest {
 }
 
 // ---------------------------------------------------------------------------
-// Audio narration types — shared across Web Speech (Tier 1) and CDN (Tier 2).
+// Audio narration types: shared across Web Speech (Tier 1) and CDN (Tier 2).
 // ---------------------------------------------------------------------------
 
 export type PlaybackStatus = 'idle' | 'playing' | 'paused';

@@ -1,4 +1,5 @@
-import type { AnswerProvider, RetrievalResult, SearchEngine } from '@bibleit/engine';
+import type { AnswerProvider, SearchEngine } from '../core/ports';
+import { SearchOriginEnum, type RetrievalResult } from '../core/types';
 
 /**
  * HybridEngine: Tiered search engine delegating to remote API when online,
@@ -34,11 +35,10 @@ export class HybridEngine implements SearchEngine {
   }
 
   async retrieve(query: string, k = 10): Promise<RetrievalResult> {
-    if (this.isDeviceOnly?.()) {
+    if (!this.remoteUrl || this.isDeviceOnly?.()) {
       return this.localEngine.retrieve(query, k);
     }
     const canAttemptRemote =
-      this.remoteUrl &&
       Date.now() >= this.remoteDownUntil &&
       typeof navigator !== 'undefined' &&
       navigator.onLine;
@@ -57,7 +57,10 @@ export class HybridEngine implements SearchEngine {
           const result = (await res.json()) as RetrievalResult;
           if (Array.isArray(result?.passages)) {
             this.remoteDownUntil = 0;
-            return result;
+            return {
+              ...result,
+              origin: SearchOriginEnum.REMOTE,
+            };
           }
         }
       } catch (err) {

@@ -1,18 +1,18 @@
 import { persistentAtom } from '@nanostores/persistent';
-import { PackageStatus } from '../core/types';
+import { PackageStatusEnum } from '../core/types';
 
-export const $textPackageStatus = persistentAtom<PackageStatus>(
+export const $textPackageStatus = persistentAtom<PackageStatusEnum>(
   'bibleit_text_status',
-  PackageStatus.NOT_DOWNLOADED,
+  PackageStatusEnum.NOT_DOWNLOADED,
 );
 
-export const $aiPackageStatus = persistentAtom<PackageStatus>(
+export const $aiPackageStatus = persistentAtom<PackageStatusEnum>(
   'bibleit_ai_status',
-  PackageStatus.NOT_DOWNLOADED,
+  PackageStatusEnum.NOT_DOWNLOADED,
 );
 
-export const $modelPackageStatus = persistentAtom<PackageStatus>(
+export const $modelPackageStatus = persistentAtom<PackageStatusEnum>(
   'bibleit_model_status',
-  PackageStatus.NOT_DOWNLOADED,
+  PackageStatusEnum.NOT_DOWNLOADED,
 );
 

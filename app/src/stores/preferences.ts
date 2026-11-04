@@ -1,11 +1,9 @@
 import { persistentAtom } from '@nanostores/persistent';
-import { Theme, ViewTab, SearchMode } from '../core/types';
+import { ThemeEnum, ViewTabEnum, SearchModeEnum } from '../core/types';
 
-export { Theme, ViewTab, SearchMode };
+export const $theme = persistentAtom<ThemeEnum>('bibleit_theme', ThemeEnum.SEPIA);
 
-export const $theme = persistentAtom<Theme>('bibleit_theme', Theme.SEPIA);
-
-export const $activeTab = persistentAtom<ViewTab>('bibleit_active_tab', ViewTab.SEARCH);
+export const $activeTab = persistentAtom<ViewTabEnum>('bibleit_active_tab', ViewTabEnum.SEARCH);
 
 export const $isAiEnabled = persistentAtom<boolean>('bibleit_ai_enabled', true, {
   encode: String,
@@ -22,4 +20,4 @@ export const $hasSeenStorageBanner = persistentAtom<boolean>('bibleit_storage_ba
   decode: (v) => v === 'true',
 });
 
-export const $searchMode = persistentAtom<SearchMode>('bibleit_search_mode', SearchMode.AUTO);
+export const $searchMode = persistentAtom<SearchModeEnum>('bibleit_search_mode', SearchModeEnum.AUTO);

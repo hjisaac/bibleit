@@ -1,5 +1,5 @@
 /**
- * Composition root — the ONLY file that imports concrete adapters.
+ * Composition root: the ONLY file that imports concrete adapters.
  * Swapping a component happens here and nowhere else.
  */
 import type {
@@ -9,7 +9,7 @@ import type {
   SearchEngine,
 } from './core/ports';
 import {
-  buildLocalEngine,
+  LocalEngine,
   RegexRefParser,
   MiniSearchLexicalIndex,
   BruteForceVectorIndex,
@@ -21,7 +21,7 @@ import { OpfsArtifactStore } from './adapters/opfs-artifact-store';
 import { WorkerQueryEmbedder } from './adapters/worker-query-embedder';
 import { WebSpeechNarrator } from './adapters/web-speech-narrator';
 
-export { buildLocalEngine };
+export { LocalEngine };
 
 export function createDefaultArtifactStore(): ArtifactStore {
   return new OpfsArtifactStore();
@@ -43,7 +43,7 @@ export function createDefaultEngine(
   embedder: QueryEmbedder = createDefaultEmbedder(),
   isDeviceOnly?: () => boolean,
 ): SearchEngine {
-  const localEngine = buildLocalEngine({
+  const localEngine = new LocalEngine({
     store,
     refParser: new RegexRefParser(),
     lexical: new MiniSearchLexicalIndex(),

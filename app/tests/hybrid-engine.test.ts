@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HybridEngine } from '../src/adapters/hybrid-engine';
-import type { RetrievalResult, SearchEngine } from '@bibleit/engine';
+import type { SearchEngine } from '../src/core/ports';
+import { SearchOriginEnum, type RetrievalResult } from '../src/core/types';
 
 describe('HybridEngine', () => {
   const mockLocalResult: RetrievalResult = {
@@ -12,6 +13,7 @@ describe('HybridEngine', () => {
       },
     ],
     parsedRefs: [],
+    origin: SearchOriginEnum.LOCAL,
   };
 
   const mockRemoteResult: RetrievalResult = {
@@ -46,6 +48,7 @@ describe('HybridEngine', () => {
     const result = await engine.retrieve('love');
 
     expect(result.passages[0]?.chunk.text).toContain('Remote API');
+    expect(result.origin).toBe(SearchOriginEnum.REMOTE);
     expect(mockLocalEngine.retrieve).not.toHaveBeenCalled();
   });
 
@@ -56,6 +59,7 @@ describe('HybridEngine', () => {
     const result = await engine.retrieve('love');
 
     expect(result.passages[0]?.chunk.text).toContain('For God so loved the world');
+    expect(result.origin).toBe(SearchOriginEnum.LOCAL);
     expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
   });
 

@@ -5,12 +5,13 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import {
-  buildLocalEngine,
+  LocalEngine,
   RegexRefParser,
   MiniSearchLexicalIndex,
   BruteForceVectorIndex,
   RrfRanker,
   NullAnswerProvider,
+  SearchOriginEnum,
   type ArtifactStore,
   type SearchEngine,
 } from '@bibleit/engine';
@@ -36,7 +37,7 @@ const store: ArtifactStore = artifactBaseUrl
   : new FsArtifactStore(dataDir);
 const embedder = new NodeQueryEmbedder();
 
-const engine: SearchEngine = buildLocalEngine({
+const engine: SearchEngine = new LocalEngine({
   store,
   refParser: new RegexRefParser(),
   lexical: new MiniSearchLexicalIndex(),
@@ -107,13 +108,13 @@ app.get('/api/v1/search', async (c) => {
   const k = Math.min(Number(c.req.query('k')) || 10, 50);
 
   if (!q) {
-    return c.json({ passages: [], parsedRefs: [] });
+    return c.json({ passages: [], parsedRefs: [], origin: SearchOriginEnum.REMOTE });
   }
 
   try {
     const result = await engine.retrieve(q, k);
     logger.debug({ q, k, hits: result.passages.length }, 'Search executed');
-    return c.json(result);
+    return c.json({ ...result, origin: SearchOriginEnum.REMOTE });
   } catch (err) {
     captureCrash(err, { endpoint: '/api/v1/search', q, k });
     return c.json({ error: 'Search failed' }, 500);

@@ -4,7 +4,7 @@ import { SearchView } from '../src/components/SearchView';
 import { HybridEngine } from '../src/adapters/hybrid-engine';
 import type { SearchEngine, AudioNarrator } from '../src/core/ports';
 import type { ComponentProps } from 'preact';
-import { getChunkKey, PackageStatus, type ScoredPassage } from '../src/core/types';
+import { getChunkKey, PackageStatusEnum, type ScoredPassage } from '../src/core/types';
 
 type SearchViewProps = ComponentProps<typeof SearchView>;
 
@@ -97,7 +97,7 @@ describe('SearchView Result Cards & User Actions', () => {
       isAiEnabled: false,
       isInspectorMode: false,
       showHeadings: true,
-      offlineTextStatus: PackageStatus.DOWNLOADED,
+      offlineTextStatus: PackageStatusEnum.DOWNLOADED,
       hasSeenOnboarding: true,
       savedVerses: [],
       onSaveVerse: onSaveVerseSpy,
@@ -105,7 +105,8 @@ describe('SearchView Result Cards & User Actions', () => {
       onToast: onToastSpy,
       ...overrides,
     };
-    return render(<SearchView {...props} />);
+    const rendered = render(<SearchView {...props} />);
+    return { ...rendered, props };
   }
 
   it('renders passage citation, heading badge, and passage text', () => {
@@ -383,5 +384,106 @@ describe('SearchView Result Cards & User Actions', () => {
       expect(screen.getByText(/Rejoice in the Lord always/i)).toBeTruthy();
     });
   });
+
+  it('displays offline error state when offline and text not downloaded', async () => {
+    retrieveSpy.mockResolvedValueOnce({
+      query: 'love',
+      passages: [],
+      sources: { reference: [], lexical: [], semantic: [] },
+      parsedRefs: [],
+    });
+
+    renderSearchView({
+      isOnline: false,
+      offlineTextStatus: PackageStatusEnum.NOT_DOWNLOADED,
+    });
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'love' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(screen.getByText(/You're currently offline/i)).toBeTruthy();
+      expect(screen.getByText(/An internet connection is required to search online/i)).toBeTruthy();
+    });
+  });
+
+  it('displays server unavailable error state when remote fails and text not downloaded', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Network error'));
+    const emptyLocalEngine: SearchEngine = {
+      ready: Promise.resolve(),
+      retrieve: vi.fn().mockResolvedValue({ passages: [], parsedRefs: [], origin: 'local' }),
+      answers: { available: false, answer: async function* () {} },
+    };
+    const hybridEngine = new HybridEngine(emptyLocalEngine, 'https://api.bibleit.test');
+
+    renderSearchView({
+      engine: hybridEngine,
+      isOnline: true,
+      offlineTextStatus: PackageStatusEnum.NOT_DOWNLOADED,
+    });
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'love' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Search service currently unavailable/i)).toBeTruthy();
+      expect(screen.getByText(/We couldn't connect to the search server/i)).toBeTruthy();
+    });
+  });
+
+  it('displays active download progress card when offlineTextStatus is DOWNLOADING', () => {
+    renderSearchView({
+      offlineTextStatus: PackageStatusEnum.DOWNLOADING,
+      textProgress: 42,
+    });
+
+    expect(screen.getByText(/Saving scripture to this device…/i)).toBeTruthy();
+    expect(screen.getByText('42%')).toBeTruthy();
+  });
+
+  it('automatically refreshes and retrieves passages when offlineTextStatus transitions to DOWNLOADED', async () => {
+    localStorage.setItem(
+      'bibleit_last_search',
+      JSON.stringify({ query: 'love your neighbor', passages: [], answerText: '' })
+    );
+
+    retrieveSpy.mockResolvedValueOnce({
+      query: 'love your neighbor',
+      passages: samplePassages,
+      sources: { reference: [], lexical: samplePassages, semantic: [] },
+      parsedRefs: [],
+      origin: 'local',
+    });
+
+    const { rerender, props } = renderSearchView({
+      offlineTextStatus: PackageStatusEnum.DOWNLOADING,
+    });
+
+    // Simulate download completing and transitioning to DOWNLOADED
+    rerender(<SearchView {...props} offlineTextStatus={PackageStatusEnum.DOWNLOADED} />);
+
+    await waitFor(() => {
+      expect(retrieveSpy).toHaveBeenCalledWith('love your neighbor');
+      expect(screen.getByText(/Rejoice in the Lord always/i)).toBeTruthy();
+    });
+  });
+
+  it('re-runs a persisted empty search on remount when text is already downloaded', async () => {
+    localStorage.setItem(
+      'bibleit_last_search',
+      JSON.stringify({ query: 'love your neighbor', passages: [], answerText: '', origin: 'local' })
+    );
+
+    renderSearchView({ offlineTextStatus: PackageStatusEnum.DOWNLOADED });
+
+    await waitFor(() => {
+      expect(retrieveSpy).toHaveBeenCalledWith('love your neighbor');
+      expect(screen.getByText(/Rejoice in the Lord always/i)).toBeTruthy();
+    });
+    expect(screen.queryByText('No matching passages found')).toBeNull();
+  });
 });
+
 

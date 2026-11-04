@@ -1,4 +1,5 @@
 export * from './core/types';
+export { SearchOriginEnum } from './core/types';
 export * from './core/ports';
 export * from './core/bible-books';
 

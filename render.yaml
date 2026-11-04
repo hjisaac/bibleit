@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: bibleit-api
+    runtime: docker
+    dockerfilePath: api/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 7860
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /app/data

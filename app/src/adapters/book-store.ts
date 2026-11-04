@@ -141,7 +141,7 @@ export async function loadBook(bookId: string): Promise<BookData> {
         }),
       );
     } catch {
-      // Storage quota or permission error — data remains in memory
+      // Storage quota or permission error: data remains in memory
     }
   }
 
