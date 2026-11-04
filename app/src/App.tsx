@@ -449,7 +449,6 @@ export function App(): JSX.Element {
         isAiEnabled={isAiEnabled}
         searchMode={searchMode}
         onOpenHelp={() => setIsHelpOpen(true)}
-        onOpenAccount={() => showToast('Guest mode')}
       />
 
       <main class="flex-1 flex flex-col overflow-hidden">
