@@ -499,7 +499,7 @@ describe('SearchView Result Cards & User Actions', () => {
 
     renderSearchView({ isInspectorMode: true });
 
-    expect(screen.getByText(/source:/i)).toBeTruthy();
+    expect(screen.getByText(/Source:/i)).toBeTruthy();
     expect(screen.getByText('server')).toBeTruthy();
     expect(screen.getByText('42ms latency')).toBeTruthy();
   });
