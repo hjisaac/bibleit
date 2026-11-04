@@ -34,10 +34,10 @@ export function SavedView({ savedVerses, onOpenVerse, onUnsaveVerse }: SavedView
 
       {savedVerses.length === 0 ? (
         <p
-          class="py-8 text-center text-xs"
+          class="py-8 text-center text-xs leading-relaxed"
           style={{ color: 'var(--text-muted)' }}
         >
-          No saved verses yet. In the reader or search results, tap Save to bookmark passages.
+          No saved verses yet. Tap the bookmark icon in search results or long-press a verse in the reader to save passages.
         </p>
       ) : (
         <div class="flex flex-col space-y-3">

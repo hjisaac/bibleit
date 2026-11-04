@@ -67,4 +67,12 @@ describe('SavedView Component', () => {
     fireEvent.click(screen.getByText('John 3:16'));
     expect(handleOpen).toHaveBeenCalledWith(mockVerses[0]);
   });
+
+  it('renders clean unboxed empty state message when no verses are saved', () => {
+    render(<SavedView savedVerses={[]} onOpenVerse={vi.fn()} />);
+
+    expect(
+      screen.getByText(/Tap the bookmark icon in search results or long-press a verse in the reader/i),
+    ).toBeTruthy();
+  });
 });
