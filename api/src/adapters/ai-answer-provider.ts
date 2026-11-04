@@ -205,6 +205,9 @@ export class AiAnswerProvider implements AnswerProvider {
   }
 
   markCooldown(providerName: string, err: unknown): void {
+    if (err instanceof Error && (err.name === 'AbortError' || err.message?.includes('aborted'))) {
+      return;
+    }
     const cooldownMs = parseCooldownMs(err);
     const cooldownUntil = Date.now() + cooldownMs;
     this.cooldowns.set(providerName, cooldownUntil);
@@ -221,8 +224,8 @@ export class AiAnswerProvider implements AnswerProvider {
     const prompt = buildPrompt(query, context.passages);
 
     for (const provider of candidates) {
+      let yieldedAny = false;
       try {
-        let streamError: Error | null = null;
         const client = createOpenAI({
           baseURL: provider.baseURL,
           apiKey: provider.apiKey,
@@ -231,19 +234,17 @@ export class AiAnswerProvider implements AnswerProvider {
           model: client.chat(provider.model),
           system: SYSTEM_PROMPT,
           prompt,
-          onError: ({ error }) => {
-            streamError = error instanceof Error ? error : new Error(String(error));
-          },
         });
 
         for await (const chunk of result.textStream) {
+          yieldedAny = true;
           yield chunk;
         }
 
-        if (!streamError) return;
-        this.markCooldown(provider.name, streamError);
+        return;
       } catch (err) {
         this.markCooldown(provider.name, err);
+        if (yieldedAny) return;
       }
     }
   }
@@ -278,8 +279,32 @@ export class AiAnswerProvider implements AnswerProvider {
           system: SYSTEM_PROMPT,
           prompt,
           abortSignal: signal,
-          onError: ({ error }) => {
-            this.markCooldown(provider.name, error);
+        });
+
+        const iterator = result.textStream[Symbol.asyncIterator]();
+        const first = await iterator.next();
+
+        if (first.done && !first.value) {
+          throw new Error('Provider returned empty stream');
+        }
+
+        const markCd = (err: unknown) => this.markCooldown(provider.name, err);
+        const responseStream = new ReadableStream<string>({
+          async start(controller) {
+            if (first.value) {
+              controller.enqueue(first.value);
+            }
+            try {
+              while (true) {
+                const { done, value } = await iterator.next();
+                if (done) break;
+                controller.enqueue(value);
+              }
+              controller.close();
+            } catch (err) {
+              markCd(err);
+              controller.error(err);
+            }
           },
         });
 
@@ -289,7 +314,7 @@ export class AiAnswerProvider implements AnswerProvider {
         );
 
         return createTextStreamResponse({
-          stream: result.textStream,
+          stream: responseStream,
           headers: {
             'x-bibleit-provider': provider.name,
             'x-bibleit-model': provider.model,

@@ -26,6 +26,9 @@ import {
   DEFAULT_SEARCH_RATE_LIMIT,
   DEFAULT_GENERATE_RATE_LIMIT,
   RATE_LIMIT_WINDOW_MS,
+  MAX_QUERY_LENGTH,
+  MAX_PASSAGES,
+  MAX_PASSAGE_TEXT_LENGTH,
 } from './constants';
 import { rateLimiter } from 'hono-rate-limiter';
 import type { Context } from 'hono';
@@ -93,7 +96,14 @@ const generateLimiter = rateLimiter({
 
 const app = new Hono();
 
-app.use('*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'OPTIONS'] }));
+app.use(
+  '*',
+  cors({
+    origin: '*',
+    allowMethods: ['GET', 'POST', 'OPTIONS'],
+    exposeHeaders: ['x-bibleit-provider', 'x-bibleit-model', 'x-bibleit-attempts'],
+  }),
+);
 
 app.use('*', async (c, next) => {
   const start = performance.now();
@@ -171,12 +181,40 @@ const routes = app
     if (!query) {
       return c.json({ error: 'Missing "query" parameter' }, StatusCodes.BAD_REQUEST);
     }
+    if (query.length > MAX_QUERY_LENGTH) {
+      return c.json(
+        { error: `Query exceeds maximum length of ${MAX_QUERY_LENGTH} characters` },
+        StatusCodes.BAD_REQUEST,
+      );
+    }
 
     try {
-      let passages = body.passages;
-      if (!Array.isArray(passages) || passages.length === 0) {
-        const searchResult = await engine.retrieve(query, 5);
+      let passages: any[];
+      if (Array.isArray(body.passages) && body.passages.length > 0) {
+        passages = body.passages
+          .slice(0, MAX_PASSAGES)
+          .filter(
+            (p) =>
+              typeof p?.chunk?.text === 'string' &&
+              (typeof p?.chunk?.book === 'string' || typeof p?.chunk?.id === 'string'),
+          )
+          .map((p) => ({
+            ...p,
+            chunk: {
+              ...p.chunk,
+              text: p.chunk.text.slice(0, MAX_PASSAGE_TEXT_LENGTH),
+            },
+          }));
+      } else {
+        const searchResult = await engine.retrieve(query, MAX_PASSAGES);
         passages = searchResult.passages;
+      }
+
+      if (passages.length === 0) {
+        return c.json(
+          { error: 'No scripture passages available to answer question' },
+          StatusCodes.BAD_REQUEST,
+        );
       }
 
       return await answerProvider.streamResponse(query, passages, c.req.raw.signal);

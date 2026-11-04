@@ -85,4 +85,69 @@ describe('AiAnswerProvider candidate list and rotation', () => {
     );
     assert.strictEqual(geminiStatus?.status, 'healthy');
   });
+
+  it('does not cool down provider on client AbortError', () => {
+    const provider = new AiAnswerProvider();
+    const abortErr = new Error('The operation was aborted');
+    abortErr.name = 'AbortError';
+    provider.markCooldown('groq', abortErr);
+
+    const statuses = provider.getProviderStatuses();
+    const groq = statuses.find((s) => s.name === 'groq');
+    assert.strictEqual(groq?.status, 'healthy');
+  });
+
+  it('fails over to next provider in streamResponse when first provider fails', async () => {
+    process.env.GROQ_API_KEY = 'mock_groq';
+    process.env.GEMINI_API_KEY = 'mock_gemini';
+    delete process.env.OPENROUTER_API_KEY;
+
+    const originalFetch = globalThis.fetch;
+    const fetchCalls: string[] = [];
+
+    globalThis.fetch = async (url: string | URL | Request) => {
+      const urlStr = url.toString();
+      fetchCalls.push(urlStr);
+
+      // Groq endpoint fails with 429
+      if (urlStr.includes('api.groq.com')) {
+        return new Response(JSON.stringify({ error: { message: 'rate limit exceeded' } }), {
+          status: 429,
+          headers: { 'retry-after': '60', 'content-type': 'application/json' },
+        });
+      }
+
+      // Gemini endpoint succeeds with SSE stream
+      return new Response(
+        'data: {"choices":[{"index":0,"delta":{"content":"God is love"}}]}\n\ndata: [DONE]\n\n',
+        { status: 200, headers: { 'content-type': 'text/event-stream' } },
+      );
+    };
+
+    try {
+      const provider = new AiAnswerProvider();
+      const mockPassage = {
+        chunk: { id: 'c1', book: 'JHN', start: [3, 16] as [number, number], end: [3, 16] as [number, number], text: 'For God so loved the world' },
+        score: 1,
+        source: 'reference' as const,
+      };
+
+      const res = await provider.streamResponse('Who is God?', [mockPassage]);
+
+      // Headers reflect successful fallback to gemini on attempt 2
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.headers.get('x-bibleit-provider'), 'gemini');
+      assert.strictEqual(res.headers.get('x-bibleit-attempts'), '2');
+
+      // Body contains streamed chunk
+      const text = await res.text();
+      assert.ok(text.includes('God is love'), `Expected text to include 'God is love', got ${text}`);
+
+      // Groq is marked on cooldown
+      const groqStatus = provider.getProviderStatuses().find((s) => s.name === 'groq');
+      assert.strictEqual(groqStatus?.status, 'cooldown');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
