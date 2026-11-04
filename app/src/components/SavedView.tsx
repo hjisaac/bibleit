@@ -33,16 +33,12 @@ export function SavedView({ savedVerses, onOpenVerse, onUnsaveVerse }: SavedView
       </div>
 
       {savedVerses.length === 0 ? (
-        <div
-          class="p-6 text-center rounded-2xl border text-xs"
-          style={{
-            borderColor: 'var(--border-subtle)',
-            backgroundColor: 'var(--bg-surface-elevated)',
-            color: 'var(--text-muted)',
-          }}
+        <p
+          class="py-8 text-center text-xs"
+          style={{ color: 'var(--text-muted)' }}
         >
           No saved verses yet. In the reader or search results, tap Save to bookmark passages.
-        </div>
+        </p>
       ) : (
         <div class="flex flex-col space-y-3">
           {savedVerses.map((item) => (
