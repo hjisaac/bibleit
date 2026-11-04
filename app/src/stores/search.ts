@@ -10,6 +10,7 @@ export interface StoredSearch {
   passages: ScoredPassage[];
   answerText: string;
   origin?: SearchOriginEnum;
+  durationMs?: number;
 }
 
 const DEFAULT_STORED_SEARCH: StoredSearch = {
@@ -78,6 +79,7 @@ export const $lastSearch = createPersistentStore<StoredSearch>(
             passages: Array.isArray(parsed.passages) ? parsed.passages : [],
             answerText: typeof parsed.answerText === 'string' ? parsed.answerText : '',
             origin: parsed.origin,
+            durationMs: typeof parsed.durationMs === 'number' ? parsed.durationMs : undefined,
           };
         }
       } catch {

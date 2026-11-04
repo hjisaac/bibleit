@@ -193,6 +193,7 @@ export function SearchView({
   const [query, setQuery] = useState(initialSearch.query);
   const [passages, setPassages] = useState<ScoredPassage[]>(initialSearch.passages);
   const [searchOrigin, setSearchOrigin] = useState<SearchOriginEnum | undefined>(() => initialSearch.origin);
+  const [searchDurationMs, setSearchDurationMs] = useState<number | null>(() => initialSearch.durationMs ?? null);
   const [isPanelOpen, setIsPanelOpen] = useState(initialSearch.query.trim().length === 0);
   const lastSubmittedQueryRef = useRef(initialSearch.query);
   const [expandedCardKey, setExpandedCardKey] = useState<string | null>(null);
@@ -236,16 +237,20 @@ export function SearchView({
     if (!trimmed) {
       setPassages([]);
       setSearchOrigin(undefined);
+      setSearchDurationMs(null);
       setIsSearching(false);
       setHasSearched(false);
       return;
     }
     setIsSearching(true);
     setHasSearched(true);
+    const startTime = performance.now();
     void engine
       .retrieve(trimmed)
       .then((res) => {
         if (searchRunIdRef.current === runId) {
+          const duration = Math.round(performance.now() - startTime);
+          setSearchDurationMs(duration);
           setPassages(res.passages);
           setSearchOrigin(res.origin);
         }
@@ -293,8 +298,14 @@ export function SearchView({
   const matchedBook = findBookByPrefix(query);
 
   useEffect(() => {
-    $lastSearch.set({ query, passages, answerText, origin: searchOrigin });
-  }, [query, passages, answerText, searchOrigin]);
+    $lastSearch.set({
+      query,
+      passages,
+      answerText,
+      origin: searchOrigin,
+      durationMs: searchDurationMs ?? undefined,
+    });
+  }, [query, passages, answerText, searchOrigin, searchDurationMs]);
 
   useEffect(() => {
     if (expandedCardKey === null) return;
@@ -380,7 +391,10 @@ export function SearchView({
     setIsSynthesisCollapsed(false);
 
     try {
+      const startTime = performance.now();
       const res = await engine.retrieve(trimmed);
+      const duration = Math.round(performance.now() - startTime);
+      setSearchDurationMs(duration);
       setPassages(res.passages);
       setSearchOrigin(res.origin);
       const stream = engine.answers.answer(trimmed, res);
@@ -544,6 +558,7 @@ export function SearchView({
                 e.stopPropagation();
                 searchRunIdRef.current++;
                 setQuery('');
+                setSearchDurationMs(null);
                 setIsPanelOpen(true);
                 inputRef.current?.focus();
               }}
@@ -961,6 +976,43 @@ export function SearchView({
           </div>
         );
       })()}
+
+      {/* Inspector Mode Telemetry: Origin & Timing */}
+      {isInspectorMode && passages.length > 0 && (
+        <div
+          class="mb-3 px-3 py-1.5 rounded-xl border flex items-center justify-between text-[11px] font-mono animate-fadeIn shrink-0"
+          style={{
+            borderColor: 'var(--border-subtle)',
+            backgroundColor: 'var(--bg-surface-elevated)',
+            color: 'var(--text-subtle)',
+          }}
+        >
+          <div class="flex items-center gap-1.5">
+            <span
+              class="w-1.5 h-1.5 rounded-full shrink-0"
+              style={{
+                backgroundColor:
+                  searchOrigin === SearchOriginEnum.REMOTE ? '#3b82f6' : '#10b981',
+              }}
+            />
+            <span>
+              Origin:{' '}
+              <span class="font-semibold" style={{ color: 'var(--text-main)' }}>
+                {searchOrigin === SearchOriginEnum.REMOTE ? 'Cloud API' : 'On-Device'}
+              </span>
+            </span>
+          </div>
+
+          {searchDurationMs !== null && (
+            <div class="flex items-center gap-1">
+              <span>Time:</span>
+              <span class="font-semibold" style={{ color: 'var(--text-main)' }}>
+                {searchDurationMs}ms
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Results Stream */}
       <div class="flex flex-col space-y-3 pb-4">

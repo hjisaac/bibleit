@@ -484,6 +484,25 @@ describe('SearchView Result Cards & User Actions', () => {
     });
     expect(screen.queryByText('No matching passages found')).toBeNull();
   });
+
+  it('renders search timing and origin telemetry when isInspectorMode is enabled', () => {
+    localStorage.setItem(
+      'bibleit_last_search',
+      JSON.stringify({
+        query: 'rejoice',
+        passages: samplePassages,
+        answerText: '',
+        origin: 'remote',
+        durationMs: 42,
+      }),
+    );
+
+    renderSearchView({ isInspectorMode: true });
+
+    expect(screen.getByText(/Origin:/i)).toBeTruthy();
+    expect(screen.getByText('Cloud API')).toBeTruthy();
+    expect(screen.getByText('42ms')).toBeTruthy();
+  });
 });
 
 

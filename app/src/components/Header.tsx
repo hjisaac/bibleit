@@ -28,11 +28,10 @@ export function Header({
         </span>
         {isOnDevice && (
           <span
-            class="text-[10px] tracking-wide uppercase px-2 py-0.5 rounded-full font-semibold transition-all border"
+            class="text-[10px] font-medium px-1.5 py-0.5 rounded transition-opacity"
             style={{
               backgroundColor: 'var(--bg-surface-elevated)',
-              borderColor: 'var(--border-subtle)',
-              color: 'var(--text-muted)',
+              color: 'var(--text-subtle)',
             }}
             title="On-device mode active: Searching locally on this device."
           >
