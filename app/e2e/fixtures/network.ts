@@ -24,7 +24,8 @@ export async function useSearchCassette(
   const resolved = resolveCassettePath(harPath);
   await page.routeFromHAR(resolved, {
     url: '**/api/v1/search*',
-    update: options.update,
+    update: options.update ?? !!process.env.RECORD_CASSETTES,
+    updateContent: 'embed',
     notFound: 'abort',
   });
 }
