@@ -455,7 +455,6 @@ export function App(): JSX.Element {
         <div class={activeTab === ViewTabEnum.SEARCH ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
           <SearchView
             engine={engine}
-            manifest={manifest}
             narrator={narrator}
             narrationState={narrationState}
             isOnline={isOnline}
