@@ -499,7 +499,8 @@ describe('SearchView Result Cards & User Actions', () => {
 
     renderSearchView({ isInspectorMode: true });
 
-    expect(screen.getByText('origin: remote')).toBeTruthy();
+    expect(screen.getByText(/Origin:/i)).toBeTruthy();
+    expect(screen.getByText('remote')).toBeTruthy();
     expect(screen.getByText('42ms latency')).toBeTruthy();
   });
 });

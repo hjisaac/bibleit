@@ -980,7 +980,7 @@ export function SearchView({
       {/* Technical Diagnostics Bar (Shown only in Inspector Mode when results are present) */}
       {isInspectorMode && passages.length > 0 && (
         <div
-          class="flex items-center justify-between text-[10px] sm:text-[11px] mb-2.5 px-1 py-1 border-b border-dashed font-mono shrink-0 animate-fadeIn"
+          class="flex items-center justify-between text-[9px] sm:text-[10px] mb-2 px-1 py-0.5 border-b border-dashed font-mono shrink-0 animate-fadeIn"
           style={{
             borderColor: 'var(--border-subtle)',
             color: 'var(--text-subtle)',
@@ -993,7 +993,10 @@ export function SearchView({
               }`}
             />
             <span>
-              origin: {searchOrigin === SearchOriginEnum.REMOTE ? 'remote' : 'local'}
+              Origin:{' '}
+              <span class="text-emerald-600 dark:text-emerald-400 font-semibold">
+                {searchOrigin === SearchOriginEnum.REMOTE ? 'remote' : 'local'}
+              </span>
             </span>
           </div>
           {searchDurationMs !== null && (
