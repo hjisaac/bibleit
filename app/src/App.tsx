@@ -494,6 +494,7 @@ export function App(): JSX.Element {
             onOpenVerse={(item) => {
               handleOpenReader(item.book, item.chapter, item.verse);
             }}
+            onUnsaveVerse={handleToggleSaveVerse}
           />
         )}
 
