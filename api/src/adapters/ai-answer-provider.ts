@@ -14,7 +14,15 @@ export interface ProviderConfig {
   baseURL: string;
   apiKey: string;
   model: string;
-  tier?: number;
+  tier: 1 | 2;
+}
+
+export interface ProviderStatus {
+  name: string;
+  tier: 1 | 2;
+  model: string;
+  status: 'healthy' | 'cooldown';
+  cooldownRemainingSec?: number;
 }
 
 const SYSTEM_PROMPT = `You are BibleIt, a focused scripture assistant.
@@ -144,29 +152,56 @@ export class AiAnswerProvider implements AnswerProvider {
   }
 
   /**
-   * Returns healthy providers ordered by round-robin rotation,
-   * keeping Tier 1 primary providers ahead of Tier 2 reserve providers.
+   * Returns candidate providers ordered with healthy Tier 1 providers rotated round-robin,
+   * followed by healthy Tier 2 reserve providers.
    */
   getCandidateList(): ProviderConfig[] {
     const all = this.getProviders();
     if (all.length === 0) return [];
 
     const now = Date.now();
-    const healthy = all.filter((p) => now >= (this.cooldowns.get(p.name) || 0));
+    const isCool = (p: ProviderConfig) => now >= (this.cooldowns.get(p.name) || 0);
 
-    // Fallback to earliest recovering provider if all are currently cooling down
-    const pool =
-      healthy.length > 0
-        ? healthy
-        : [...all].sort((a, b) => (this.cooldowns.get(a.name) || 0) - (this.cooldowns.get(b.name) || 0));
+    const tier1Healthy = all.filter((p) => p.tier === 1 && isCool(p));
+    const tier2Healthy = all.filter((p) => p.tier === 2 && isCool(p));
 
-    const offset = Math.abs(this.roundRobinCounter++) % pool.length;
-    return [...pool.slice(offset), ...pool.slice(0, offset)];
+    const candidates: ProviderConfig[] = [];
+    if (tier1Healthy.length > 0) {
+      const offset = Math.abs(this.roundRobinCounter++) % tier1Healthy.length;
+      candidates.push(...tier1Healthy.slice(offset), ...tier1Healthy.slice(0, offset));
+    }
+
+    candidates.push(...tier2Healthy);
+
+    if (candidates.length === 0) {
+      const cooling = [...all].sort(
+        (a, b) => (this.cooldowns.get(a.name) || 0) - (this.cooldowns.get(b.name) || 0),
+      );
+      candidates.push(...cooling);
+    }
+
+    return candidates;
   }
 
   /** Alias for getCandidateList */
   getCandidateQueue(): ProviderConfig[] {
     return this.getCandidateList();
+  }
+
+  /** Returns live health and cooldown status for all configured providers. */
+  getProviderStatuses(): ProviderStatus[] {
+    const now = Date.now();
+    return this.getProviders().map((p) => {
+      const cooldownUntil = this.cooldowns.get(p.name) || 0;
+      const isCooling = cooldownUntil > now;
+      return {
+        name: p.name,
+        tier: p.tier,
+        model: p.model,
+        status: isCooling ? 'cooldown' : 'healthy',
+        ...(isCooling ? { cooldownRemainingSec: Math.ceil((cooldownUntil - now) / 1000) } : {}),
+      };
+    });
   }
 
   markCooldown(providerName: string, err: unknown): void {
@@ -248,7 +283,19 @@ export class AiAnswerProvider implements AnswerProvider {
           },
         });
 
-        return createTextStreamResponse({ stream: result.textStream });
+        logger.info(
+          { provider: provider.name, model: provider.model, attempts: i + 1 },
+          'Serving AI generation stream',
+        );
+
+        return createTextStreamResponse({
+          stream: result.textStream,
+          headers: {
+            'x-bibleit-provider': provider.name,
+            'x-bibleit-model': provider.model,
+            'x-bibleit-attempts': String(i + 1),
+          },
+        });
       } catch (err) {
         this.markCooldown(provider.name, err);
         if (i === candidates.length - 1) {

@@ -116,11 +116,30 @@ export function renderHomeHtml(): string {
   );
 }
 
-export function renderHealthHtml(isReady: boolean): string {
+export function renderHealthHtml(
+  isReady: boolean,
+  providers: Array<{ name: string; tier: 1 | 2; model?: string; status: string; cooldownRemainingSec?: number }> = [],
+): string {
   const operationalPill = '<span class="pill ok"><span class="dot"></span>operational</span>';
   const initPill = '<span class="pill init"><span class="dot"></span>initializing</span>';
   const onPill = '<span class="pill ok"><span class="dot"></span>ON</span>';
   const offPill = '<span class="pill off"><span class="dot"></span>OFF</span>';
+
+  const providerItems =
+    providers.length > 0
+      ? providers
+          .map((p) => {
+            const isHealthy = p.status === 'healthy';
+            const label = isHealthy ? `healthy (T${p.tier})` : `cooldown (${p.cooldownRemainingSec || 0}s)`;
+            const pillClass = isHealthy ? 'pill ok' : 'pill init';
+            return `
+      <div class="item">
+        <span class="name">${p.name} <span style="color:#71717a;font-size:0.75rem;">(${p.model || ''})</span></span>
+        <span class="${pillClass}"><span class="dot"></span>${label}</span>
+      </div>`;
+          })
+          .join('')
+      : `<div class="item"><span class="name">None configured</span><span class="pill off"><span class="dot"></span>OFF</span></div>`;
 
   return renderPage(
     'Health · bibleit',
@@ -138,6 +157,10 @@ export function renderHealthHtml(isReady: boolean): string {
         <span class="name">GET /api/v1/search</span>
         ${isReady ? operationalPill : initPill}
       </div>
+      <div class="item">
+        <span class="name">POST /api/v1/generate</span>
+        ${providers.length > 0 ? operationalPill : offPill}
+      </div>
 
       <div class="section-title" style="margin-top: 1.5rem;">Subsystems</div>
       <div class="item">
@@ -152,6 +175,9 @@ export function renderHealthHtml(isReady: boolean): string {
         <span class="name">Neural Embedder</span>
         ${isReady ? onPill : offPill}
       </div>
+
+      <div class="section-title" style="margin-top: 1.5rem;">LLM Providers</div>
+      ${providerItems}
     </div>`,
   );
 }

@@ -28,43 +28,61 @@ describe('parseCooldownMs', () => {
 });
 
 describe('AiAnswerProvider candidate list and rotation', () => {
-  it('rotates healthy providers round-robin across calls', () => {
+  it('rotates Tier 1 providers round-robin and reserves Tier 2 providers', () => {
     process.env.GROQ_API_KEY = 'mock_groq';
     process.env.GEMINI_API_KEY = 'mock_gemini';
     process.env.OPENROUTER_API_KEY = 'mock_openrouter';
 
     const provider = new AiAnswerProvider();
 
-    // Call 1: Starts at index 0 (groq)
+    // Call 1: Starts at index 0 of Tier 1 (groq), Tier 2 (openrouter) placed at end
     const list1 = provider.getCandidateList();
     assert.strictEqual(list1[0]?.name, 'groq');
     assert.strictEqual(list1[1]?.name, 'gemini');
     assert.strictEqual(list1[2]?.name, 'openrouter');
 
-    // Call 2: Rotates to index 1 (gemini)
+    // Call 2: Rotates to index 1 of Tier 1 (gemini), Tier 2 (openrouter) remains reserve
     const list2 = provider.getCandidateList();
     assert.strictEqual(list2[0]?.name, 'gemini');
-    assert.strictEqual(list2[1]?.name, 'openrouter');
-    assert.strictEqual(list2[2]?.name, 'groq');
-
-    // Call 3: Rotates to index 2 (openrouter)
-    const list3 = provider.getCandidateList();
-    assert.strictEqual(list3[0]?.name, 'openrouter');
-    assert.strictEqual(list3[1]?.name, 'groq');
-    assert.strictEqual(list3[2]?.name, 'gemini');
+    assert.strictEqual(list2[1]?.name, 'groq');
+    assert.strictEqual(list2[2]?.name, 'openrouter');
   });
 
-  it('bypasses provider on cooldown and recovers seamlessly', () => {
+  it('bypasses provider on cooldown and promotes Tier 2 when Tier 1 is exhausted', () => {
     process.env.GROQ_API_KEY = 'mock_groq';
     process.env.GEMINI_API_KEY = 'mock_gemini';
+    process.env.OPENROUTER_API_KEY = 'mock_openrouter';
 
     const provider = new AiAnswerProvider();
 
-    // Mark Groq on cooldown
+    // Cool down both Tier 1 providers
     provider.markCooldown('groq', { responseHeaders: { 'retry-after': '60' } });
+    provider.markCooldown('gemini', { responseHeaders: { 'retry-after': '60' } });
 
-    // Groq is skipped; Gemini is selected first
+    // Tier 2 (openrouter) is selected first
     const list = provider.getCandidateList();
-    assert.strictEqual(list[0]?.name, 'gemini');
+    assert.strictEqual(list[0]?.name, 'openrouter');
+  });
+
+  it('reports live provider statuses and cooldown countdowns', () => {
+    process.env.GROQ_API_KEY = 'mock_groq';
+    process.env.GEMINI_API_KEY = 'mock_gemini';
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.MISTRAL_API_KEY;
+    delete process.env.COHERE_API_KEY;
+
+    const provider = new AiAnswerProvider();
+    provider.markCooldown('groq', { responseHeaders: { 'retry-after': '30' } });
+
+    const statuses = provider.getProviderStatuses();
+    const groqStatus = statuses.find((s) => s.name === 'groq');
+    const geminiStatus = statuses.find((s) => s.name === 'gemini');
+
+    assert.strictEqual(groqStatus?.status, 'cooldown');
+    assert.ok(
+      groqStatus?.cooldownRemainingSec && groqStatus.cooldownRemainingSec >= 25,
+      `Expected ~30s, got ${groqStatus?.cooldownRemainingSec}`,
+    );
+    assert.strictEqual(geminiStatus?.status, 'healthy');
   });
 });

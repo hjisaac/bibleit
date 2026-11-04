@@ -120,9 +120,11 @@ app.get('/', (c) => {
 });
 
 app.get(API_ROUTES.HEALTH, (c) => {
+  const providers = answerProvider.getProviderStatuses();
   const jsonPayload = {
     status: isReady ? 'ok' : 'initializing',
     ready: isReady,
+    providers,
   };
 
   const wantsJson =
@@ -136,7 +138,7 @@ app.get(API_ROUTES.HEALTH, (c) => {
     return c.json(jsonPayload, status);
   }
 
-  return c.html(renderHealthHtml(isReady), status);
+  return c.html(renderHealthHtml(isReady, providers), status);
 });
 
 const routes = app
