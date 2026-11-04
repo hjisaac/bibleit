@@ -46,3 +46,17 @@ The live web app is hosted on free-tier infrastructure:
 - **Cloud API**: Hosted on Render free tier. Free instances sleep after inactivity, so the initial search request may take 40 to 60 seconds while the server spins up. Subsequent requests run normally.
 - **Search Interaction**: Queries are submitted explicitly using Enter or the Search button (not search-as-you-type).
 - **Offline Fallback & On-Device Search**: When the cloud API is sleeping or unreachable, the app falls back to local in-browser search for downloaded assets. Reference and keyword search require downloaded scripture text. Local semantic search additionally requires downloading the embedding model and vector index. Users can also enable the "Device-only (Offline)" toggle in Settings at any time to keep all search entirely local.
+
+## Citation
+
+If this project is helpful to your work or studies, citation is appreciated:
+
+```bibtex
+@misc{bibleit2026,
+  author = {Houngue, Isaac H.J.},
+  title = {bibleit: Offline-first hybrid Bible search},
+  year = {2026},
+  url = {https://github.com/hjisaac/bibleit}
+}
+```
+
