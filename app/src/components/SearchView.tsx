@@ -983,24 +983,16 @@ export function SearchView({
           class="flex items-center justify-between text-[9px] sm:text-[10px] mb-2 px-1 py-0.5 border-b border-dashed font-mono shrink-0 animate-fadeIn"
           style={{
             borderColor: 'var(--border-subtle)',
-            color: 'var(--text-subtle)',
           }}
         >
-          <div class="flex items-center gap-1.5">
-            <span
-              class={`inline-block w-1.5 h-1.5 rounded-full animate-pulse shrink-0 ${
-                searchOrigin === SearchOriginEnum.REMOTE ? 'bg-blue-500' : 'bg-emerald-500'
-              }`}
-            />
+          <span class="text-emerald-500 dark:text-emerald-400">
+            Origin:{' '}
             <span>
-              Origin:{' '}
-              <span class="text-emerald-600 dark:text-emerald-400 font-semibold">
-                {searchOrigin === SearchOriginEnum.REMOTE ? 'remote' : 'local'}
-              </span>
+              {searchOrigin === SearchOriginEnum.REMOTE ? 'remote' : 'local'}
             </span>
-          </div>
+          </span>
           {searchDurationMs !== null && (
-            <span class="text-emerald-600 dark:text-emerald-400 font-semibold shrink-0">
+            <span class="text-emerald-500 dark:text-emerald-400 shrink-0">
               {searchDurationMs}ms latency
             </span>
           )}
