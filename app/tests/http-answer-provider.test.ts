@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HttpAnswerProvider } from '../src/adapters/http-answer-provider';
 import type { RetrievalResult } from '../src/core/types';
+import { API_ROUTES } from '@bibleit/engine';
 
 describe('HttpAnswerProvider', () => {
   beforeEach(() => {
@@ -69,10 +70,9 @@ describe('HttpAnswerProvider', () => {
 
     expect(chunks).toEqual(['God ', 'is ', 'love.']);
     expect(fetchSpy).toHaveBeenCalledWith(
-      'https://api.bibleit.test/api/v1/generate',
+      `https://api.bibleit.test${API_ROUTES.GENERATE}`,
       expect.objectContaining({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: 'What is love?', passages: mockContext.passages }),
       }),
     );

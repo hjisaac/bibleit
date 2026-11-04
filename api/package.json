@@ -6,7 +6,8 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.108",

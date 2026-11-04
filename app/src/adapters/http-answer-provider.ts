@@ -1,11 +1,18 @@
 import type { AnswerProvider } from '../core/ports';
 import type { RetrievalResult } from '../core/types';
+import { BibleitApiClient } from './api-client';
 
 export class HttpAnswerProvider implements AnswerProvider {
+  private client: BibleitApiClient | null = null;
+
   constructor(
     private remoteUrl: string | null,
     private isDeviceOnly?: () => boolean,
-  ) {}
+  ) {
+    if (this.remoteUrl) {
+      this.client = new BibleitApiClient(this.remoteUrl);
+    }
+  }
 
   get available(): boolean {
     if (!this.remoteUrl || this.isDeviceOnly?.()) return false;
@@ -13,14 +20,10 @@ export class HttpAnswerProvider implements AnswerProvider {
   }
 
   async *answer(query: string, context: RetrievalResult): AsyncIterable<string> {
-    if (!this.available || !this.remoteUrl) return;
+    if (!this.available || !this.client) return;
 
     try {
-      const res = await fetch(`${this.remoteUrl}/api/v1/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, passages: context.passages }),
-      });
+      const res = await this.client.generate(query, context.passages);
 
       if (!res.ok || !res.body) return;
 

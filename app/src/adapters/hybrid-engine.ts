@@ -1,6 +1,7 @@
 import type { AnswerProvider, SearchEngine } from '../core/ports';
 import { SearchOriginEnum, type RetrievalResult } from '../core/types';
 import { HttpAnswerProvider } from './http-answer-provider';
+import { BibleitApiClient } from './api-client';
 
 /**
  * HybridEngine: Tiered search engine delegating to remote API when online,
@@ -15,6 +16,7 @@ export class HybridEngine implements SearchEngine {
   private localEngine: SearchEngine;
   private remoteUrl: string | null;
   private isDeviceOnly?: () => boolean;
+  private apiClient: BibleitApiClient | null = null;
 
   // Timestamp until which remote requests are bypassed after a failure.
   private remoteDownUntil = 0;
@@ -31,6 +33,9 @@ export class HybridEngine implements SearchEngine {
     this.answers = this.remoteUrl
       ? new HttpAnswerProvider(this.remoteUrl, isDeviceOnly)
       : localEngine.answers;
+    if (this.remoteUrl) {
+      this.apiClient = new BibleitApiClient(this.remoteUrl);
+    }
   }
 
   async sync(): Promise<void> {
@@ -46,25 +51,19 @@ export class HybridEngine implements SearchEngine {
       typeof navigator !== 'undefined' &&
       navigator.onLine;
 
-    if (canAttemptRemote) {
+    if (canAttemptRemote && this.apiClient) {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), REMOTE_TIMEOUT_MS);
-        const res = await fetch(
-          `${this.remoteUrl}/api/v1/search?q=${encodeURIComponent(query)}&k=${k}`,
-          { signal: controller.signal },
-        );
+        const result = await this.apiClient.search(query, k, controller.signal);
         clearTimeout(timeout);
 
-        if (res.ok) {
-          const result = (await res.json()) as RetrievalResult;
-          if (Array.isArray(result?.passages)) {
-            this.remoteDownUntil = 0;
-            return {
-              ...result,
-              origin: SearchOriginEnum.REMOTE,
-            };
-          }
+        if (result && Array.isArray(result.passages)) {
+          this.remoteDownUntil = 0;
+          return {
+            ...result,
+            origin: SearchOriginEnum.REMOTE,
+          };
         }
       } catch (err) {
         this.remoteDownUntil = Date.now() + REMOTE_COOLDOWN_MS;

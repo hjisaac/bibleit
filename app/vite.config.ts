@@ -36,6 +36,7 @@ export default defineConfig(async ({ command, mode }) => {
     resolve: {
       alias: {
         '@bibleit/engine': path.resolve(__dirname, '../engine/src/index.ts'),
+        '@bibleit/api': path.resolve(__dirname, '../api/src/index.ts'),
       },
     },
     define: {

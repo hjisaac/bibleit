@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HybridEngine } from '../src/adapters/hybrid-engine';
 import type { SearchEngine } from '../src/core/ports';
 import { SearchOriginEnum, type RetrievalResult } from '../src/core/types';
+import { API_ROUTES } from '@bibleit/engine';
 
 describe('HybridEngine', () => {
   const mockLocalResult: RetrievalResult = {
@@ -188,7 +189,7 @@ describe('HybridEngine', () => {
     }
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      'https://api.bibleit.test/api/v1/generate',
+      `https://api.bibleit.test${API_ROUTES.GENERATE}`,
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ query: 'who is God?', passages: mockLocalResult.passages }),

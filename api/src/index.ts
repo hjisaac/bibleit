@@ -10,8 +10,8 @@ import {
   MiniSearchLexicalIndex,
   BruteForceVectorIndex,
   RrfRanker,
-  NullAnswerProvider,
   SearchOriginEnum,
+  API_ROUTES,
   type ArtifactStore,
   type SearchEngine,
 } from '@bibleit/engine';
@@ -119,7 +119,7 @@ app.get('/', (c) => {
   return c.html(renderHomeHtml());
 });
 
-app.get('/health', (c) => {
+app.get(API_ROUTES.HEALTH, (c) => {
   const jsonPayload = {
     status: isReady ? 'ok' : 'initializing',
     ready: isReady,
@@ -139,50 +139,52 @@ app.get('/health', (c) => {
   return c.html(renderHealthHtml(isReady), status);
 });
 
-app.get('/api/v1/search', searchLimiter, async (c) => {
-  const q = c.req.query('q')?.trim() || '';
-  const k = Math.min(Number(c.req.query('k')) || 10, 50);
+const routes = app
+  .get(API_ROUTES.SEARCH, searchLimiter, async (c) => {
+    const q = c.req.query('q')?.trim() || '';
+    const k = Math.min(Number(c.req.query('k')) || 10, 50);
 
-  if (!q) {
-    return c.json({ passages: [], parsedRefs: [], origin: SearchOriginEnum.REMOTE });
-  }
-
-  try {
-    const result = await engine.retrieve(q, k);
-    logger.debug({ q, k, hits: result.passages.length }, 'Search executed');
-    return c.json({ ...result, origin: SearchOriginEnum.REMOTE });
-  } catch (err) {
-    captureCrash(err, { endpoint: '/api/v1/search', q, k });
-    return c.json({ error: 'Search failed' }, StatusCodes.INTERNAL_SERVER_ERROR);
-  }
-});
-
-app.post('/api/v1/generate', generateLimiter, async (c) => {
-  let body: { query?: string; passages?: any[] };
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: 'Invalid JSON request body' }, StatusCodes.BAD_REQUEST);
-  }
-
-  const query = body.query?.trim();
-  if (!query) {
-    return c.json({ error: 'Missing "query" parameter' }, StatusCodes.BAD_REQUEST);
-  }
-
-  try {
-    let passages = body.passages;
-    if (!Array.isArray(passages) || passages.length === 0) {
-      const searchResult = await engine.retrieve(query, 5);
-      passages = searchResult.passages;
+    if (!q) {
+      return c.json({ passages: [], parsedRefs: [], origin: SearchOriginEnum.REMOTE });
     }
 
-    return await answerProvider.streamResponse(query, passages, c.req.raw.signal);
-  } catch (err) {
-    captureCrash(err, { endpoint: '/api/v1/generate', query });
-    return c.json({ error: 'Failed to generate answer' }, StatusCodes.INTERNAL_SERVER_ERROR);
-  }
-});
+    try {
+      const result = await engine.retrieve(q, k);
+      logger.debug({ q, k, hits: result.passages.length }, 'Search executed');
+      return c.json({ ...result, origin: SearchOriginEnum.REMOTE });
+    } catch (err) {
+      captureCrash(err, { endpoint: API_ROUTES.SEARCH, q, k });
+      return c.json({ error: 'Search failed' }, StatusCodes.INTERNAL_SERVER_ERROR);
+    }
+  })
+  .post(API_ROUTES.GENERATE, generateLimiter, async (c) => {
+    let body: { query?: string; passages?: any[] };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'Invalid JSON request body' }, StatusCodes.BAD_REQUEST);
+    }
+
+    const query = body.query?.trim();
+    if (!query) {
+      return c.json({ error: 'Missing "query" parameter' }, StatusCodes.BAD_REQUEST);
+    }
+
+    try {
+      let passages = body.passages;
+      if (!Array.isArray(passages) || passages.length === 0) {
+        const searchResult = await engine.retrieve(query, 5);
+        passages = searchResult.passages;
+      }
+
+      return await answerProvider.streamResponse(query, passages, c.req.raw.signal);
+    } catch (err) {
+      captureCrash(err, { endpoint: API_ROUTES.GENERATE, query });
+      return c.json({ error: 'Failed to generate answer' }, StatusCodes.INTERNAL_SERVER_ERROR);
+    }
+  });
+
+export type AppType = typeof routes;
 
 process.on('uncaughtException', (err) => {
   captureCrash(err, { origin: 'uncaughtException' });

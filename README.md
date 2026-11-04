@@ -40,6 +40,12 @@ Experiment runs and benchmark metrics:
 
 </details>
 
+## Current Scope & Ongoing Work
+
+While `bibleit` delivers robust, offline-first hybrid retrieval across reference, keyword, and on-device semantic search, the project remains an active testbed for continued empirical optimization:
+- **Calibrated Abstention**: The search and answering pipelines retrieve and synthesize candidate passages across queries. Calibrated abstention (enabling the system to systematically detect unanswerable or weakly-supported questions and abstain from generating an answer) is not yet implemented in the app and is an active area for future grounding safeguards.
+- **Ingest & Chunking Explorations**: Further experimental sweeps across token boundaries, pericope grouping heuristics, and quantized embeddings are planned to continually refine retrieval quality, storage footprint, and edge latency.
+
 ## Live Deployment
 
 The live web app is hosted on free-tier infrastructure:
