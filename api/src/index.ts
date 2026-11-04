@@ -19,7 +19,16 @@ import { fileURLToPath } from 'node:url';
 import { FsArtifactStore } from './adapters/fs-artifact-store';
 import { HttpArtifactStore } from './adapters/http-artifact-store';
 import { NodeQueryEmbedder } from './adapters/node-query-embedder';
-import { DEFAULT_PORT } from './constants';
+import { AiAnswerProvider } from './adapters/ai-answer-provider';
+import { StatusCodes } from 'http-status-codes';
+import {
+  DEFAULT_PORT,
+  DEFAULT_SEARCH_RATE_LIMIT,
+  DEFAULT_ANSWER_RATE_LIMIT,
+  RATE_LIMIT_WINDOW_MS,
+} from './constants';
+import { rateLimiter } from 'hono-rate-limiter';
+import type { Context } from 'hono';
 import { logger, initSentry, captureCrash } from './logger';
 import { renderHomeHtml, renderHealthHtml } from './views';
 
@@ -36,6 +45,7 @@ const store: ArtifactStore = artifactBaseUrl
   ? new HttpArtifactStore(artifactBaseUrl)
   : new FsArtifactStore(dataDir);
 const embedder = new NodeQueryEmbedder();
+const answerProvider = new AiAnswerProvider();
 
 const engine: SearchEngine = new LocalEngine({
   store,
@@ -44,7 +54,7 @@ const engine: SearchEngine = new LocalEngine({
   embedder,
   vectors: new BruteForceVectorIndex(),
   ranker: new RrfRanker(),
-  answers: new NullAnswerProvider(),
+  answers: answerProvider,
 });
 
 let isReady = false;
@@ -57,9 +67,32 @@ engine.ready
     captureCrash(err, { subsystem: 'engine.ready' });
   });
 
+const getClientIp = (c: Context): string => {
+  const forwarded = c.req.header('x-forwarded-for');
+  if (forwarded) return forwarded.split(',')[0]!.trim();
+  return c.req.header('x-real-ip') || c.req.header('cf-connecting-ip') || '127.0.0.1';
+};
+
+const searchRateLimit = Number(process.env.RATE_LIMIT_SEARCH) || DEFAULT_SEARCH_RATE_LIMIT;
+const answerRateLimit = Number(process.env.RATE_LIMIT_ANSWER) || DEFAULT_ANSWER_RATE_LIMIT;
+
+const searchLimiter = rateLimiter({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  limit: searchRateLimit,
+  keyGenerator: getClientIp,
+  message: { error: 'Too many search requests, please try again shortly.' },
+});
+
+const answerLimiter = rateLimiter({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  limit: answerRateLimit,
+  keyGenerator: getClientIp,
+  message: { error: 'Too many answer requests, please try again shortly.' },
+});
+
 const app = new Hono();
 
-app.use('*', cors({ origin: '*', allowMethods: ['GET', 'OPTIONS'] }));
+app.use('*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'OPTIONS'] }));
 
 app.use('*', async (c, next) => {
   const start = performance.now();
@@ -78,7 +111,7 @@ app.use('*', async (c, next) => {
 
 app.onError((err, c) => {
   captureCrash(err, { method: c.req.method, path: c.req.path });
-  return c.json({ error: 'Internal server error' }, 500);
+  return c.json({ error: 'Internal server error' }, StatusCodes.INTERNAL_SERVER_ERROR);
 });
 
 app.get('/', (c) => {
@@ -96,14 +129,16 @@ app.get('/health', (c) => {
     (c.req.header('accept')?.includes('application/json') &&
       !c.req.header('accept')?.includes('text/html'));
 
+  const status = isReady ? StatusCodes.OK : StatusCodes.SERVICE_UNAVAILABLE;
+
   if (wantsJson) {
-    return c.json(jsonPayload, isReady ? 200 : 503);
+    return c.json(jsonPayload, status);
   }
 
-  return c.html(renderHealthHtml(isReady), isReady ? 200 : 503);
+  return c.html(renderHealthHtml(isReady), status);
 });
 
-app.get('/api/v1/search', async (c) => {
+app.get('/api/v1/search', searchLimiter, async (c) => {
   const q = c.req.query('q')?.trim() || '';
   const k = Math.min(Number(c.req.query('k')) || 10, 50);
 
@@ -117,7 +152,34 @@ app.get('/api/v1/search', async (c) => {
     return c.json({ ...result, origin: SearchOriginEnum.REMOTE });
   } catch (err) {
     captureCrash(err, { endpoint: '/api/v1/search', q, k });
-    return c.json({ error: 'Search failed' }, 500);
+    return c.json({ error: 'Search failed' }, StatusCodes.INTERNAL_SERVER_ERROR);
+  }
+});
+
+app.post('/api/v1/answer', answerLimiter, async (c) => {
+  let body: { query?: string; passages?: any[] };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON request body' }, StatusCodes.BAD_REQUEST);
+  }
+
+  const query = body.query?.trim();
+  if (!query) {
+    return c.json({ error: 'Missing "query" parameter' }, StatusCodes.BAD_REQUEST);
+  }
+
+  try {
+    let passages = body.passages;
+    if (!Array.isArray(passages) || passages.length === 0) {
+      const searchResult = await engine.retrieve(query, 5);
+      passages = searchResult.passages;
+    }
+
+    return await answerProvider.streamResponse(query, passages, c.req.raw.signal);
+  } catch (err) {
+    captureCrash(err, { endpoint: '/api/v1/answer', query });
+    return c.json({ error: 'Failed to generate answer' }, StatusCodes.INTERNAL_SERVER_ERROR);
   }
 });
 
