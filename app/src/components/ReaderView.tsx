@@ -469,48 +469,78 @@ export function ReaderView({
               {/* Action buttons revealed directly below the verse on long-press */}
               {hasActions && (
                 <div
-                  class="mt-2 mb-1 flex items-center justify-end gap-2 px-1 animate-fadeIn"
+                  class="mt-2 mb-1 flex items-center justify-start px-0.5 animate-fadeIn"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {narrator?.supported && (
+                  <div
+                    class="inline-flex items-center rounded-xl border divide-x overflow-hidden shadow-sm"
+                    style={{
+                      borderColor: 'var(--border-subtle)',
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                    }}
+                  >
+                    {narrator?.supported && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleListenFromVerse(e)}
+                        class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-medium transition-all hover:opacity-80 active:opacity-60 cursor-pointer"
+                        style={{ color: 'var(--text-main)', borderColor: 'var(--border-subtle)' }}
+                        title="Listen from this verse"
+                      >
+                        <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z"
+                          />
+                        </svg>
+                        <span>Listen</span>
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={(e) => handleListenFromVerse(e)}
-                      class="px-3 py-1 rounded-lg border text-xs font-sans font-medium transition-all hover:opacity-85 active:scale-95"
-                      style={{
-                        borderColor: 'var(--border-subtle)',
-                        backgroundColor: 'var(--bg-surface-elevated)',
-                        color: 'var(--text-main)',
-                      }}
+                      onClick={(e) => handleCopy(e)}
+                      class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-medium transition-all hover:opacity-80 active:opacity-60 cursor-pointer"
+                      style={{ color: 'var(--text-main)', borderColor: 'var(--border-subtle)' }}
+                      title="Copy verse text"
                     >
-                      Listen from here
+                      <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                        />
+                      </svg>
+                      <span>Copy</span>
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={(e) => handleCopy(e)}
-                    class="px-3 py-1 rounded-lg border text-xs font-sans font-medium transition-all hover:opacity-85 active:scale-95"
-                    style={{
-                      borderColor: 'var(--border-subtle)',
-                      backgroundColor: 'var(--bg-surface-elevated)',
-                      color: 'var(--text-main)',
-                    }}
-                  >
-                    Copy
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => handleSave(e)}
-                    class="px-3 py-1 rounded-lg border text-xs font-sans font-medium transition-all hover:opacity-85 active:scale-95"
-                    style={{
-                      borderColor: 'var(--border-subtle)',
-                      backgroundColor: 'var(--bg-surface-elevated)',
-                      color: 'var(--text-main)',
-                    }}
-                    title={isSaved ? 'Remove from bookmarks' : 'Save to bookmarks'}
-                  >
-                    {isSaved ? 'Unsave' : 'Save'}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleSave(e)}
+                      class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-medium transition-all hover:opacity-80 active:opacity-60 cursor-pointer"
+                      style={{
+                        color: isSaved ? 'var(--accent)' : 'var(--text-main)',
+                        borderColor: 'var(--border-subtle)',
+                      }}
+                      title={isSaved ? 'Remove from bookmarks' : 'Save to bookmarks'}
+                    >
+                      <svg
+                        class="w-3.5 h-3.5 shrink-0"
+                        fill={isSaved ? 'currentColor' : 'none'}
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                        />
+                      </svg>
+                      <span>{isSaved ? 'Unsave' : 'Save'}</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
