@@ -151,4 +151,50 @@ describe('HybridEngine', () => {
     expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
     expect(result).toEqual(mockLocalResult);
   });
+
+  it('wires HttpAnswerProvider when remoteUrl is present', () => {
+    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
+    expect(engine.answers.available).toBe(true);
+  });
+
+  it('delegates answers to localEngine when remoteUrl is not configured', () => {
+    const engine = new HybridEngine(mockLocalEngine, null);
+    expect(engine.answers).toBe(mockLocalEngine.answers);
+  });
+
+  it('HttpAnswerProvider fetches /api/v1/generate with query and passages', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      body: {
+        getReader: () => {
+          let readCount = 0;
+          return {
+            read: async () => {
+              if (readCount++ === 0) {
+                return { done: false, value: new TextEncoder().encode('God is love') };
+              }
+              return { done: true, value: undefined };
+            },
+            releaseLock: () => {},
+          };
+        },
+      },
+    } as unknown as Response);
+
+    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
+    const chunks: string[] = [];
+    for await (const chunk of engine.answers.answer('who is God?', mockLocalResult)) {
+      chunks.push(chunk);
+    }
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.bibleit.test/api/v1/generate',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ query: 'who is God?', passages: mockLocalResult.passages }),
+      }),
+    );
+    expect(chunks.join('')).toBe('God is love');
+    fetchSpy.mockRestore();
+  });
 });

@@ -12,6 +12,7 @@ import {
   type ScoredPassage,
 } from '../core/types';
 import { BIBLE_BOOKS_BY_ID, findBookByPrefix } from '../core/bible-books';
+import { formatCitation } from '@bibleit/engine';
 import { resolveVerseText } from '../adapters/book-store';
 import { POPULAR_TOPICS, SEARCH_SUGGESTIONS } from '../core/starter-topics';
 import type { SavedVerse } from './SavedView';
@@ -73,20 +74,6 @@ function renderHighlightedText(
       {text.slice(end)}
     </>
   );
-}
-
-function formatCitation(bookId: string, start: [number, number], end: [number, number]): string {
-  const bookName = BIBLE_BOOKS_BY_ID[bookId]?.name ?? bookId;
-  const [startCh, startV] = start;
-  const [endCh, endV] = end;
-
-  if (startCh === endCh) {
-    if (startV === endV) {
-      return `${bookName} ${startCh}:${startV}`;
-    }
-    return `${bookName} ${startCh}:${startV}–${endV}`;
-  }
-  return `${bookName} ${startCh}:${startV}–${endCh}:${endV}`;
 }
 
 function buildPassageSegments(passageList: ScoredPassage[]): NarrationSegment[] {

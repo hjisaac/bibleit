@@ -2,6 +2,7 @@ export * from './core/types';
 export { SearchOriginEnum } from './core/types';
 export * from './core/ports';
 export * from './core/bible-books';
+export * from './core/renderers';
 
 export * from './adapters/regex-ref-parser';
 export * from './adapters/minisearch-lexical-index';

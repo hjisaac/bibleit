@@ -1,5 +1,6 @@
 import type { AnswerProvider, SearchEngine } from '../core/ports';
 import { SearchOriginEnum, type RetrievalResult } from '../core/types';
+import { HttpAnswerProvider } from './http-answer-provider';
 
 /**
  * HybridEngine: Tiered search engine delegating to remote API when online,
@@ -27,7 +28,9 @@ export class HybridEngine implements SearchEngine {
     this.remoteUrl = remoteUrl?.trim().replace(/\/+$/, '') || null;
     this.isDeviceOnly = isDeviceOnly;
     this.ready = localEngine.ready;
-    this.answers = localEngine.answers;
+    this.answers = this.remoteUrl
+      ? new HttpAnswerProvider(this.remoteUrl, isDeviceOnly)
+      : localEngine.answers;
   }
 
   async sync(): Promise<void> {

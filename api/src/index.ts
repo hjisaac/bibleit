@@ -24,7 +24,7 @@ import { StatusCodes } from 'http-status-codes';
 import {
   DEFAULT_PORT,
   DEFAULT_SEARCH_RATE_LIMIT,
-  DEFAULT_ANSWER_RATE_LIMIT,
+  DEFAULT_GENERATE_RATE_LIMIT,
   RATE_LIMIT_WINDOW_MS,
 } from './constants';
 import { rateLimiter } from 'hono-rate-limiter';
@@ -74,7 +74,8 @@ const getClientIp = (c: Context): string => {
 };
 
 const searchRateLimit = Number(process.env.RATE_LIMIT_SEARCH) || DEFAULT_SEARCH_RATE_LIMIT;
-const answerRateLimit = Number(process.env.RATE_LIMIT_ANSWER) || DEFAULT_ANSWER_RATE_LIMIT;
+const generateRateLimit =
+  Number(process.env.RATE_LIMIT_GENERATE ?? process.env.RATE_LIMIT_ANSWER) || DEFAULT_GENERATE_RATE_LIMIT;
 
 const searchLimiter = rateLimiter({
   windowMs: RATE_LIMIT_WINDOW_MS,
@@ -83,11 +84,11 @@ const searchLimiter = rateLimiter({
   message: { error: 'Too many search requests, please try again shortly.' },
 });
 
-const answerLimiter = rateLimiter({
+const generateLimiter = rateLimiter({
   windowMs: RATE_LIMIT_WINDOW_MS,
-  limit: answerRateLimit,
+  limit: generateRateLimit,
   keyGenerator: getClientIp,
-  message: { error: 'Too many answer requests, please try again shortly.' },
+  message: { error: 'Too many generate requests, please try again shortly.' },
 });
 
 const app = new Hono();
@@ -156,7 +157,7 @@ app.get('/api/v1/search', searchLimiter, async (c) => {
   }
 });
 
-app.post('/api/v1/answer', answerLimiter, async (c) => {
+app.post('/api/v1/generate', generateLimiter, async (c) => {
   let body: { query?: string; passages?: any[] };
   try {
     body = await c.req.json();
@@ -178,7 +179,7 @@ app.post('/api/v1/answer', answerLimiter, async (c) => {
 
     return await answerProvider.streamResponse(query, passages, c.req.raw.signal);
   } catch (err) {
-    captureCrash(err, { endpoint: '/api/v1/answer', query });
+    captureCrash(err, { endpoint: '/api/v1/generate', query });
     return c.json({ error: 'Failed to generate answer' }, StatusCodes.INTERNAL_SERVER_ERROR);
   }
 });
