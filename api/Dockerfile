@@ -2,8 +2,9 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Enable pnpm
+# Enable pnpm and skip unused CUDA GPU binaries for CPU deployment
 RUN corepack enable && corepack prepare pnpm@8.15.4 --activate
+ENV ONNXRUNTIME_NODE_INSTALL=skip
 
 # Copy workspace, engine, api, and data artifacts (only 3.3 MB)
 COPY pnpm-workspace.yaml ./
@@ -11,10 +12,10 @@ COPY engine ./engine
 COPY api ./api
 COPY app/public/data ./data
 
-# Install dependencies using pnpm
-RUN pnpm --filter @bibleit/engine install --prod=false
-RUN pnpm --filter @bibleit/api install --prod=false
-RUN pnpm --filter @bibleit/api run build
+# Install dependencies and compile api
+RUN pnpm --filter @bibleit/engine install --prod=false && \
+    pnpm --filter @bibleit/api install --prod=false && \
+    pnpm --filter @bibleit/api run build
 
 EXPOSE 7860
 ENV PORT=7860
