@@ -16,7 +16,7 @@ const mockVerses: SavedVerse[] = [
 ];
 
 describe('SavedView Component', () => {
-  it('renders saved verses and handles inline unsave confirmation', () => {
+  it('renders saved verses and handles unsave directly without navigation', () => {
     const handleOpen = vi.fn();
     const handleUnsave = vi.fn();
 
@@ -31,25 +31,11 @@ describe('SavedView Component', () => {
     expect(screen.getByText('John 3:16')).toBeTruthy();
     expect(screen.getByText('"For God so loved the world..."')).toBeTruthy();
 
-    const unbookmarkBtn = screen.getByTitle('Remove from saved passages');
+    const unbookmarkBtn = screen.getByTitle('Remove from bookmarks');
     expect(unbookmarkBtn).toBeTruthy();
 
-    // Clicking unbookmark should reveal inline confirmation without navigating
+    // Clicking unbookmark should immediately call onUnsaveVerse without navigating
     fireEvent.click(unbookmarkBtn);
-    expect(handleOpen).not.toHaveBeenCalled();
-    expect(screen.getByText('Unsave?')).toBeTruthy();
-
-    // Clicking Cancel restores icon
-    const cancelBtn = screen.getByText('Cancel');
-    fireEvent.click(cancelBtn);
-    expect(handleUnsave).not.toHaveBeenCalled();
-    expect(screen.queryByText('Unsave?')).toBeNull();
-
-    // Clicking unbookmark again and confirming with Yes
-    fireEvent.click(screen.getByTitle('Remove from saved passages'));
-    const yesBtn = screen.getByText('Yes');
-    fireEvent.click(yesBtn);
-
     expect(handleUnsave).toHaveBeenCalledWith(mockVerses[0]);
     expect(handleOpen).not.toHaveBeenCalled();
   });
