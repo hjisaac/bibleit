@@ -1,9 +1,9 @@
 /**
  * The seams. Every runtime component implements one of these interfaces and is
- * wired in src/composition.ts — nothing else may import from src/adapters/.
+ * wired in src/composition.ts: nothing else may import from src/adapters/.
  *
  * Swapping a component for perf = new adapter + one line in the composition root.
- * See design/architecture.md → "Component map & swap paths".
+ * See docs/architecture.md → "Component map & swap paths".
  */
 import type {
   Chunk,
@@ -18,7 +18,7 @@ import type {
 } from './types';
 
 /**
- * COARSE seam — the only contract the UI knows about.
+ * COARSE seam: the only contract the UI knows about.
  *
  * Swap granularity works at two levels:
  *  - Swap the WHOLE search stack: implement this interface over HTTP
@@ -51,6 +51,8 @@ export interface ArtifactStore {
   hasVerses?(): Promise<boolean>;
   /** Check if embeddings are already installed in local storage without parsing. */
   hasEmbeddings?(): Promise<boolean>;
+  /** Check if persistent offline storage (e.g. OPFS) is supported and accessible. */
+  isStorageAvailable?(): Promise<boolean>;
   /** Drop local copies (settings → "free up space" / recover from corruption). */
   clear(): Promise<void>;
 }
@@ -74,7 +76,7 @@ export interface LexicalIndex {
 
 /**
  * Embeds the *query only* (corpus embeddings are precomputed offline).
- * INVARIANT: modelId must equal manifest.embeddings.model — the composition
+ * INVARIANT: modelId must equal manifest.embeddings.model: the composition
  * root enforces this and refuses to wire mismatched versions.
  * v1: transformers.js WASM. Swap: WebGPU backend, smaller model, or a remote
  * endpoint (same interface, network call).

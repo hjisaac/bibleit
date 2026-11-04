@@ -1,6 +1,6 @@
 /**
  * Domain types shared by all ports. Mirrors the artifact contract in
- * design/architecture.md — keep in sync with ingest/bibleit_ingest/artifacts.py.
+ * docs/architecture.md: keep in sync with ingest/bibleit_ingest/artifacts.py.
  */
 
 /** Verse-precise location, e.g. John 3:16 → { book: "JHN", chapter: 3, verse: 16 } */
@@ -75,7 +75,7 @@ export interface RetrievalResult {
 }
 
 // ---------------------------------------------------------------------------
-// Artifact manifest (schema_version 3) — the offline/runtime boundary.
+// Artifact manifest (schema_version 3): the offline/runtime boundary.
 // ---------------------------------------------------------------------------
 
 export interface Manifest {
@@ -102,7 +102,7 @@ export interface Manifest {
 }
 
 // ---------------------------------------------------------------------------
-// Audio narration types — shared across Web Speech (Tier 1) and CDN (Tier 2).
+// Audio narration types: shared across Web Speech (Tier 1) and CDN (Tier 2).
 // ---------------------------------------------------------------------------
 
 export type PlaybackStatus = 'idle' | 'playing' | 'paused';
@@ -137,7 +137,6 @@ export enum PackageStatusEnum {
   DOWNLOADING = 'downloading',
   DOWNLOADED = 'downloaded',
 }
-export { PackageStatusEnum as PackageStatus };
 
 export enum ViewTabEnum {
   SEARCH = 'search',
@@ -145,24 +144,20 @@ export enum ViewTabEnum {
   SAVED = 'saved',
   SETTINGS = 'settings',
 }
-export { ViewTabEnum as ViewTab };
 
 export enum SearchModeEnum {
   AUTO = 'auto',
   DEVICE = 'device',
 }
-export { SearchModeEnum as SearchMode };
 
 export enum NetworkStatusEnum {
   ONLINE = 'online',
   OFFLINE = 'offline',
 }
-export { NetworkStatusEnum as NetworkStatus };
 
 export enum ThemeEnum {
   PAPER = 'paper',
   SEPIA = 'sepia',
   OBSIDIAN = 'obsidian',
 }
-export { ThemeEnum as Theme };
 

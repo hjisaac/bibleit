@@ -4,7 +4,7 @@ import { SearchView } from '../src/components/SearchView';
 import { HybridEngine } from '../src/adapters/hybrid-engine';
 import type { SearchEngine, AudioNarrator } from '../src/core/ports';
 import type { ComponentProps } from 'preact';
-import { getChunkKey, PackageStatus, type ScoredPassage } from '../src/core/types';
+import { getChunkKey, PackageStatusEnum, type ScoredPassage } from '../src/core/types';
 
 type SearchViewProps = ComponentProps<typeof SearchView>;
 
@@ -97,7 +97,7 @@ describe('SearchView Result Cards & User Actions', () => {
       isAiEnabled: false,
       isInspectorMode: false,
       showHeadings: true,
-      offlineTextStatus: PackageStatus.DOWNLOADED,
+      offlineTextStatus: PackageStatusEnum.DOWNLOADED,
       hasSeenOnboarding: true,
       savedVerses: [],
       onSaveVerse: onSaveVerseSpy,
@@ -395,7 +395,7 @@ describe('SearchView Result Cards & User Actions', () => {
 
     renderSearchView({
       isOnline: false,
-      offlineTextStatus: PackageStatus.NOT_DOWNLOADED,
+      offlineTextStatus: PackageStatusEnum.NOT_DOWNLOADED,
     });
 
     const input = screen.getByRole('textbox') as HTMLInputElement;
@@ -420,7 +420,7 @@ describe('SearchView Result Cards & User Actions', () => {
     renderSearchView({
       engine: hybridEngine,
       isOnline: true,
-      offlineTextStatus: PackageStatus.NOT_DOWNLOADED,
+      offlineTextStatus: PackageStatusEnum.NOT_DOWNLOADED,
     });
 
     const input = screen.getByRole('textbox') as HTMLInputElement;
@@ -435,7 +435,7 @@ describe('SearchView Result Cards & User Actions', () => {
 
   it('displays active download progress card when offlineTextStatus is DOWNLOADING', () => {
     renderSearchView({
-      offlineTextStatus: PackageStatus.DOWNLOADING,
+      offlineTextStatus: PackageStatusEnum.DOWNLOADING,
       textProgress: 42,
     });
 
@@ -458,11 +458,11 @@ describe('SearchView Result Cards & User Actions', () => {
     });
 
     const { rerender, props } = renderSearchView({
-      offlineTextStatus: PackageStatus.DOWNLOADING,
+      offlineTextStatus: PackageStatusEnum.DOWNLOADING,
     });
 
     // Simulate download completing and transitioning to DOWNLOADED
-    rerender(<SearchView {...props} offlineTextStatus={PackageStatus.DOWNLOADED} />);
+    rerender(<SearchView {...props} offlineTextStatus={PackageStatusEnum.DOWNLOADED} />);
 
     await waitFor(() => {
       expect(retrieveSpy).toHaveBeenCalledWith('love your neighbor');
@@ -476,7 +476,7 @@ describe('SearchView Result Cards & User Actions', () => {
       JSON.stringify({ query: 'love your neighbor', passages: [], answerText: '', origin: 'local' })
     );
 
-    renderSearchView({ offlineTextStatus: PackageStatus.DOWNLOADED });
+    renderSearchView({ offlineTextStatus: PackageStatusEnum.DOWNLOADED });
 
     await waitFor(() => {
       expect(retrieveSpy).toHaveBeenCalledWith('love your neighbor');

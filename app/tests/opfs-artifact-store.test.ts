@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { CorruptArtifactError, OpfsArtifactStore } from '../src/adapters/opfs-artifact-store';
+import {
+  CorruptArtifactError,
+  OpfsArtifactStore,
+  StorageUnavailableError,
+} from '../src/adapters/opfs-artifact-store';
 import type { Manifest } from '../src/core/types';
 
 const mockManifest: Manifest = {
@@ -265,5 +269,46 @@ describe('OpfsArtifactStore', () => {
     const verses = await store.verses();
     expect(verses.GEN?.[1]?.[0]).toBe('In the beginning...');
     expect(opfs.files.get('verses-v3.json.gz')).toEqual(compressedGzip);
+  });
+
+  it('correctly reports isStorageAvailable as true when OPFS is accessible and false when blocked', async () => {
+    const store = new OpfsArtifactStore();
+    expect(await store.isStorageAvailable()).toBe(true);
+
+    // Simulate Private Browsing where getDirectory throws a SecurityError
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: {
+        getDirectory: vi.fn(async () => {
+          throw new DOMException('Access denied in private browsing', 'SecurityError');
+        }),
+      },
+    });
+
+    const privateStore = new OpfsArtifactStore();
+    expect(await privateStore.isStorageAvailable()).toBe(false);
+  });
+
+  it('throws StorageUnavailableError when attempting to install artifacts while OPFS is unavailable', async () => {
+    Object.defineProperty(navigator, 'storage', {
+      configurable: true,
+      value: {
+        getDirectory: vi.fn(async () => {
+          throw new DOMException('Access denied in private browsing', 'SecurityError');
+        }),
+      },
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.endsWith('manifest.json')) return new Response(JSON.stringify(mockManifest), { status: 200 });
+        if (url.endsWith('verses.json.gz')) return new Response(JSON.stringify({ JHN: [[], [], ['Valid text']] }), { status: 200 });
+        return new Response(null, { status: 404 });
+      }),
+    );
+
+    const store = new OpfsArtifactStore();
+    await expect(store.verses()).rejects.toThrow(StorageUnavailableError);
   });
 });

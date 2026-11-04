@@ -11,6 +11,13 @@ export class CorruptArtifactError extends Error {
   }
 }
 
+export class StorageUnavailableError extends Error {
+  constructor(message = 'Offline storage is unavailable in this environment (e.g. Private Browsing).') {
+    super(message);
+    this.name = 'StorageUnavailableError';
+  }
+}
+
 function getDataUrl(file: string): string {
   const baseUrl = import.meta.env.BASE_URL ?? '/';
   const cleanBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
@@ -238,6 +245,12 @@ export class OpfsArtifactStore implements ArtifactStore {
       }
     }
 
+    if (!root) {
+      throw new StorageUnavailableError(
+        'Offline storage is unavailable in this environment (e.g. Private Browsing). Artifact cannot be installed.',
+      );
+    }
+
     const downloaded = await fetchWithProgress(getDataUrl(remoteFile), onProgress, signal);
     let uncompressed: Uint8Array<ArrayBuffer>;
     let toStore: Uint8Array<ArrayBuffer>;
@@ -258,10 +271,8 @@ export class OpfsArtifactStore implements ArtifactStore {
 
     await verifySha256(uncompressed, expectedSha256);
     const parsed = await parse(uncompressed);
-    if (root) {
-      await writeOpfsFile(root, filename, toStore);
-      onCachedToOpfs?.();
-    }
+    await writeOpfsFile(root, filename, toStore);
+    onCachedToOpfs?.();
     return parsed;
   }
 
@@ -357,6 +368,11 @@ export class OpfsArtifactStore implements ArtifactStore {
     } catch {
       return false;
     }
+  }
+
+  async isStorageAvailable(): Promise<boolean> {
+    const root = await getOpfsRoot();
+    return root !== null;
   }
 
   async clear(): Promise<void> {

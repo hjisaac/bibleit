@@ -4,7 +4,7 @@ import { useStore } from '@nanostores/preact';
 import type { AudioNarrator, SearchEngine } from '../core/ports';
 import {
   getChunkKey,
-  PackageStatus,
+  PackageStatusEnum,
   type NarrationSegment,
   type NarrationState,
   type NarrationWordBoundary,
@@ -34,7 +34,7 @@ interface SearchViewProps {
   isAiEnabled: boolean;
   isInspectorMode: boolean;
   showHeadings?: boolean;
-  offlineTextStatus?: PackageStatus;
+  offlineTextStatus?: PackageStatusEnum;
   textProgress?: number;
   hasSeenOnboarding?: boolean;
   savedVerses?: SavedVerse[];
@@ -179,7 +179,7 @@ export function SearchView({
   isAiEnabled,
   isInspectorMode,
   showHeadings = true,
-  offlineTextStatus = PackageStatus.DOWNLOADED,
+  offlineTextStatus = PackageStatusEnum.DOWNLOADED,
   textProgress,
   hasSeenOnboarding = true,
   savedVerses,
@@ -214,8 +214,8 @@ export function SearchView({
   const prevOfflineTextStatusRef = useRef(offlineTextStatus);
   useEffect(() => {
     if (
-      prevOfflineTextStatusRef.current !== PackageStatus.DOWNLOADED &&
-      offlineTextStatus === PackageStatus.DOWNLOADED
+      prevOfflineTextStatusRef.current !== PackageStatusEnum.DOWNLOADED &&
+      offlineTextStatus === PackageStatusEnum.DOWNLOADED
     ) {
       if (passages.length === 0 && query.trim().length > 0) {
         runSearch(query);
@@ -225,7 +225,7 @@ export function SearchView({
   }, [offlineTextStatus, passages.length, query]);
 
   useEffect(() => {
-    if (offlineTextStatus === PackageStatus.DOWNLOADED && passages.length === 0 && query.trim().length > 0) {
+    if (offlineTextStatus === PackageStatusEnum.DOWNLOADED && passages.length === 0 && query.trim().length > 0) {
       runSearch(query);
     }
   }, []);
@@ -397,7 +397,7 @@ export function SearchView({
   return (
     <section class="flex-1 flex flex-col px-4 sm:px-8 pt-4 sm:pt-5 pb-24 sm:pb-24 overflow-y-auto overscroll-y-contain max-w-2xl mx-auto w-full">
       {/* Offline Storage Status Banner / Super Tiny Reminder */}
-      {offlineTextStatus !== PackageStatus.DOWNLOADED && (
+      {offlineTextStatus !== PackageStatusEnum.DOWNLOADED && (
         !hasSeenOnboarding ? (
           <div
             class="mb-3.5 sm:mb-4 px-3 py-1.5 rounded-xl border flex items-center justify-between gap-2.5 animate-fadeIn shrink-0 transition-all bg-amber-500/[0.07] border-amber-500/25"
@@ -723,7 +723,7 @@ export function SearchView({
       )}
 
       {/* Active Download Progress Card */}
-      {offlineTextStatus === PackageStatus.DOWNLOADING && (
+      {offlineTextStatus === PackageStatusEnum.DOWNLOADING && (
         <div
           class="mb-4 p-4 rounded-xl border flex flex-col gap-2 animate-fadeIn"
           style={{
@@ -756,8 +756,8 @@ export function SearchView({
       )}
 
       {/* No Results & Error States */}
-      {!isPanelOpen && !isSearching && hasSearched && query.trim().length > 0 && passages.length === 0 && offlineTextStatus !== PackageStatus.DOWNLOADING && (
-        !isOnline && offlineTextStatus !== PackageStatus.DOWNLOADED ? (
+      {!isPanelOpen && !isSearching && hasSearched && query.trim().length > 0 && passages.length === 0 && offlineTextStatus !== PackageStatusEnum.DOWNLOADING && (
+        !isOnline && offlineTextStatus !== PackageStatusEnum.DOWNLOADED ? (
           <div class="py-12 sm:py-16 flex flex-col items-center justify-center text-center animate-fadeIn max-w-sm mx-auto px-4">
             <div class="w-10 h-10 rounded-full flex items-center justify-center mb-3 bg-stone-500/10 text-stone-500">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -771,7 +771,7 @@ export function SearchView({
               An internet connection is required to search online. Tap above to set up scripture, or visit Settings to save it for offline search.
             </p>
           </div>
-        ) : searchOrigin !== SearchOriginEnum.REMOTE && offlineTextStatus !== PackageStatus.DOWNLOADED ? (
+        ) : searchOrigin !== SearchOriginEnum.REMOTE && offlineTextStatus !== PackageStatusEnum.DOWNLOADED ? (
           <div class="py-12 sm:py-16 flex flex-col items-center justify-center text-center animate-fadeIn max-w-sm mx-auto px-4">
             <div class="w-10 h-10 rounded-full flex items-center justify-center mb-3 bg-amber-500/10 text-amber-600">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

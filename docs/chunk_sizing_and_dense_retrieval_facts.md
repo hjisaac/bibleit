@@ -66,7 +66,7 @@ This document tracks direct empirical evidence, papers proving each claim, what 
 
 ---
 
-## Fact 4: Techniques to Try — Late Chunking (Context Without Dilution)
+## Fact 4: Techniques to Try - Late Chunking (Context Without Dilution)
 
 ### What It Is (In One Read)
 - **Late Chunking:** Instead of cutting text into chunks *first* and then embedding each piece separately, you feed the *entire* long document through the transformer model first so every word has full cross-document context (e.g. pronouns like "he" or "it" know who they refer to). *After* that full pass, you pool the token representations into small **128–256 token chunks**.
@@ -84,13 +84,13 @@ This document tracks direct empirical evidence, papers proving each claim, what 
 
 ---
 
-## Fact 5: Techniques to Try — Contextual Retrieval
+## Fact 5: Techniques to Try - Contextual Retrieval
 
 ### What It Is (In One Read)
 - **Contextual Retrieval:** Keeping chunks small (150–300 tokens) for sharp retrieval, but prepending a short 50-token explanatory summary to each chunk before embedding so it never loses its broader narrative context.
 
 ### Who Proved It
-- **Anthropic Research (2024) — *Contextual Retrieval***
+- **Anthropic Research (2024): *Contextual Retrieval***
   - **Experiment:** Evaluated retrieval failure rates when prepending chunk-specific context vs. raw chunks across diverse knowledge bases.
   - **What They Found:** Prepending a concise context prefix reduced retrieval failure by **35%** (and by **49%** when combined with BM25 hybrid search).
 
@@ -124,7 +124,7 @@ This document tracks direct empirical evidence, papers proving each claim, what 
    - Distances between the closest neighbor and farthest neighbor concentrate toward a narrow band. This makes similarity scores brittle and sensitive to small noise fluctuations rather than true semantic relevance.
 
 3. **Single-Vector Bottleneck vs. Multi-Vector (ColBERT)**:
-   - Compressing an entire long passage into *any* single dense vector—regardless of dimension—forces a global reduction.
+   - Compressing an entire long passage into *any* single dense vector (regardless of dimension) forces a global reduction.
    - The only architectural method proven to handle long passages without semantic loss is **Multi-Vector Retrieval (e.g. ColBERT / Late Interaction)**, where the model outputs **one vector per token**, comparing all query tokens against all document tokens via MaxSim:
      $$\text{Score}(\mathbf{q}, \mathbf{d}) = \sum_{i \in \mathbf{q}} \max_{j \in \mathbf{d}} (\mathbf{q}_i \cdot \mathbf{d}_j)$$
    - *Client-Side Constraint for `bibleit`:* Multi-vector indexes require gigabytes of storage and memory, making them infeasible for offline browser-based execution. Single-vector retrieval with small, focused chunks (256–512 tokens) remains the only feasible approach for offline web clients.
@@ -164,7 +164,7 @@ This document tracks direct empirical evidence, papers proving each claim, what 
   appear almost identical: they alter token counts by merely **3 to 10 tokens** (statistically negligible in length distributions).
 - **However, in neural embedding space, their vector geometry impact is profound:**
   - **Topic Purity vs. Semantic Bridges (`include_overlap_heading`):** If a 1-verse overlap crosses a pericope boundary and includes that boundary's heading, the chunk possesses two distinct topical titles (e.g., `### The Beatitudes` and `### Salt and Light`). In dense vector space, does this blend two topics into an ambiguous intermediate vector, or does it act as a dual-topic bridge that improves cross-pericope query recall?
-  - **Genre Grounding vs. Vector Collapse (`book_and_heading`):** Prepending `"Genesis — "` or `"Romans — "` injects an inductive prior that prevents cross-testament false positives (e.g. distinguishing creation poetry in Psalms from historical creation in Genesis). However, it introduces the risk of intra-book vector collapse (all Genesis chunks clustering too tightly together, shrinking angular separation).
+  - **Genre Grounding vs. Vector Collapse (`book_and_heading`):** Prepending `"Genesis - "` or `"Romans - "` injects an inductive prior that prevents cross-testament false positives (e.g. distinguishing creation poetry in Psalms from historical creation in Genesis). However, it introduces the risk of intra-book vector collapse (all Genesis chunks clustering too tightly together, shrinking angular separation).
 
 ### Experimental Methodology Implication
 - **Never prune ablation axes based purely on token-length invariance.**

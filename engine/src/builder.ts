@@ -61,6 +61,10 @@ export class LocalEngine implements SearchEngine {
     this.ready = baseReady.then(() => {});
   }
 
+  /**
+   * Initializes verse corpus data and populates the in-memory lexical index.
+   * Returns an empty list when scripture data is uninstalled or storage is blocked.
+   */
   private async loadBase(): Promise<Chunk[]> {
     if (this.ports.store.hasVerses && !(await this.ports.store.hasVerses())) {
       this.verseStore = this.ports.verseStore ?? null;
@@ -82,6 +86,10 @@ export class LocalEngine implements SearchEngine {
     return chunks;
   }
 
+  /**
+   * Prepares vector embeddings and activates the semantic search index.
+   * Skips index initialization if precomputed vectors or the query model are missing.
+   */
   private async loadSemantic(chunks: Chunk[]): Promise<void> {
     if (chunks.length === 0) {
       this.semanticReady = false;

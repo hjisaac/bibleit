@@ -277,3 +277,6 @@ app/.env.local
 
 # Uncommitted white paper draft and assets
 paper/
+
+# Local task tracking
+TODO.md

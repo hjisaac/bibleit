@@ -1,4 +1,4 @@
-# bibleit — Agent Instructions
+# bibleit: Agent Instructions
 
 ## Project Overview
 `bibleit` is an offline-first Bible search Progressive Web App (PWA) with hybrid retrieval:
@@ -6,7 +6,7 @@
 - **Keyword search**: Lexical / full-text search (BM25 or client inverted index).
 - **Semantic search**: Dense vector search running locally/offline via embeddings and ONNX Runtime.
 
-The codebase was restarted from a pre-adapter checkpoint (`design/architecture.md`, `design/conventions.md`, `design/vocabulary.md`) so the user can re-derive and own the architecture.
+The codebase was restarted from a pre-adapter checkpoint (`docs/architecture.md`, `docs/conventions.md`, `docs/vocabulary.md`) so the user can re-derive and own the architecture.
 
 ---
 
@@ -62,7 +62,7 @@ The user is building this project to learn by doing and to have full ownership o
 - `ingest/eval/`: Experiment runner and benchmark evaluation.
   - Powered by Crucible: `crucible execute <job>`.
   - Config-driven execution: scalar values produce a single run; lists in YAML trigger multi-axis sweeps.
-- `design/`: Architectural documents, domain vocabulary (`vocabulary.md`), and conventions (`conventions.md`).
+- `docs/`: Architectural documents, domain vocabulary (`vocabulary.md`), and conventions (`conventions.md`).
 
 ---
 

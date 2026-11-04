@@ -2,13 +2,14 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, fireEvent, act } from '@testing-library/preact';
 import { useState } from 'preact/hooks';
 import { useHeadroom } from '../src/core/headroom';
-import { Navbar, ViewTab } from '../src/components/Navbar';
+import { Navbar } from '../src/components/Navbar';
+import { ViewTabEnum } from '../src/core/types';
 
 function TestNavbarScrollComponent() {
-  const [activeTab, setActiveTab] = useState<ViewTab>(ViewTab.READER);
+  const [activeTab, setActiveTab] = useState<ViewTabEnum>(ViewTabEnum.READER);
   const [isBarVisible, setIsBarVisible] = useHeadroom({ threshold: 50, deltaThreshold: 8 });
 
-  const handleTabChange = (tab: ViewTab) => {
+  const handleTabChange = (tab: ViewTabEnum) => {
     setActiveTab(tab);
     setIsBarVisible(true);
   };

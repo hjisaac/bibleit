@@ -1,29 +1,28 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { PackageStatus, Theme, SearchMode, type Manifest } from '../core/types';
-
-export { PackageStatus };
+import { PackageStatusEnum, ThemeEnum, SearchModeEnum, type Manifest } from '../core/types';
 
 interface SettingsViewProps {
   manifest?: Manifest | null;
-  currentTheme: Theme;
-  onThemeChange: (theme: Theme) => void;
+  currentTheme: ThemeEnum;
+  onThemeChange: (theme: ThemeEnum) => void;
   isAiEnabled: boolean;
   onToggleAi: (enabled: boolean) => void;
   isInspectorMode: boolean;
   onToggleInspector: (enabled: boolean) => void;
   showHeadings: boolean;
   onToggleHeadings: (enabled: boolean) => void;
-  textPackageStatus: PackageStatus;
-  aiPackageStatus: PackageStatus;
-  modelPackageStatus: PackageStatus;
+  textPackageStatus: PackageStatusEnum;
+  aiPackageStatus: PackageStatusEnum;
+  modelPackageStatus: PackageStatusEnum;
   textProgress: number;
   aiProgress: number;
   modelProgress: number;
-  searchMode?: SearchMode;
-  onToggleSearchMode?: (mode: SearchMode) => void;
+  searchMode?: SearchModeEnum;
+  onToggleSearchMode?: (mode: SearchModeEnum) => void;
   highlightStorage?: boolean;
   onClearHighlight?: () => void;
+  isStorageAvailable?: boolean;
   onDownloadText: () => void;
   onCancelDownloadText?: () => void;
   onDownloadAi: () => void;
@@ -49,10 +48,11 @@ export function SettingsView({
   textProgress,
   aiProgress,
   modelProgress,
-  searchMode = SearchMode.AUTO,
+  searchMode = SearchModeEnum.AUTO,
   onToggleSearchMode,
   highlightStorage,
   onClearHighlight,
+  isStorageAvailable = true,
   onDownloadText,
   onCancelDownloadText,
   onDownloadAi,
@@ -66,9 +66,9 @@ export function SettingsView({
   const [isConfirmingClear, setIsConfirmingClear] = useState<boolean>(false);
   const [confirmCountdown, setConfirmCountdown] = useState<number>(6);
   const hasDownloadedArtifacts =
-    textPackageStatus === PackageStatus.DOWNLOADED ||
-    aiPackageStatus === PackageStatus.DOWNLOADED ||
-    modelPackageStatus === PackageStatus.DOWNLOADED;
+    textPackageStatus === PackageStatusEnum.DOWNLOADED ||
+    aiPackageStatus === PackageStatusEnum.DOWNLOADED ||
+    modelPackageStatus === PackageStatusEnum.DOWNLOADED;
 
   // Active countdown ticker for auto-disarming clear confirmation
   useEffect(() => {
@@ -136,9 +136,9 @@ export function SettingsView({
         <div class="grid grid-cols-3 gap-2.5">
           <button
             type="button"
-            onClick={() => onThemeChange(Theme.PAPER)}
+            onClick={() => onThemeChange(ThemeEnum.PAPER)}
             class={`p-3 rounded-xl border text-left transition-all ${
-              currentTheme === Theme.PAPER ? 'ring-2 ring-amber-500/60 font-semibold' : 'hover:opacity-80'
+              currentTheme === ThemeEnum.PAPER ? 'ring-2 ring-amber-500/60 font-semibold' : 'hover:opacity-80'
             }`}
             style={{
               backgroundColor: '#FFFFFF',
@@ -152,9 +152,9 @@ export function SettingsView({
 
           <button
             type="button"
-            onClick={() => onThemeChange(Theme.SEPIA)}
+            onClick={() => onThemeChange(ThemeEnum.SEPIA)}
             class={`p-3 rounded-xl border text-left transition-all ${
-              currentTheme === Theme.SEPIA ? 'ring-2 ring-amber-700/60 font-semibold' : 'hover:opacity-80'
+              currentTheme === ThemeEnum.SEPIA ? 'ring-2 ring-amber-700/60 font-semibold' : 'hover:opacity-80'
             }`}
             style={{
               backgroundColor: '#FAF6ED',
@@ -168,9 +168,9 @@ export function SettingsView({
 
           <button
             type="button"
-            onClick={() => onThemeChange(Theme.OBSIDIAN)}
+            onClick={() => onThemeChange(ThemeEnum.OBSIDIAN)}
             class={`p-3 rounded-xl border text-left transition-all ${
-              currentTheme === Theme.OBSIDIAN ? 'ring-2 ring-stone-400 font-semibold' : 'hover:opacity-80'
+              currentTheme === ThemeEnum.OBSIDIAN ? 'ring-2 ring-stone-400 font-semibold' : 'hover:opacity-80'
             }`}
             style={{
               backgroundColor: '#171412',
@@ -319,7 +319,7 @@ export function SettingsView({
               </span>
             </div>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {textPackageStatus === PackageStatus.DOWNLOADED
+              {textPackageStatus === PackageStatusEnum.DOWNLOADED
                 ? 'Search scripture strictly on this device without contacting backend servers.'
                 : 'Download the scripture package below to unlock on-device search.'}
             </p>
@@ -327,15 +327,15 @@ export function SettingsView({
 
           <label
             class={`relative inline-flex items-center shrink-0 ${
-              textPackageStatus === PackageStatus.DOWNLOADED ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+              textPackageStatus === PackageStatusEnum.DOWNLOADED ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
             }`}
           >
             <input
               type="checkbox"
-              disabled={textPackageStatus !== PackageStatus.DOWNLOADED}
-              checked={searchMode === SearchMode.DEVICE}
+              disabled={textPackageStatus !== PackageStatusEnum.DOWNLOADED}
+              checked={searchMode === SearchModeEnum.DEVICE}
               onChange={(e) =>
-                onToggleSearchMode?.((e.target as HTMLInputElement).checked ? SearchMode.DEVICE : SearchMode.AUTO)
+                onToggleSearchMode?.((e.target as HTMLInputElement).checked ? SearchModeEnum.DEVICE : SearchModeEnum.AUTO)
               }
               class="sr-only peer"
             />
@@ -367,17 +367,38 @@ export function SettingsView({
           <span class="text-xs font-mono font-medium text-emerald-600">
             {(() => {
               let mb = 0;
-              if (textPackageStatus === PackageStatus.DOWNLOADED) mb += 1.2;
-              if (aiPackageStatus === PackageStatus.DOWNLOADED) mb += 2.1;
-              if (modelPackageStatus === PackageStatus.DOWNLOADED) mb += 137;
+              if (textPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 1.2;
+              if (aiPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 2.1;
+              if (modelPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 137;
               if (mb === 0) return '0 MB cached';
-              if (modelPackageStatus === PackageStatus.DOWNLOADED) return `${mb.toFixed(1)} MB cached`;
+              if (modelPackageStatus === PackageStatusEnum.DOWNLOADED) return `${mb.toFixed(1)} MB cached`;
               return `${mb.toFixed(1)} MB in OPFS`;
             })()}
           </span>
         </div>
 
-        {/* Package 1: Essential Scripture Text */}
+        <div
+          class={
+            !isStorageAvailable
+              ? 'p-3 rounded-2xl border space-y-3 bg-red-500/[0.06] border-red-500/25'
+              : 'space-y-4'
+          }
+        >
+          {!isStorageAvailable && (
+            <div class="flex items-start gap-2.5 px-1 pt-0.5 pb-0.5">
+              <svg class="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div class="text-xs">
+                <p class="font-semibold text-red-600 dark:text-red-400">Offline storage restricted</p>
+                <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  Your browser disables device storage (common in Private/Incognito windows). Switch to a standard window to download scripture for offline use.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Package 1: Essential Scripture Text */}
         <div
           class="p-3 rounded-xl border flex flex-col gap-2.5"
           style={{
@@ -400,18 +421,18 @@ export function SettingsView({
               </p>
             </div>
 
-            {textPackageStatus === PackageStatus.DOWNLOADED ? (
+            {textPackageStatus === PackageStatusEnum.DOWNLOADED ? (
               <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
                 ✓ Installed
               </span>
-            ) : textPackageStatus === PackageStatus.DOWNLOADING ? (
+            ) : textPackageStatus === PackageStatusEnum.DOWNLOADING ? (
               <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
                 {textProgress}%
               </span>
             ) : null}
           </div>
 
-          {textPackageStatus === PackageStatus.DOWNLOADING && (
+          {textPackageStatus === PackageStatusEnum.DOWNLOADING && (
             <div class="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden">
               <div
                 class="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
@@ -422,13 +443,13 @@ export function SettingsView({
 
           <div class="flex items-center justify-between text-xs pt-1">
             <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
-              {textPackageStatus === PackageStatus.DOWNLOADED
+              {textPackageStatus === PackageStatusEnum.DOWNLOADED
                 ? 'Ready for offline reading'
-                : textPackageStatus === PackageStatus.DOWNLOADING
+                : textPackageStatus === PackageStatusEnum.DOWNLOADING
                 ? 'Downloading verses...'
                 : 'Not stored locally'}
             </span>
-            {textPackageStatus === PackageStatus.DOWNLOADING ? (
+            {textPackageStatus === PackageStatusEnum.DOWNLOADING ? (
               <button
                 type="button"
                 onClick={onCancelDownloadText}
@@ -441,11 +462,15 @@ export function SettingsView({
               >
                 Cancel
               </button>
-            ) : textPackageStatus !== PackageStatus.DOWNLOADED ? (
+            ) : textPackageStatus !== PackageStatusEnum.DOWNLOADED ? (
               <button
                 type="button"
                 onClick={onDownloadText}
-                class="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-85"
+                disabled={!isStorageAvailable}
+                title={!isStorageAvailable ? 'Device storage disabled in Private Browsing' : undefined}
+                class={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                  isStorageAvailable ? 'hover:opacity-85' : 'opacity-50 cursor-not-allowed'
+                }`}
                 style={{
                   backgroundColor: 'var(--accent)',
                   color: '#FFFFFF',
@@ -480,18 +505,18 @@ export function SettingsView({
               </p>
             </div>
 
-            {aiPackageStatus === PackageStatus.DOWNLOADED ? (
+            {aiPackageStatus === PackageStatusEnum.DOWNLOADED ? (
               <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
                 ✓ Installed
               </span>
-            ) : aiPackageStatus === PackageStatus.DOWNLOADING ? (
+            ) : aiPackageStatus === PackageStatusEnum.DOWNLOADING ? (
               <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
                 {aiProgress}%
               </span>
             ) : null}
           </div>
 
-          {aiPackageStatus === PackageStatus.DOWNLOADING && (
+          {aiPackageStatus === PackageStatusEnum.DOWNLOADING && (
             <div class="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden">
               <div
                 class="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
@@ -502,13 +527,13 @@ export function SettingsView({
 
           <div class="flex items-center justify-between text-xs pt-1">
             <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
-              {aiPackageStatus === PackageStatus.DOWNLOADED
+              {aiPackageStatus === PackageStatusEnum.DOWNLOADED
                 ? 'Ready for vector search'
-                : aiPackageStatus === PackageStatus.DOWNLOADING
+                : aiPackageStatus === PackageStatusEnum.DOWNLOADING
                 ? 'Downloading vectors...'
                 : 'Not stored locally'}
             </span>
-            {aiPackageStatus === PackageStatus.DOWNLOADING ? (
+            {aiPackageStatus === PackageStatusEnum.DOWNLOADING ? (
               <button
                 type="button"
                 onClick={onCancelDownloadAi}
@@ -521,11 +546,15 @@ export function SettingsView({
               >
                 Cancel
               </button>
-            ) : aiPackageStatus !== PackageStatus.DOWNLOADED ? (
+            ) : aiPackageStatus !== PackageStatusEnum.DOWNLOADED ? (
               <button
                 type="button"
                 onClick={onDownloadAi}
-                class="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-85"
+                disabled={!isStorageAvailable}
+                title={!isStorageAvailable ? 'Device storage disabled in Private Browsing' : undefined}
+                class={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                  isStorageAvailable ? 'hover:opacity-85' : 'opacity-50 cursor-not-allowed'
+                }`}
                 style={{
                   backgroundColor: 'var(--accent)',
                   color: '#FFFFFF',
@@ -560,18 +589,18 @@ export function SettingsView({
               </p>
             </div>
 
-            {modelPackageStatus === PackageStatus.DOWNLOADED ? (
+            {modelPackageStatus === PackageStatusEnum.DOWNLOADED ? (
               <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
                 ✓ Installed
               </span>
-            ) : modelPackageStatus === PackageStatus.DOWNLOADING ? (
+            ) : modelPackageStatus === PackageStatusEnum.DOWNLOADING ? (
               <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
                 {modelProgress}%
               </span>
             ) : null}
           </div>
 
-          {modelPackageStatus === PackageStatus.DOWNLOADING && (
+          {modelPackageStatus === PackageStatusEnum.DOWNLOADING && (
             <div class="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden">
               <div
                 class="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
@@ -582,13 +611,13 @@ export function SettingsView({
 
           <div class="flex items-center justify-between text-xs pt-1">
             <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
-              {modelPackageStatus === PackageStatus.DOWNLOADED
+              {modelPackageStatus === PackageStatusEnum.DOWNLOADED
                 ? 'Ready for on-device inference'
-                : modelPackageStatus === PackageStatus.DOWNLOADING
+                : modelPackageStatus === PackageStatusEnum.DOWNLOADING
                 ? 'Downloading model weights...'
                 : 'Not stored locally'}
             </span>
-            {modelPackageStatus === PackageStatus.DOWNLOADING ? (
+            {modelPackageStatus === PackageStatusEnum.DOWNLOADING ? (
               <button
                 type="button"
                 onClick={onCancelDownloadModel}
@@ -601,11 +630,15 @@ export function SettingsView({
               >
                 Cancel
               </button>
-            ) : modelPackageStatus !== PackageStatus.DOWNLOADED ? (
+            ) : modelPackageStatus !== PackageStatusEnum.DOWNLOADED ? (
               <button
                 type="button"
                 onClick={onDownloadModel}
-                class="px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-85"
+                disabled={!isStorageAvailable}
+                title={!isStorageAvailable ? 'Device storage disabled in Private Browsing' : undefined}
+                class={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                  isStorageAvailable ? 'hover:opacity-85' : 'opacity-50 cursor-not-allowed'
+                }`}
                 style={{
                   backgroundColor: 'var(--accent)',
                   color: '#FFFFFF',
@@ -615,6 +648,7 @@ export function SettingsView({
               </button>
             ) : null}
           </div>
+        </div>
         </div>
 
         {/* Clear Storage Action with Inline Confirmation & Visual Countdown */}
@@ -707,8 +741,8 @@ export function SettingsView({
             color: 'var(--text-main)',
           }}
         >
-          <option selected>World English Bible (WEB) — Public Domain</option>
-          <option>Louis Segond 1910 (LSG) — Domaine Public (Français)</option>
+          <option selected>World English Bible (WEB) - Public Domain</option>
+          <option>Louis Segond 1910 (LSG) - Domaine Public (Français)</option>
         </select>
       </div>
 

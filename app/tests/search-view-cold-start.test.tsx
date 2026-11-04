@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/preact';
 import { SearchView, MAX_HISTORY_ITEMS } from '../src/components/SearchView';
-import { PackageStatus } from '../src/core/types';
+import { PackageStatusEnum } from '../src/core/types';
 import { POPULAR_TOPICS } from '../src/core/starter-topics';
 import type { SearchEngine } from '../src/core/ports';
 import type { ComponentProps } from 'preact';
@@ -40,7 +40,7 @@ describe('SearchView Cold Start and Search Persistence', () => {
       isAiEnabled: true,
       isInspectorMode: false,
       showHeadings: true,
-      offlineTextStatus: PackageStatus.DOWNLOADED,
+      offlineTextStatus: PackageStatusEnum.DOWNLOADED,
       hasSeenOnboarding: true,
       savedVerses: [],
       onOpenReader: vi.fn(),

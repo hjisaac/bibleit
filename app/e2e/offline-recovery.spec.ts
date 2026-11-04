@@ -30,7 +30,7 @@ test.describe('Offline Scripture Recovery Flow', () => {
     await searchInput.fill('What did Jesus teach about worry?');
     await searchInput.press('Enter');
 
-    // 3. UI should show service unavailable / setup state — NEVER "No matching passages found"
+    // 3. UI should show service unavailable / setup state: NEVER "No matching passages found"
     await expect(page.getByText('Search service currently unavailable')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('No matching passages found')).not.toBeVisible();
 

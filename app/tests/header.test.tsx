@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/preact';
-import { Header, SearchMode } from '../src/components/Header';
+import { Header } from '../src/components/Header';
+import { SearchModeEnum } from '../src/core/types';
 
 describe('Header Component', () => {
   it('is silent by default when in AUTO search mode', () => {
@@ -8,7 +9,7 @@ describe('Header Component', () => {
       <Header
         isOnline={true}
         isAiEnabled={true}
-        searchMode={SearchMode.AUTO}
+        searchMode={SearchModeEnum.AUTO}
         onOpenHelp={vi.fn()}
       />,
     );
@@ -23,7 +24,7 @@ describe('Header Component', () => {
       <Header
         isOnline={true}
         isAiEnabled={true}
-        searchMode={SearchMode.DEVICE}
+        searchMode={SearchModeEnum.DEVICE}
         onOpenHelp={vi.fn()}
       />,
     );

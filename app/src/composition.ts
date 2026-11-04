@@ -1,5 +1,5 @@
 /**
- * Composition root — the ONLY file that imports concrete adapters.
+ * Composition root: the ONLY file that imports concrete adapters.
  * Swapping a component happens here and nowhere else.
  */
 import type {

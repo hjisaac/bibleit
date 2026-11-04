@@ -1,7 +1,5 @@
 import type { JSX } from 'preact';
-import { Theme, SearchMode } from '../core/types';
-
-export { Theme, SearchMode };
+import { SearchModeEnum } from '../core/types';
 
 export interface UserProfile {
   name: string;
@@ -12,19 +10,19 @@ export interface UserProfile {
 interface HeaderProps {
   isOnline: boolean;
   isAiEnabled: boolean;
-  searchMode?: SearchMode;
+  searchMode?: SearchModeEnum;
   user?: UserProfile | null;
   onOpenHelp: () => void;
   onOpenAccount?: () => void;
 }
 
 export function Header({
-  searchMode = SearchMode.AUTO,
+  searchMode = SearchModeEnum.AUTO,
   user,
   onOpenHelp,
   onOpenAccount,
 }: HeaderProps): JSX.Element {
-  const isOnDevice = searchMode === SearchMode.DEVICE;
+  const isOnDevice = searchMode === SearchModeEnum.DEVICE;
 
   return (
     <header

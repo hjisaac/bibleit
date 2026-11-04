@@ -15,40 +15,32 @@ Most Scripture search tools force a trade-off between brittle keyword matching a
 
 ## Architecture
 
-The system maintains a strict boundary between offline data preparation and the client runtime:
+`bibleit` is organized into four workspace packages:
+- **`engine/` (`@bibleit/engine`)**: Shared core search algorithms and port contracts.
+- **`app/`**: Progressive Web App (PWA) built with Preact and TypeScript, running locally with OPFS and Web Workers.
+- **`api/` (`@bibleit/api`)**: Fast Node.js search server (Hono) providing cloud-assisted search when online.
+- **`ingest/` (`bibleit_ingest`)**: Offline Python pipeline parsing USFM sources, chunking, quantizing, and exporting static artifacts.
 
-### Ingest Pipeline (`ingest/`)
-An offline Python pipeline responsible for data preparation, segmentation, and evaluation:
-- Parses public-domain translations (World English Bible, Berean Standard Bible) from USFM and USJ AST formats.
-- Projects semantic pericope boundaries across versification schemes to generate context-preserving passage chunks.
-- Profiles token distributions and benchmarks retrieval quality (MRR, Hits@k) using Crucible experiment orchestration.
-- Quantizes and exports version-gated static artifacts (`manifest.json`, `chunks.json.gz`, `verses.json.gz`, int8 binary embeddings).
-
-### Client Application (`app/`)
-A lightweight, offline-ready web application built with Preact and TypeScript:
-- **Hexagonal Architecture**: Core domain ports decouple search engines, rankers, and storage from runtime implementations.
-- **Client-Side Storage**: Entire Bible corpora and retrieval models cache locally using Cache Storage and IndexedDB.
-- **Reader & Discovery**: Renders canonical citation spans, pericope section titles, and transitions smoothly into full-chapter Scripture reading.
+Detailed specification: [docs/architecture.md](docs/architecture.md).
 
 ## Empirical Evaluation & Experiments
+
+<details>
+<summary>Systematic ablation sweeps and experiment tracking</summary>
 
 Offline semantic retrieval in the browser requires strict trade-offs between passage granularity, embedding token limits, and ranking accuracy. Instead of arbitrary chunking heuristics, `bibleit` evaluates chunking configurations, token headroom margins, and embedding models through systematic ablation sweeps using Crucible and streaming quantiles.
 
 All experimental runs and benchmark metrics are tracked and published openly:
 
-- **Corpus Linguistic Profiling**: [Weights & Biases — `bibleit-analysis-corpus-profile`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-analysis-corpus-profile)  
+- **Corpus Linguistic Profiling**: [Weights & Biases - `bibleit-analysis-corpus-profile`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-analysis-corpus-profile)  
   Statistical distributions of raw verse lengths, pericope token budgets, and chapter structures across testaments.
-- **Chunking Strategy Analysis**: [Weights & Biases — `bibleit-analysis-chunking-strategy`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-analysis-chunking-strategy)  
+- **Chunking Strategy Analysis**: [Weights & Biases - `bibleit-analysis-chunking-strategy`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-analysis-chunking-strategy)  
   Ablation sweeps over token ceilings (256, 512, 1024), verse overlaps, and header render strategies to measure token distributions (P50, P90, P99), pericope preservation, and truncation boundaries.
-- **Embedding Space Diagnostics**: [Weights & Biases — `bibleit-analysis-embed-corpus`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-analysis-embed-corpus)  
+- **Embedding Space Diagnostics**: [Weights & Biases - `bibleit-analysis-embed-corpus`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-analysis-embed-corpus)  
   Vector space health diagnostics profiling representation spread, vector norm distributions, and pairwise cosine similarity across text rendering representations.
-- **Vector Quantization Diagnostics**: [Weights & Biases — `bibleit-analysis-quantize-corpus`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-analysis-quantize-corpus)  
+- **Vector Quantization Diagnostics**: [Weights & Biases - `bibleit-analysis-quantize-corpus`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-analysis-quantize-corpus)  
   Vector compression diagnostics profiling row-wise cosine fidelity, reconstruction MSE, and int8 scale distributions.
-- **Retrieval Benchmark**: [Weights & Biases — `bibleit-eval-question-to-passage`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-eval-question-to-passage)  
+- **Retrieval Benchmark**: [Weights & Biases - `bibleit-eval-question-to-passage`](https://wandb.ai/hjisaach-aims-south-africa/bibleit-eval-question-to-passage)  
   Retrieval ranking performance (MRR, Hits@1, Hits@5, Hits@10) across embedding models and vector quantization targets.
 
-## Documentation
-
-- [design/architecture.md](design/architecture.md) — System design, artifact contract, and component ports.
-- [design/conventions.md](design/conventions.md) — Engineering standards and architectural rules.
-- [design/vocabulary.md](design/vocabulary.md) — Domain definitions (references, pericopes, passages, chunks).
+</details>

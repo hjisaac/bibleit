@@ -19,11 +19,11 @@ import { FeedbackModal } from './components/FeedbackModal';
 import { AudioPlayerBar } from './components/AudioPlayerBar';
 import { useHeadroom } from './core/headroom';
 import {
-  PackageStatus,
-  ViewTab,
-  SearchMode,
-  NetworkStatus,
-  Theme,
+  PackageStatusEnum,
+  ViewTabEnum,
+  SearchModeEnum,
+  NetworkStatusEnum,
+  ThemeEnum,
   type Manifest,
   type NarrationState,
 } from './core/types';
@@ -43,7 +43,7 @@ export function App(): JSX.Element {
   const store = useMemo(() => createDefaultArtifactStore(), []);
   const embedder = useMemo(() => createDefaultEmbedder(), []);
   const engine = useMemo(
-    () => createDefaultEngine(store, embedder, () => $searchMode.get() === SearchMode.DEVICE),
+    () => createDefaultEngine(store, embedder, () => $searchMode.get() === SearchModeEnum.DEVICE),
     [store, embedder],
   );
   const narrator = useMemo(() => createDefaultNarrator(), []);
@@ -64,12 +64,12 @@ export function App(): JSX.Element {
 
 
   const theme = useStore($theme);
-  const handleThemeChange = (nextTheme: Theme) => $theme.set(nextTheme);
+  const handleThemeChange = (nextTheme: ThemeEnum) => $theme.set(nextTheme);
 
   const activeTab = useStore($activeTab);
   const [isBarVisible, setIsBarVisible] = useHeadroom({ threshold: 50, deltaThreshold: 8 });
 
-  const handleTabChange = (tab: ViewTab) => {
+  const handleTabChange = (tab: ViewTabEnum) => {
     $activeTab.set(tab);
     setIsBarVisible(true);
   };
@@ -84,16 +84,21 @@ export function App(): JSX.Element {
   const aiPackageStatus = useStore($aiPackageStatus);
   const modelPackageStatus = useStore($modelPackageStatus);
   const [textProgress, setTextProgress] = useState<number>(() =>
-    $textPackageStatus.get() === PackageStatus.DOWNLOADED ? 100 : 0,
+    $textPackageStatus.get() === PackageStatusEnum.DOWNLOADED ? 100 : 0,
   );
   const [aiProgress, setAiProgress] = useState<number>(() =>
-    $aiPackageStatus.get() === PackageStatus.DOWNLOADED ? 100 : 0,
+    $aiPackageStatus.get() === PackageStatusEnum.DOWNLOADED ? 100 : 0,
   );
   const [modelProgress, setModelProgress] = useState<number>(() =>
-    $modelPackageStatus.get() === PackageStatus.DOWNLOADED ? 100 : 0,
+    $modelPackageStatus.get() === PackageStatusEnum.DOWNLOADED ? 100 : 0,
   );
   const hasSeenStorageBanner = useStore($hasSeenStorageBanner);
   const [highlightStorage, setHighlightStorage] = useState<boolean>(false);
+  const [isStorageAvailable, setIsStorageAvailable] = useState<boolean>(true);
+
+  useEffect(() => {
+    store.isStorageAvailable?.().then(setIsStorageAvailable).catch(() => setIsStorageAvailable(false));
+  }, [store]);
 
   const readerLocation = useStore($readerLocation);
   const setReaderLocation = (
@@ -134,10 +139,10 @@ export function App(): JSX.Element {
   };
 
   const searchMode = useStore($searchMode);
-  const handleToggleSearchMode = (mode: SearchMode) => {
+  const handleToggleSearchMode = (mode: SearchModeEnum) => {
     $searchMode.set(mode);
     showToast(
-      mode === SearchMode.DEVICE
+      mode === SearchModeEnum.DEVICE
         ? 'Device-only search enabled: Searching locally'
         : 'Auto mode: Cloud search with offline fallback',
     );
@@ -145,24 +150,24 @@ export function App(): JSX.Element {
 
   // Reconcile in-memory state if page was reloaded mid-download
   useEffect(() => {
-    if ($textPackageStatus.get() === PackageStatus.DOWNLOADING) $textPackageStatus.set(PackageStatus.NOT_DOWNLOADED);
-    if ($aiPackageStatus.get() === PackageStatus.DOWNLOADING) $aiPackageStatus.set(PackageStatus.NOT_DOWNLOADED);
-    if ($modelPackageStatus.get() === PackageStatus.DOWNLOADING) $modelPackageStatus.set(PackageStatus.NOT_DOWNLOADED);
+    if ($textPackageStatus.get() === PackageStatusEnum.DOWNLOADING) $textPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
+    if ($aiPackageStatus.get() === PackageStatusEnum.DOWNLOADING) $aiPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
+    if ($modelPackageStatus.get() === PackageStatusEnum.DOWNLOADING) $modelPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
   }, []);
 
   // Sync offline packages state with real OPFS and browser cache in background
   useEffect(() => {
     store.hasVerses?.().then((has) => {
-      $textPackageStatus.set(has ? PackageStatus.DOWNLOADED : PackageStatus.NOT_DOWNLOADED);
+      $textPackageStatus.set(has ? PackageStatusEnum.DOWNLOADED : PackageStatusEnum.NOT_DOWNLOADED);
       if (has) setTextProgress(100);
     });
     store.hasEmbeddings?.().then((has) => {
-      $aiPackageStatus.set(has ? PackageStatus.DOWNLOADED : PackageStatus.NOT_DOWNLOADED);
+      $aiPackageStatus.set(has ? PackageStatusEnum.DOWNLOADED : PackageStatusEnum.NOT_DOWNLOADED);
       if (has) setAiProgress(100);
     });
     isQueryModelCached().then((isCached) => {
       if (isCached) {
-        $modelPackageStatus.set(PackageStatus.DOWNLOADED);
+        $modelPackageStatus.set(PackageStatusEnum.DOWNLOADED);
         setModelProgress(100);
       }
     });
@@ -171,8 +176,8 @@ export function App(): JSX.Element {
   // Subscribe to query embedder progress events
   useEffect(() => {
     const unsub = embedder.onProgress((fraction) => {
-      if ($modelPackageStatus.get() !== PackageStatus.DOWNLOADED) {
-        $modelPackageStatus.set(PackageStatus.DOWNLOADING);
+      if ($modelPackageStatus.get() !== PackageStatusEnum.DOWNLOADED) {
+        $modelPackageStatus.set(PackageStatusEnum.DOWNLOADING);
         setModelProgress(Math.round(fraction * 100));
       }
     });
@@ -183,7 +188,7 @@ export function App(): JSX.Element {
     engine.ready.then(() => {
       isQueryModelCached().then((isCached) => {
         if (isCached) {
-          $modelPackageStatus.set(PackageStatus.DOWNLOADED);
+          $modelPackageStatus.set(PackageStatusEnum.DOWNLOADED);
           setModelProgress(100);
         }
       });
@@ -198,29 +203,29 @@ export function App(): JSX.Element {
     const controller = new AbortController();
     textAbortRef.current = controller;
 
-    $textPackageStatus.set(PackageStatus.DOWNLOADING);
+    $textPackageStatus.set(PackageStatusEnum.DOWNLOADING);
     setTextProgress(0);
     try {
       await store.verses((pct) => setTextProgress(Math.round(pct * 0.8)), controller.signal);
       await store.chunks((pct) => setTextProgress(80 + Math.round(pct * 0.2)), controller.signal);
       setTextProgress(100);
       await engine.sync?.();
-      $textPackageStatus.set(PackageStatus.DOWNLOADED);
+      $textPackageStatus.set(PackageStatusEnum.DOWNLOADED);
       showToast('Scripture text verified & installed in OPFS (1.2 MB)');
     } catch (err) {
       if (controller.signal.aborted) {
-        $textPackageStatus.set(PackageStatus.NOT_DOWNLOADED);
+        $textPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
         setTextProgress(0);
         showToast('Scripture download cancelled.');
         return;
       }
       console.error('Download failed:', err);
       showToast(
-        err instanceof Error && err.name === 'CorruptArtifactError'
+        err instanceof Error && (err.name === 'CorruptArtifactError' || err.name === 'StorageUnavailableError')
           ? err.message
           : 'Download interrupted. Check network and try again.',
       );
-      $textPackageStatus.set(PackageStatus.NOT_DOWNLOADED);
+      $textPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     } finally {
       if (textAbortRef.current === controller) {
         textAbortRef.current = null;
@@ -237,28 +242,28 @@ export function App(): JSX.Element {
     const controller = new AbortController();
     aiAbortRef.current = controller;
 
-    $aiPackageStatus.set(PackageStatus.DOWNLOADING);
+    $aiPackageStatus.set(PackageStatusEnum.DOWNLOADING);
     setAiProgress(0);
     try {
       await store.embeddings((pct) => setAiProgress(pct), controller.signal);
       setAiProgress(100);
       await engine.sync?.();
-      $aiPackageStatus.set(PackageStatus.DOWNLOADED);
+      $aiPackageStatus.set(PackageStatusEnum.DOWNLOADED);
       showToast('Verse vectors verified & installed in OPFS (2.1 MB)');
     } catch (err) {
       if (controller.signal.aborted) {
-        $aiPackageStatus.set(PackageStatus.NOT_DOWNLOADED);
+        $aiPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
         setAiProgress(0);
         showToast('AI vectors download cancelled.');
         return;
       }
       console.error('Download failed:', err);
       showToast(
-        err instanceof Error && err.name === 'CorruptArtifactError'
+        err instanceof Error && (err.name === 'CorruptArtifactError' || err.name === 'StorageUnavailableError')
           ? err.message
           : 'AI download interrupted. Check network and try again.',
       );
-      $aiPackageStatus.set(PackageStatus.NOT_DOWNLOADED);
+      $aiPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     } finally {
       if (aiAbortRef.current === controller) {
         aiAbortRef.current = null;
@@ -274,24 +279,24 @@ export function App(): JSX.Element {
 
   const handleDownloadModel = async () => {
     isModelAbortedRef.current = false;
-    $modelPackageStatus.set(PackageStatus.DOWNLOADING);
+    $modelPackageStatus.set(PackageStatusEnum.DOWNLOADING);
     setModelProgress(0);
     try {
       await embedder.load((fraction) => setModelProgress(Math.round(fraction * 100)));
       setModelProgress(100);
       await engine.sync?.();
-      $modelPackageStatus.set(PackageStatus.DOWNLOADED);
+      $modelPackageStatus.set(PackageStatusEnum.DOWNLOADED);
       showToast('Neural query model installed in browser cache (137 MB)');
     } catch (err) {
       if (isModelAbortedRef.current || (err instanceof DOMException && err.name === 'AbortError')) {
-        $modelPackageStatus.set(PackageStatus.NOT_DOWNLOADED);
+        $modelPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
         setModelProgress(0);
         showToast('Model download cancelled.');
         return;
       }
       console.error('Model download failed:', err);
       showToast('Model download interrupted. Check network and try again.');
-      $modelPackageStatus.set(PackageStatus.NOT_DOWNLOADED);
+      $modelPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     }
   };
 
@@ -305,9 +310,9 @@ export function App(): JSX.Element {
     await embedder.clear?.();
     await clearQueryModelCache();
     await engine.sync?.();
-    $textPackageStatus.set(PackageStatus.NOT_DOWNLOADED);
-    $aiPackageStatus.set(PackageStatus.NOT_DOWNLOADED);
-    $modelPackageStatus.set(PackageStatus.NOT_DOWNLOADED);
+    $textPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
+    $aiPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
+    $modelPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     setTextProgress(0);
     setAiProgress(0);
     setModelProgress(0);
@@ -315,7 +320,7 @@ export function App(): JSX.Element {
   };
 
   const handleOpenStorage = () => {
-    handleTabChange(ViewTab.SETTINGS);
+    handleTabChange(ViewTabEnum.SETTINGS);
     setHighlightStorage(true);
   };
 
@@ -324,7 +329,7 @@ export function App(): JSX.Element {
   };
 
   const handleAudioBarClick = () => {
-    if (activeTab === ViewTab.SEARCH) {
+    if (activeTab === ViewTabEnum.SEARCH) {
       const activeCard = document.getElementById('search-active-narrating-card');
       if (activeCard) {
         activeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -357,8 +362,8 @@ export function App(): JSX.Element {
       showToast('Offline: Local search & reader active');
     };
 
-    window.addEventListener(NetworkStatus.ONLINE, handleOnline);
-    window.addEventListener(NetworkStatus.OFFLINE, handleOffline);
+    window.addEventListener(NetworkStatusEnum.ONLINE, handleOnline);
+    window.addEventListener(NetworkStatusEnum.OFFLINE, handleOffline);
 
     const interval = setInterval(() => {
       if (typeof navigator !== 'undefined') {
@@ -374,8 +379,8 @@ export function App(): JSX.Element {
     }, 800);
 
     return () => {
-      window.removeEventListener(NetworkStatus.ONLINE, handleOnline);
-      window.removeEventListener(NetworkStatus.OFFLINE, handleOffline);
+      window.removeEventListener(NetworkStatusEnum.ONLINE, handleOnline);
+      window.removeEventListener(NetworkStatusEnum.OFFLINE, handleOffline);
       clearInterval(interval);
     };
   }, []);
@@ -395,7 +400,7 @@ export function App(): JSX.Element {
 
   const handleOpenReader = (book: string, chapter: number, verse: number) => {
     setReaderLocation({ book, chapter, targetVerse: verse, scrollKey: Date.now() });
-    handleTabChange(ViewTab.READER);
+    handleTabChange(ViewTabEnum.READER);
   };
 
   const handleSaveVerse = (verse: {
@@ -448,7 +453,7 @@ export function App(): JSX.Element {
       />
 
       <main class="flex-1 flex flex-col overflow-hidden">
-        <div class={activeTab === ViewTab.SEARCH ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
+        <div class={activeTab === ViewTabEnum.SEARCH ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
           <SearchView
             engine={engine}
             narrator={narrator}
@@ -469,7 +474,7 @@ export function App(): JSX.Element {
           />
         </div>
 
-        <div class={activeTab === ViewTab.READER ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
+        <div class={activeTab === ViewTabEnum.READER ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
           <ReaderView
             book={readerLocation.book}
             chapter={readerLocation.chapter}
@@ -484,7 +489,7 @@ export function App(): JSX.Element {
           />
         </div>
 
-        {activeTab === ViewTab.SAVED && (
+        {activeTab === ViewTabEnum.SAVED && (
           <SavedView
             savedVerses={savedVerses}
             onOpenVerse={(item) => {
@@ -493,7 +498,7 @@ export function App(): JSX.Element {
           />
         )}
 
-        {activeTab === ViewTab.SETTINGS && (
+        {activeTab === ViewTabEnum.SETTINGS && (
           <SettingsView
             manifest={manifest}
             currentTheme={theme}
@@ -513,6 +518,7 @@ export function App(): JSX.Element {
             searchMode={searchMode}
             onToggleSearchMode={handleToggleSearchMode}
             highlightStorage={highlightStorage}
+            isStorageAvailable={isStorageAvailable}
             onDownloadText={handleDownloadText}
             onCancelDownloadText={handleCancelDownloadText}
             onDownloadAi={handleDownloadAi}
@@ -530,7 +536,7 @@ export function App(): JSX.Element {
         isNavbarVisible={isBarVisible}
         onNavigateToSegment={handleOpenReader}
         onBarClick={handleAudioBarClick}
-        title={activeTab === ViewTab.SEARCH ? 'Scroll to playing card' : 'Jump to passage in Reader'}
+        title={activeTab === ViewTabEnum.SEARCH ? 'Scroll to playing card' : 'Jump to passage in Reader'}
       />
 
       <Navbar activeTab={activeTab} onTabChange={handleTabChange} isVisible={isBarVisible} />
