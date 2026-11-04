@@ -469,7 +469,7 @@ export function ReaderView({
               {/* Action buttons revealed directly below the verse on long-press */}
               {hasActions && (
                 <div
-                  class="mt-2 mb-1 flex items-center justify-start px-0.5 animate-fadeIn"
+                  class="mt-2 mb-1 flex items-center justify-end px-0.5 animate-fadeIn"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div
