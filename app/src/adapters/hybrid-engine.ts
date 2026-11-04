@@ -5,7 +5,7 @@ import { SearchOriginEnum, type RetrievalResult } from '../core/types';
  * HybridEngine: Tiered search engine delegating to remote API when online,
  * with seamless zero-latency fallback to LocalEngine when offline or on network failure.
  */
-const REMOTE_TIMEOUT_MS = 2000;
+const REMOTE_TIMEOUT_MS = 4000;
 const REMOTE_COOLDOWN_MS = 20_000;
 
 export class HybridEngine implements SearchEngine {

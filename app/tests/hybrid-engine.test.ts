@@ -96,7 +96,7 @@ describe('HybridEngine', () => {
     expect(result.passages[0]?.chunk.text).toContain('For God so loved the world');
   });
 
-  it('falls back to localEngine when remote API times out after 3000ms', async () => {
+  it('falls back to localEngine when remote API times out after 4000ms', async () => {
     vi.useFakeTimers();
     vi.spyOn(globalThis, 'fetch').mockImplementationOnce((_url, init) => {
       return new Promise((_, reject) => {
@@ -108,7 +108,7 @@ describe('HybridEngine', () => {
 
     const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
     const retrievePromise = engine.retrieve('love');
-    await vi.advanceTimersByTimeAsync(3100);
+    await vi.advanceTimersByTimeAsync(4100);
     const result = await retrievePromise;
 
     expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
