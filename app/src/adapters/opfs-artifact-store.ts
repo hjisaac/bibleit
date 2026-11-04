@@ -160,6 +160,8 @@ async function compressGzipBytes(bytes: Uint8Array<ArrayBuffer>): Promise<Uint8A
 
 export class OpfsArtifactStore implements ArtifactStore {
   private manifestPromise: Promise<Manifest> | null = null;
+  // Session-only fallback when OPFS is blocked (e.g. Firefox private browsing).
+  private memory = new Map<string, unknown>();
 
   manifest(): Promise<Manifest> {
     if (!this.manifestPromise) {
@@ -224,6 +226,7 @@ export class OpfsArtifactStore implements ArtifactStore {
     signal?: AbortSignal,
   ): Promise<T> {
     const isGz = remoteFile.endsWith('.gz');
+    if (!root && this.memory.has(filename)) return this.memory.get(filename) as T;
     const cached = root ? await readOpfsFile(root, filename) : null;
     if (cached) {
       try {
@@ -261,6 +264,8 @@ export class OpfsArtifactStore implements ArtifactStore {
     if (root) {
       await writeOpfsFile(root, filename, toStore);
       onCachedToOpfs?.();
+    } else {
+      this.memory.set(filename, parsed);
     }
     return parsed;
   }
@@ -334,7 +339,7 @@ export class OpfsArtifactStore implements ArtifactStore {
 
   async hasVerses(): Promise<boolean> {
     const root = await getOpfsRoot();
-    if (!root) return false;
+    if (!root) return this.memory.has(`verses-v${SUPPORTED_SCHEMA_VERSION}.json.gz`);
     try {
       const cached = await readOpfsFile(root, `verses-v${SUPPORTED_SCHEMA_VERSION}.json.gz`);
       return cached !== null && cached.length > 0;
@@ -345,7 +350,7 @@ export class OpfsArtifactStore implements ArtifactStore {
 
   async hasEmbeddings(): Promise<boolean> {
     const root = await getOpfsRoot();
-    if (!root) return false;
+    if (!root) return [...this.memory.keys()].some((name) => name.startsWith('embeddings-'));
     try {
       for await (const name of (root as unknown as { keys(): AsyncIterable<string> }).keys?.() ?? []) {
         if (name.startsWith('embeddings-') && (name.endsWith('.i8.bin') || name.endsWith('.f32.bin'))) {
@@ -361,6 +366,7 @@ export class OpfsArtifactStore implements ArtifactStore {
 
   async clear(): Promise<void> {
     this.manifestPromise = null;
+    this.memory.clear();
     const root = await getOpfsRoot();
     if (root) {
       for await (const name of (root as unknown as { keys(): AsyncIterable<string> }).keys?.() ?? []) {
