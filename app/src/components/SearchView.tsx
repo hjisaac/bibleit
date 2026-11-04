@@ -983,9 +983,10 @@ export function SearchView({
           class="flex items-center justify-between text-[9px] sm:text-[10px] mb-2 px-1 py-0.5 border-b border-dashed font-mono shrink-0 animate-fadeIn"
           style={{
             borderColor: 'var(--border-subtle)',
+            color: 'var(--text-subtle)',
           }}
         >
-          <span class="text-emerald-500 dark:text-emerald-400">
+          <span>
             Source:{' '}
             <span>
               {searchOrigin === SearchOriginEnum.REMOTE ? 'server' : 'device'}
