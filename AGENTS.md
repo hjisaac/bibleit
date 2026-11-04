@@ -53,9 +53,11 @@ The user is building this project to learn by doing and to have full ownership o
 
 ## Repository Structure & Architecture
 
-- `app/`: Astro + TypeScript client application.
+- `app/`: Preact + TypeScript client application (Vite PWA).
   - Hexagonal architecture: Ports live in `app/src/core/ports.ts`, adapters live in `app/src/adapters/`.
   - **Composition root**: Only `app/src/composition.ts` may import adapters and wire dependencies.
+- `engine/`: Shared TypeScript retrieval engine (`@bibleit/engine`) implementing core retrieval algorithms.
+- `api/`: Node.js search server (`@bibleit/api`) built with Hono for cloud retrieval.
 - `ingest/`: Python data preparation pipeline (`bibleit_ingest`).
   - USFM parsing, pericope extraction, verse addressing, chunking strategies, and embedding generation.
   - Ingest and the client app communicate strictly via versioned artifacts (`manifest.json` + data files).
