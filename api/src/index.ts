@@ -12,6 +12,7 @@ import {
   RrfRanker,
   SearchOriginEnum,
   API_ROUTES,
+  TELEMETRY_HEADERS,
   type ArtifactStore,
   type SearchEngine,
 } from '@bibleit/engine';
@@ -101,7 +102,7 @@ app.use(
   cors({
     origin: '*',
     allowMethods: ['GET', 'POST', 'OPTIONS'],
-    exposeHeaders: ['x-bibleit-provider', 'x-bibleit-model', 'x-bibleit-attempts'],
+    exposeHeaders: Object.values(TELEMETRY_HEADERS),
   }),
 );
 

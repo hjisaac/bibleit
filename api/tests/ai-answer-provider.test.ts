@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { parseCooldownMs, AiAnswerProvider } from '../src/adapters/ai-answer-provider';
+import { TELEMETRY_HEADERS } from '@bibleit/engine';
 
 describe('parseCooldownMs', () => {
   it('parses standard RFC retry-after header (Groq, Mistral)', () => {
@@ -136,8 +137,8 @@ describe('AiAnswerProvider candidate list and rotation', () => {
 
       // Headers reflect successful fallback to gemini on attempt 2
       assert.strictEqual(res.status, 200);
-      assert.strictEqual(res.headers.get('x-bibleit-provider'), 'gemini');
-      assert.strictEqual(res.headers.get('x-bibleit-attempts'), '2');
+      assert.strictEqual(res.headers.get(TELEMETRY_HEADERS.PROVIDER), 'gemini');
+      assert.strictEqual(res.headers.get(TELEMETRY_HEADERS.ATTEMPTS), '2');
 
       // Body contains streamed chunk
       const text = await res.text();

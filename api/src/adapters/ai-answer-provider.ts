@@ -3,6 +3,7 @@ import { streamText, createTextStreamResponse } from 'ai';
 import { StatusCodes } from 'http-status-codes';
 import {
   renderChunk,
+  TELEMETRY_HEADERS,
   type AnswerProvider,
   type RetrievalResult,
   type ScoredPassage,
@@ -316,9 +317,9 @@ export class AiAnswerProvider implements AnswerProvider {
         return createTextStreamResponse({
           stream: responseStream,
           headers: {
-            'x-bibleit-provider': provider.name,
-            'x-bibleit-model': provider.model,
-            'x-bibleit-attempts': String(i + 1),
+            [TELEMETRY_HEADERS.PROVIDER]: provider.name,
+            [TELEMETRY_HEADERS.MODEL]: provider.model,
+            [TELEMETRY_HEADERS.ATTEMPTS]: String(i + 1),
           },
         });
       } catch (err) {
