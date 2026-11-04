@@ -499,9 +499,8 @@ describe('SearchView Result Cards & User Actions', () => {
 
     renderSearchView({ isInspectorMode: true });
 
-    expect(screen.getByText(/Origin:/i)).toBeTruthy();
     expect(screen.getByText('Cloud API')).toBeTruthy();
-    expect(screen.getByText('42ms')).toBeTruthy();
+    expect(screen.getByText('42ms latency')).toBeTruthy();
   });
 });
 

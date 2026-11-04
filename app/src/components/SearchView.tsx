@@ -4,6 +4,7 @@ import { useStore } from '@nanostores/preact';
 import type { AudioNarrator, SearchEngine } from '../core/ports';
 import {
   getChunkKey,
+  type Manifest,
   PackageStatusEnum,
   type NarrationSegment,
   type NarrationState,
@@ -28,6 +29,7 @@ export { MAX_HISTORY_ITEMS, SEARCH_HISTORY_KEY, SEARCH_STORAGE_KEY };
 
 interface SearchViewProps {
   engine: SearchEngine;
+  manifest?: Manifest | null;
   narrator?: AudioNarrator;
   narrationState?: NarrationState;
   isOnline: boolean;
@@ -173,6 +175,7 @@ function isQuestionQuery(text: string): boolean {
 
 export function SearchView({
   engine,
+  manifest,
   narrator,
   narrationState,
   isOnline,
@@ -977,40 +980,34 @@ export function SearchView({
         );
       })()}
 
-      {/* Inspector Mode Telemetry: Origin & Timing */}
+      {/* Technical Diagnostics Bar (Shown only in Inspector Mode when results are present) */}
       {isInspectorMode && passages.length > 0 && (
         <div
-          class="mb-3 px-3 py-1.5 rounded-xl border flex items-center justify-between text-[11px] font-mono animate-fadeIn shrink-0"
+          class="flex items-center justify-between text-[10px] sm:text-[11px] mb-2.5 px-1 py-1 border-b border-dashed font-mono shrink-0 animate-fadeIn"
           style={{
             borderColor: 'var(--border-subtle)',
-            backgroundColor: 'var(--bg-surface-elevated)',
             color: 'var(--text-subtle)',
           }}
         >
           <div class="flex items-center gap-1.5">
-            <span
-              class="w-1.5 h-1.5 rounded-full shrink-0"
-              style={{
-                backgroundColor:
-                  searchOrigin === SearchOriginEnum.REMOTE ? '#3b82f6' : '#10b981',
-              }}
-            />
+            <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
             <span>
-              Origin:{' '}
-              <span class="font-semibold" style={{ color: 'var(--text-main)' }}>
-                {searchOrigin === SearchOriginEnum.REMOTE ? 'Cloud API' : 'On-Device'}
-              </span>
+              {manifest
+                ? `${manifest.embeddings.model.split('/').pop()} (${manifest.embeddings.quantization.type}) · ${manifest.corpus.count.toLocaleString()} verses`
+                : 'nomic-embed-text-v1.5 (int8) · 31,095 verses'}
             </span>
           </div>
-
-          {searchDurationMs !== null && (
-            <div class="flex items-center gap-1">
-              <span>Time:</span>
-              <span class="font-semibold" style={{ color: 'var(--text-main)' }}>
-                {searchDurationMs}ms
+          <div class="flex items-center gap-1.5 shrink-0">
+            {searchOrigin && (
+              <span>{searchOrigin === SearchOriginEnum.REMOTE ? 'Cloud API' : 'On-Device'}</span>
+            )}
+            {searchOrigin && searchDurationMs !== null && <span>·</span>}
+            {searchDurationMs !== null && (
+              <span class="text-emerald-600 dark:text-emerald-400 font-semibold">
+                {searchDurationMs}ms latency
               </span>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 
