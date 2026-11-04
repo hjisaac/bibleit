@@ -23,7 +23,7 @@ An offline-first Bible search Progressive Web App (PWA) with hybrid retrieval.
 <details>
 <summary>Systematic ablation sweeps and experiment tracking</summary>
 
-`bibleit` evaluates chunking configurations, token limits, and embedding models through systematic ablation sweeps using Crucible.
+Chunking configurations, token limits, and embedding models are evaluated through systematic ablation sweeps using Crucible.
 
 Experiment runs and benchmark metrics:
 
