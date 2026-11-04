@@ -18,13 +18,6 @@ An offline-first Bible search Progressive Web App (PWA) with hybrid retrieval.
 - **`api/` (`@bibleit/api`)**: Node.js search server (Hono) for online cloud retrieval.
 - **`ingest/` (`bibleit_ingest`)**: Python pipeline for USFM parsing, chunking, quantization, and artifact export.
 
-## Live Deployment
-
-The live web app is hosted on free-tier infrastructure:
-- **Cloud API**: Hosted on Render free tier. Free instances sleep after inactivity, so the initial search request may take 40 to 60 seconds while the server spins up. Subsequent requests run normally.
-- **Offline Fallback**: When the cloud API is sleeping or unreachable, the app automatically falls back to local in-browser search with zero interruption.
-- **Search Interaction**: Queries are submitted explicitly using Enter or the Search button (not search-as-you-type).
-
 ## Empirical Evaluation & Experiments
 
 <details>
@@ -46,3 +39,10 @@ Experiment runs and benchmark metrics:
   Ranking performance (MRR, Hits@1, Hits@5, Hits@10) across models and quantization targets.
 
 </details>
+
+## Live Deployment
+
+The live web app is hosted on free-tier infrastructure:
+- **Cloud API**: Hosted on Render free tier. Free instances sleep after inactivity, so the initial search request may take 40 to 60 seconds while the server spins up. Subsequent requests run normally.
+- **Search Interaction**: Queries are submitted explicitly using Enter or the Search button (not search-as-you-type).
+- **Offline Fallback & On-Device Search**: When the cloud API is sleeping or unreachable, the app falls back to local in-browser search for downloaded assets. Reference and keyword search require downloaded scripture text. Local semantic search additionally requires downloading the embedding model and vector index. Users can also enable the "Device-only (Offline)" toggle in Settings at any time to keep all search entirely local.
