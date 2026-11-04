@@ -469,6 +469,21 @@ describe('SearchView Result Cards & User Actions', () => {
       expect(screen.getByText(/Rejoice in the Lord always/i)).toBeTruthy();
     });
   });
+
+  it('re-runs a persisted empty search on remount when text is already downloaded', async () => {
+    localStorage.setItem(
+      'bibleit_last_search',
+      JSON.stringify({ query: 'love your neighbor', passages: [], answerText: '', origin: 'local' })
+    );
+
+    renderSearchView({ offlineTextStatus: PackageStatus.DOWNLOADED });
+
+    await waitFor(() => {
+      expect(retrieveSpy).toHaveBeenCalledWith('love your neighbor');
+      expect(screen.getByText(/Rejoice in the Lord always/i)).toBeTruthy();
+    });
+    expect(screen.queryByText('No matching passages found')).toBeNull();
+  });
 });
 
 
