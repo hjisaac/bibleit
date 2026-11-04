@@ -57,12 +57,12 @@ export function SavedView({ savedVerses, onOpenVerse, onUnsaveVerse }: SavedView
                     onUnsaveVerse?.(item);
                   }}
                   title="Remove from bookmarks"
-                  class="p-1 -mr-1 rounded hover:opacity-75 transition-opacity flex items-center justify-center cursor-pointer"
-                  style={{ color: 'var(--text-muted)' }}
+                  class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-sans font-medium rounded-lg transition-all hover:opacity-80 active:opacity-60 cursor-pointer"
+                  style={{ color: 'var(--accent)' }}
                 >
                   <svg
-                    class="w-4 h-4"
-                    fill="none"
+                    class="w-3.5 h-3.5 shrink-0"
+                    fill="currentColor"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
@@ -72,16 +72,8 @@ export function SavedView({ savedVerses, onOpenVerse, onUnsaveVerse }: SavedView
                       stroke-width="2"
                       d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
                     />
-                    <line
-                      x1="3"
-                      y1="3"
-                      x2="21"
-                      y2="21"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                    />
                   </svg>
+                  <span>Unsave</span>
                 </button>
               </div>
               <p class="font-serif text-sm leading-relaxed" style={{ color: 'var(--text-main)' }}>

@@ -33,6 +33,7 @@ describe('SavedView Component', () => {
 
     const unbookmarkBtn = screen.getByTitle('Remove from bookmarks');
     expect(unbookmarkBtn).toBeTruthy();
+    expect(screen.getByText('Unsave')).toBeTruthy();
 
     // Clicking unbookmark should immediately call onUnsaveVerse without navigating
     fireEvent.click(unbookmarkBtn);
