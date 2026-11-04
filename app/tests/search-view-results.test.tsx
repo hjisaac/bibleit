@@ -485,7 +485,7 @@ describe('SearchView Result Cards & User Actions', () => {
     expect(screen.queryByText('No matching passages found')).toBeNull();
   });
 
-  it('renders search timing and origin telemetry when isInspectorMode is enabled', () => {
+  it('renders search timing and source telemetry when isInspectorMode is enabled', () => {
     localStorage.setItem(
       'bibleit_last_search',
       JSON.stringify({
@@ -499,8 +499,8 @@ describe('SearchView Result Cards & User Actions', () => {
 
     renderSearchView({ isInspectorMode: true });
 
-    expect(screen.getByText(/Origin:/i)).toBeTruthy();
-    expect(screen.getByText('remote')).toBeTruthy();
+    expect(screen.getByText(/source:/i)).toBeTruthy();
+    expect(screen.getByText('server')).toBeTruthy();
     expect(screen.getByText('42ms latency')).toBeTruthy();
   });
 });

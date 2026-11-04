@@ -986,9 +986,9 @@ export function SearchView({
           }}
         >
           <span class="text-emerald-500 dark:text-emerald-400">
-            Origin:{' '}
+            source:{' '}
             <span>
-              {searchOrigin === SearchOriginEnum.REMOTE ? 'remote' : 'local'}
+              {searchOrigin === SearchOriginEnum.REMOTE ? 'server' : 'device'}
             </span>
           </span>
           {searchDurationMs !== null && (
