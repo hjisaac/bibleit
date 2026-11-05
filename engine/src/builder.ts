@@ -1,11 +1,14 @@
 import type {
   AnswerProvider,
   ArtifactStore,
+  EngineHealth,
+  HealthCheckable,
   LexicalIndex,
   QueryEmbedder,
   Ranker,
   RefParser,
   SearchEngine,
+  SubsystemState,
   VectorIndex,
 } from './core/ports';
 import { ArrayVerseStore } from './adapters/array-verse-store';
@@ -22,51 +25,71 @@ export interface LocalEnginePorts {
   verseStore?: VerseStore;
 }
 
+export interface LocalEngineOptions {
+  /** When true, ready waits for both base lexical and semantic embeddings. */
+  eagerSemantic?: boolean;
+}
+
 /**
  * LocalEngine: In-memory SearchEngine orchestrating fine-grained local ports.
  * Runs identically in the browser (OPFS + Web Workers) and on Node/Server (HTTP + ONNX).
  */
-export class LocalEngine implements SearchEngine {
+export class LocalEngine implements SearchEngine, HealthCheckable {
   public ready: Promise<void>;
   public answers: AnswerProvider;
 
   private ports: LocalEnginePorts;
   private verseStore: VerseStore | null;
-  private lexicalReady = false;
-  private semanticReady = false;
+  private lexicalState: SubsystemState = 'initializing';
+  private semanticState: SubsystemState = 'initializing';
+  private semanticError?: string;
   private currentSync: Promise<void> | null = null;
 
-  get isLexicalReady(): boolean {
-    return this.lexicalReady;
-  }
-
-  get isSemanticReady(): boolean {
-    return this.semanticReady;
-  }
-
-  constructor(ports: LocalEnginePorts) {
+  constructor(ports: LocalEnginePorts, options?: LocalEngineOptions) {
     this.ports = ports;
     this.answers = ports.answers;
     this.verseStore = ports.verseStore ?? null;
 
     const baseReady = this.loadBase().catch((err) => {
       console.warn('[Base Index Init Error]:', err);
+      this.lexicalState = 'error';
       return [];
     });
 
-    void (async () => {
+    const semanticReady = (async () => {
       try {
         const chunks = await baseReady;
         await this.loadSemantic(chunks);
       } catch (err) {
         console.warn('[Semantic Index Init Error]:', err);
+        this.semanticState = 'error';
+        this.semanticError = err instanceof Error ? err.message : String(err);
         if (err instanceof Error && err.message.startsWith('Embedder/corpus mismatch:')) {
           throw err;
         }
       }
     })();
 
-    this.ready = baseReady.then(() => {});
+    if (options?.eagerSemantic) {
+      this.ready = Promise.all([baseReady, semanticReady]).then(() => {});
+    } else {
+      this.ready = baseReady.then(() => {});
+    }
+  }
+
+  getHealth(): EngineHealth {
+    return {
+      ready: this.lexicalState === 'ready',
+      subsystems: {
+        lexical: {
+          state: this.lexicalState,
+        },
+        semantic: {
+          state: this.semanticState,
+          detail: this.semanticError,
+        },
+      },
+    };
   }
 
   /**
@@ -76,7 +99,7 @@ export class LocalEngine implements SearchEngine {
   private async loadBase(): Promise<Chunk[]> {
     if (this.ports.store.hasVerses && !(await this.ports.store.hasVerses())) {
       this.verseStore = this.ports.verseStore ?? null;
-      this.lexicalReady = false;
+      this.lexicalState = 'disabled';
       return [];
     }
     const [versesData, rawChunks] = await Promise.all([
@@ -90,7 +113,7 @@ export class LocalEngine implements SearchEngine {
       text: this.verseStore!.getRange(c.book, c.start, c.end),
     }));
     await this.ports.lexical.build(chunks);
-    this.lexicalReady = true;
+    this.lexicalState = 'ready';
     return chunks;
   }
 
@@ -100,15 +123,15 @@ export class LocalEngine implements SearchEngine {
    */
   private async loadSemantic(chunks: Chunk[]): Promise<void> {
     if (chunks.length === 0) {
-      this.semanticReady = false;
+      this.semanticState = 'disabled';
       return;
     }
     if (this.ports.store.hasEmbeddings && !(await this.ports.store.hasEmbeddings())) {
-      this.semanticReady = false;
+      this.semanticState = 'disabled';
       return;
     }
     if (this.ports.embedder.hasModel && !(await this.ports.embedder.hasModel())) {
-      this.semanticReady = false;
+      this.semanticState = 'disabled';
       return;
     }
     const manifest = await this.ports.store.manifest();
@@ -125,7 +148,8 @@ export class LocalEngine implements SearchEngine {
       this.ports.embedder.load(),
     ]);
     await this.ports.vectors.build(manifest, chunks, emb.data, emb.scales);
-    this.semanticReady = true;
+    this.semanticState = 'ready';
+    this.semanticError = undefined;
   }
 
   public async sync(): Promise<void> {
@@ -165,9 +189,9 @@ export class LocalEngine implements SearchEngine {
             : [];
         })
       : [];
-    const lexical = this.lexicalReady ? this.ports.lexical.search(query, k) : [];
+    const lexical = this.lexicalState === 'ready' ? this.ports.lexical.search(query, k) : [];
     let semantic: ScoredPassage[] = [];
-    if (this.semanticReady) {
+    if (this.semanticState === 'ready') {
       try {
         const vectorPromise = this.ports.embedder.embed(query);
         const timeoutPromise = new Promise<never>((_, reject) =>

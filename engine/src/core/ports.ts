@@ -20,8 +20,22 @@ export interface SearchEngine {
   retrieve(query: string, k?: number): Promise<RetrievalResult>;
   answers: AnswerProvider;
   sync?(): Promise<void>;
-  isLexicalReady?: boolean;
-  isSemanticReady?: boolean;
+}
+
+export type SubsystemState = 'ready' | 'initializing' | 'error' | 'disabled';
+
+export interface SubsystemHealth {
+  state: SubsystemState;
+  detail?: string;
+}
+
+export interface EngineHealth {
+  ready: boolean;
+  subsystems: Record<string, SubsystemHealth>;
+}
+
+export interface HealthCheckable {
+  getHealth(): EngineHealth;
 }
 
 export interface ArtifactStore {

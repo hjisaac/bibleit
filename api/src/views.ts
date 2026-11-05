@@ -1,3 +1,5 @@
+import type { EngineHealth } from '@bibleit/engine';
+
 export function renderPage(title: string, bodyContent = ''): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -119,12 +121,19 @@ export function renderHomeHtml(): string {
 export function renderHealthHtml(
   isReady: boolean,
   providers: Array<{ name: string; tier: 1 | 2; model?: string; status: string; cooldownRemainingSec?: number }> = [],
-  subsystems: { lexical: boolean; semantic: boolean } = { lexical: isReady, semantic: isReady },
+  health: EngineHealth | null = null,
 ): string {
   const operationalPill = '<span class="pill ok"><span class="dot"></span>operational</span>';
   const initPill = '<span class="pill init"><span class="dot"></span>initializing</span>';
   const onPill = '<span class="pill ok"><span class="dot"></span>ON</span>';
   const offPill = '<span class="pill off"><span class="dot"></span>OFF</span>';
+
+  const lexicalState = health?.subsystems?.lexical?.state ?? (isReady ? 'ready' : 'initializing');
+  const semanticState = health?.subsystems?.semantic?.state ?? (isReady ? 'ready' : 'initializing');
+  const semanticDetail = health?.subsystems?.semantic?.detail;
+
+  const lexicalPill = lexicalState === 'ready' ? onPill : lexicalState === 'initializing' ? initPill : offPill;
+  const semanticPill = semanticState === 'ready' ? onPill : semanticState === 'initializing' ? initPill : offPill;
 
   const providerItems =
     providers.length > 0
@@ -166,16 +175,17 @@ export function renderHealthHtml(
       <div class="section-title" style="margin-top: 1.5rem;">Subsystems</div>
       <div class="item">
         <span class="name">Lexical Index</span>
-        ${subsystems.lexical ? onPill : offPill}
+        ${lexicalPill}
       </div>
       <div class="item">
         <span class="name">Vector Index</span>
-        ${subsystems.semantic ? onPill : offPill}
+        ${semanticPill}
       </div>
       <div class="item">
         <span class="name">Neural Embedder</span>
-        ${subsystems.semantic ? onPill : offPill}
+        ${semanticPill}
       </div>
+      ${semanticDetail ? `<div style="font-size: 0.72rem; color: #f87171; font-family: monospace; margin-top: 0.35rem; word-break: break-all;">Semantic detail: ${semanticDetail}</div>` : ''}
 
       <div class="section-title" style="margin-top: 1.5rem;">LLM Providers</div>
       ${providerItems}

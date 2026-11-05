@@ -15,6 +15,7 @@ import {
   TELEMETRY_HEADERS,
   type ArtifactStore,
   type SearchEngine,
+  type HealthCheckable,
 } from '@bibleit/engine';
 import { fileURLToPath } from 'node:url';
 import { FsArtifactStore } from './adapters/fs-artifact-store';
@@ -70,15 +71,18 @@ const store: ArtifactStore = artifactBaseUrl
 const embedder = new NodeQueryEmbedder();
 const answerProvider = new AiAnswerProvider();
 
-const engine: SearchEngine = new LocalEngine({
-  store,
-  refParser: new RegexRefParser(),
-  lexical: new MiniSearchLexicalIndex(),
-  embedder,
-  vectors: new BruteForceVectorIndex(),
-  ranker: new RrfRanker(),
-  answers: answerProvider,
-});
+const engine: SearchEngine & HealthCheckable = new LocalEngine(
+  {
+    store,
+    refParser: new RegexRefParser(),
+    lexical: new MiniSearchLexicalIndex(),
+    embedder,
+    vectors: new BruteForceVectorIndex(),
+    ranker: new RrfRanker(),
+    answers: answerProvider,
+  },
+  { eagerSemantic: true },
+);
 
 let isReady = false;
 engine.ready
@@ -151,14 +155,11 @@ app.get('/', (c) => {
 
 app.get(API_ROUTES.HEALTH, (c) => {
   const providers = answerProvider.getProviderStatuses();
-  const subsystems = {
-    lexical: engine.isLexicalReady ?? isReady,
-    semantic: engine.isSemanticReady ?? false,
-  };
+  const health = 'getHealth' in engine ? (engine as HealthCheckable).getHealth() : null;
   const jsonPayload = {
     status: isReady ? 'ok' : 'initializing',
     ready: isReady,
-    subsystems,
+    subsystems: health?.subsystems ?? {},
     providers,
   };
 
@@ -173,7 +174,7 @@ app.get(API_ROUTES.HEALTH, (c) => {
     return c.json(jsonPayload, status);
   }
 
-  return c.html(renderHealthHtml(isReady, providers, subsystems), status);
+  return c.html(renderHealthHtml(isReady, providers, health), status);
 });
 
 const routes = app
