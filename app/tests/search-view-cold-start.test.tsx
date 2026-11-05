@@ -468,38 +468,5 @@ describe('SearchView Cold Start and Search Persistence', () => {
       expect(screen.getByText('Scripture Synthesis')).toBeTruthy();
     });
   });
-
-  it('renders on-demand AI Scripture Overview button when passages are present and synthesizes on click', async () => {
-    const mockPassage = {
-      chunk: { book: 'MAT', start: [22, 39], end: [22, 40], text: 'Love your neighbor as yourself.' },
-      score: 0.9,
-      source: 'semantic' as const,
-    };
-    retrieveSpy.mockResolvedValue({
-      query: 'Love your neighbor',
-      passages: [mockPassage],
-      sources: { reference: [], lexical: [], semantic: [] },
-      parsedRefs: [],
-    });
-
-    const storedState = {
-      query: 'Love your neighbor',
-      passages: [mockPassage],
-      answerText: '',
-    };
-    localStorage.setItem('bibleit_last_search', JSON.stringify(storedState));
-
-    renderSearchView({ isAiEnabled: false });
-
-    // On-demand button should be visible when results exist but synthesis hasn't run
-    const overviewBtn = screen.getByRole('button', { name: /AI Scripture Overview/i });
-    expect(overviewBtn).toBeTruthy();
-
-    fireEvent.click(overviewBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText('Synthesized test answer')).toBeTruthy();
-    });
-  });
 });
 

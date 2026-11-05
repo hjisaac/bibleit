@@ -1004,27 +1004,6 @@ export function SearchView({
         );
       })()}
 
-      {/* On-Demand Overview Trigger */}
-      {passages.length > 0 && !answerText && !isSynthesizing && !synthesisError && engine.answers.available && (
-        <div class="mb-3 flex justify-end">
-          <button
-            type="button"
-            onClick={handleSynthesize}
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all hover:opacity-90 shadow-sm"
-            style={{
-              backgroundColor: 'var(--bg-surface-elevated)',
-              borderColor: 'var(--border-subtle)',
-              color: 'var(--accent)',
-            }}
-          >
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            <span>AI Scripture Overview</span>
-          </button>
-        </div>
-      )}
-
       {/* Technical Diagnostics Bar (Shown only in Inspector Mode when results are present) */}
       {isInspectorMode && passages.length > 0 && (
         <div
