@@ -336,6 +336,23 @@ describe('SearchView Cold Start and Search Persistence', () => {
     ]);
   });
 
+  it('displays fallback note in overview card when question is asked while offline', async () => {
+    renderSearchView({ isOnline: false, isAiEnabled: true });
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'what is love?' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(screen.getByText('Offline Fallback')).toBeTruthy();
+    expect(screen.getByText('AI overview unavailable offline - showing matching scripture')).toBeTruthy();
+    expect(screen.getByText('Matching scripture passages below')).toBeTruthy();
+
+    // Dismiss note
+    const dismissBtn = screen.getByTitle('Dismiss note');
+    fireEvent.click(dismissBtn);
+    expect(screen.queryByText('AI overview unavailable offline - showing matching scripture')).toBeNull();
+  });
+
   it('opens Panel P when focusing the search input on an existing search', () => {
     const storedState = {
       query: 'Saved custom search',
@@ -423,6 +440,33 @@ describe('SearchView Cold Start and Search Persistence', () => {
     expect(retrieveSpy).toHaveBeenCalledWith('New search');
     // Panel P is closed on submit
     expect(screen.queryByText('Suggestions')).toBeNull();
+  });
+
+  it('triggers AI overview synthesis on topical queries when isAiEnabled is true', async () => {
+    retrieveSpy.mockResolvedValue({
+      query: 'Love your neighbor',
+      passages: [
+        {
+          chunk: { book: 'MAT', start: [22, 39], end: [22, 40], text: 'Love your neighbor as yourself.' },
+          score: 0.9,
+          source: 'semantic',
+        },
+      ],
+      sources: { reference: [], lexical: [], semantic: [] },
+      parsedRefs: [],
+    });
+
+    renderSearchView({ isAiEnabled: true });
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'Love your neighbor' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(retrieveSpy).toHaveBeenCalledWith('Love your neighbor');
+    await waitFor(() => {
+      expect(screen.getByText('Synthesized test answer')).toBeTruthy();
+      expect(screen.getByText('Scripture Synthesis')).toBeTruthy();
+    });
   });
 });
 

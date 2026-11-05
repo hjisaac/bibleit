@@ -14,9 +14,10 @@ export interface SavedVerse {
 interface SavedViewProps {
   savedVerses: SavedVerse[];
   onOpenVerse: (verse: SavedVerse) => void;
+  onUnsaveVerse?: (verse: SavedVerse) => void;
 }
 
-export function SavedView({ savedVerses, onOpenVerse }: SavedViewProps): JSX.Element {
+export function SavedView({ savedVerses, onOpenVerse, onUnsaveVerse }: SavedViewProps): JSX.Element {
   return (
     <section class="flex-1 flex flex-col p-4 sm:p-8 pb-24 sm:pb-24 overflow-y-auto overscroll-y-contain space-y-4 max-w-2xl mx-auto w-full">
       <div>
@@ -29,16 +30,12 @@ export function SavedView({ savedVerses, onOpenVerse }: SavedViewProps): JSX.Ele
       </div>
 
       {savedVerses.length === 0 ? (
-        <div
-          class="p-6 text-center rounded-2xl border text-xs"
-          style={{
-            borderColor: 'var(--border-subtle)',
-            backgroundColor: 'var(--bg-surface-elevated)',
-            color: 'var(--text-muted)',
-          }}
+        <p
+          class="py-8 text-center text-xs leading-relaxed"
+          style={{ color: 'var(--text-muted)' }}
         >
-          No saved verses yet. In the reader or search results, tap Save to bookmark passages.
-        </div>
+          No saved verses yet. Tap the bookmark icon in search results or long-press a verse in the reader to save passages.
+        </p>
       ) : (
         <div class="flex flex-col space-y-3">
           {savedVerses.map((item) => (
@@ -53,7 +50,31 @@ export function SavedView({ savedVerses, onOpenVerse }: SavedViewProps): JSX.Ele
             >
               <div class="flex items-center justify-between text-xs" style={{ color: 'var(--text-muted)' }}>
                 <span class="font-semibold text-amber-700 dark:text-amber-400">{item.citation}</span>
-                <span class="text-[10px]">Saved</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUnsaveVerse?.(item);
+                  }}
+                  title="Remove from bookmarks"
+                  class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-sans font-medium rounded-lg transition-all hover:opacity-80 active:opacity-60 cursor-pointer"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  <svg
+                    class="w-3.5 h-3.5 shrink-0"
+                    fill="currentColor"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                    />
+                  </svg>
+                  <span>Unsave</span>
+                </button>
               </div>
               <p class="font-serif text-sm leading-relaxed" style={{ color: 'var(--text-main)' }}>
                 "{item.text}"

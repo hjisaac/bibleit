@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "If this project is helpful to your work or studies, citation is appreciated."
+authors:
+  - family-names: "Houngue"
+    given-names: "Isaac H.J."
+title: "bibleit: Offline-first hybrid Bible search"
+date-released: 2026-11-04
+url: "https://github.com/hjisaac/bibleit"

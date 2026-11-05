@@ -1,26 +1,16 @@
 import type { JSX } from 'preact';
 import { SearchModeEnum } from '../core/types';
 
-export interface UserProfile {
-  name: string;
-  email?: string;
-  avatarUrl?: string;
-}
-
 interface HeaderProps {
   isOnline: boolean;
   isAiEnabled: boolean;
   searchMode?: SearchModeEnum;
-  user?: UserProfile | null;
   onOpenHelp: () => void;
-  onOpenAccount?: () => void;
 }
 
 export function Header({
   searchMode = SearchModeEnum.AUTO,
-  user,
   onOpenHelp,
-  onOpenAccount,
 }: HeaderProps): JSX.Element {
   const isOnDevice = searchMode === SearchModeEnum.DEVICE;
 
@@ -38,11 +28,10 @@ export function Header({
         </span>
         {isOnDevice && (
           <span
-            class="text-[10px] tracking-wide uppercase px-2 py-0.5 rounded-full font-semibold transition-all border"
+            class="text-[10px] font-medium px-1.5 py-0.5 rounded transition-opacity"
             style={{
               backgroundColor: 'var(--bg-surface-elevated)',
-              borderColor: 'var(--border-subtle)',
-              color: 'var(--text-muted)',
+              color: 'var(--text-subtle)',
             }}
             title="On-device mode active: Searching locally on this device."
           >
@@ -51,7 +40,7 @@ export function Header({
         )}
       </div>
 
-      {/* Right utility buttons: Help and User Account */}
+      {/* Right utility buttons: Help */}
       <div class="flex items-center space-x-1">
         <button
           type="button"
@@ -71,38 +60,6 @@ export function Header({
               d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-        </button>
-
-        <button
-          type="button"
-          onClick={onOpenAccount}
-          title={user ? `Signed in as ${user.name}` : 'Account (Guest mode)'}
-          class="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all hover:opacity-70"
-          style={{
-            backgroundColor: 'transparent',
-            color: 'var(--text-muted)',
-          }}
-        >
-          <div
-            class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
-            style={{ backgroundColor: user ? 'var(--accent)' : 'var(--text-subtle)' }}
-          >
-            {user ? (
-              user.name.charAt(0).toUpperCase()
-            ) : (
-              <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                />
-              </svg>
-            )}
-          </div>
-          <span class="text-[11px] hidden sm:inline" style={{ color: 'var(--text-muted)' }}>
-            {user ? user.name : 'Guest'}
-          </span>
         </button>
       </div>
     </header>

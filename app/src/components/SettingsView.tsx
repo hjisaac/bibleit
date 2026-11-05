@@ -201,7 +201,7 @@ export function SettingsView({
               </span>
             </div>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              Generate grounded AI overviews when pressing Enter on question queries (requires internet).
+              Generate grounded AI overviews when searching topics and questions (requires internet).
             </p>
           </div>
 

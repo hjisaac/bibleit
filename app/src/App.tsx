@@ -449,7 +449,6 @@ export function App(): JSX.Element {
         isAiEnabled={isAiEnabled}
         searchMode={searchMode}
         onOpenHelp={() => setIsHelpOpen(true)}
-        onOpenAccount={() => showToast('Guest mode')}
       />
 
       <main class="flex-1 flex flex-col overflow-hidden">
@@ -495,6 +494,7 @@ export function App(): JSX.Element {
             onOpenVerse={(item) => {
               handleOpenReader(item.book, item.chapter, item.verse);
             }}
+            onUnsaveVerse={handleSaveVerse}
           />
         )}
 

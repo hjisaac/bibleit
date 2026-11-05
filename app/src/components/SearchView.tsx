@@ -12,6 +12,7 @@ import {
   type ScoredPassage,
 } from '../core/types';
 import { BIBLE_BOOKS_BY_ID, findBookByPrefix } from '../core/bible-books';
+import { formatCitation } from '@bibleit/engine';
 import { resolveVerseText } from '../adapters/book-store';
 import { POPULAR_TOPICS, SEARCH_SUGGESTIONS } from '../core/starter-topics';
 import type { SavedVerse } from './SavedView';
@@ -73,20 +74,6 @@ function renderHighlightedText(
       {text.slice(end)}
     </>
   );
-}
-
-function formatCitation(bookId: string, start: [number, number], end: [number, number]): string {
-  const bookName = BIBLE_BOOKS_BY_ID[bookId]?.name ?? bookId;
-  const [startCh, startV] = start;
-  const [endCh, endV] = end;
-
-  if (startCh === endCh) {
-    if (startV === endV) {
-      return `${bookName} ${startCh}:${startV}`;
-    }
-    return `${bookName} ${startCh}:${startV}–${endV}`;
-  }
-  return `${bookName} ${startCh}:${startV}–${endCh}:${endV}`;
 }
 
 function buildPassageSegments(passageList: ScoredPassage[]): NarrationSegment[] {
@@ -160,15 +147,18 @@ function getChunkSectionViews(
   ];
 }
 
-function isQuestionQuery(text: string): boolean {
+function isReferenceQuery(text: string): boolean {
   const trimmed = text.trim();
-  if (trimmed.endsWith('?')) return true;
-  const lower = trimmed.toLowerCase();
-  const questionWords = [
-    'what', 'why', 'how', 'who', 'where', 'when', 'which',
-    'explain', 'describe', 'tell me', 'can you', 'does', 'is it',
-  ];
-  return questionWords.some((word) => lower.startsWith(`${word} `) || lower.startsWith(`${word}'`));
+  return /^\s*([1-3]?\s*[\p{L}\p{M}]+)\s+\d+(?::\d+)?(?:[-\u2013\u2014]\d+)?\s*$/u.test(trimmed);
+}
+
+function stripPreamble(text: string): string {
+  return text
+    .replace(
+      /^(?:>?\s*)?(?:based on (?:the )?(?:provided )?passages[,\s:]*|according to (?:the )?(?:provided )?(?:passages|scripture|bible)[,\s:]*|here is what the bible (?:says|teaches|states)[^:\n]*:?\s*)+/i,
+      '',
+    )
+    .replace(/^[\s:\-*]+/, '');
 }
 
 export function SearchView({
@@ -193,6 +183,7 @@ export function SearchView({
   const [query, setQuery] = useState(initialSearch.query);
   const [passages, setPassages] = useState<ScoredPassage[]>(initialSearch.passages);
   const [searchOrigin, setSearchOrigin] = useState<SearchOriginEnum | undefined>(() => initialSearch.origin);
+  const [searchDurationMs, setSearchDurationMs] = useState<number | null>(() => initialSearch.durationMs ?? null);
   const [isPanelOpen, setIsPanelOpen] = useState(initialSearch.query.trim().length === 0);
   const lastSubmittedQueryRef = useRef(initialSearch.query);
   const [expandedCardKey, setExpandedCardKey] = useState<string | null>(null);
@@ -202,6 +193,10 @@ export function SearchView({
   const [splitPoints, setSplitPoints] = useState<Record<string, number>>({});
 
   const [answerText, setAnswerText] = useState<string>(initialSearch.answerText);
+  const [synthesisModel, setSynthesisModel] = useState<string | null>(
+    () => initialSearch?.model ?? initialSearch?.provider ?? null,
+  );
+  const [synthesisError, setSynthesisError] = useState<string | null>(null);
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
   const [isSynthesisCollapsed, setIsSynthesisCollapsed] = useState<boolean>(false);
   const [isSearching, setIsSearching] = useState<boolean>(false);
@@ -236,16 +231,20 @@ export function SearchView({
     if (!trimmed) {
       setPassages([]);
       setSearchOrigin(undefined);
+      setSearchDurationMs(null);
       setIsSearching(false);
       setHasSearched(false);
       return;
     }
     setIsSearching(true);
     setHasSearched(true);
+    const startTime = performance.now();
     void engine
       .retrieve(trimmed)
       .then((res) => {
         if (searchRunIdRef.current === runId) {
+          const duration = Math.round(performance.now() - startTime);
+          setSearchDurationMs(duration);
           setPassages(res.passages);
           setSearchOrigin(res.origin);
         }
@@ -282,19 +281,43 @@ export function SearchView({
     lastSubmittedQueryRef.current = trimmed;
     setIsPanelOpen(false);
     inputRef.current?.blur();
-    if (isQuestion && isAiEnabled && engine.answers.available && isOnline && !isSynthesizing) {
-      void handleSynthesize();
+    const isReference = isReferenceQuery(trimmed);
+    if (!isReference && isAiEnabled) {
+      if (!isOnline) {
+        setAnswerText('');
+        setSynthesisModel(null);
+        setSynthesisError('AI overview unavailable offline - showing matching scripture');
+        runSearch(trimmed);
+      } else if (!engine.answers.available) {
+        setAnswerText('');
+        setSynthesisModel(null);
+        setSynthesisError('AI overview unavailable in device-only mode - showing matching scripture');
+        runSearch(trimmed);
+      } else if (!isSynthesizing) {
+        setSynthesisError(null);
+        void handleSynthesize();
+      }
     } else {
+      setSynthesisError(null);
+      setAnswerText('');
+      setSynthesisModel(null);
       runSearch(trimmed);
     }
   };
 
-  const isQuestion = isQuestionQuery(query);
   const matchedBook = findBookByPrefix(query);
 
   useEffect(() => {
-    $lastSearch.set({ query, passages, answerText, origin: searchOrigin });
-  }, [query, passages, answerText, searchOrigin]);
+    $lastSearch.set({
+      query,
+      passages,
+      answerText,
+      origin: searchOrigin,
+      durationMs: searchDurationMs ?? undefined,
+      provider: synthesisModel ?? undefined,
+      model: synthesisModel ?? undefined,
+    });
+  }, [query, passages, answerText, searchOrigin, searchDurationMs, synthesisModel]);
 
   useEffect(() => {
     if (expandedCardKey === null) return;
@@ -377,17 +400,35 @@ export function SearchView({
     setIsPanelOpen(false);
     setIsSynthesizing(true);
     setAnswerText('');
+    setSynthesisModel(null);
+    setSynthesisError(null);
     setIsSynthesisCollapsed(false);
 
     try {
+      const startTime = performance.now();
       const res = await engine.retrieve(trimmed);
+      const duration = Math.round(performance.now() - startTime);
+      setSearchDurationMs(duration);
       setPassages(res.passages);
       setSearchOrigin(res.origin);
-      const stream = engine.answers.answer(trimmed, res);
+      if (res.passages.length === 0) {
+        setSynthesisError('No matching passages found to summarize');
+        return;
+      }
+      const stream = engine.answers.answer(trimmed, res, (meta) => {
+        const modelName = meta.model || meta.provider;
+        if (modelName) setSynthesisModel(modelName);
+      });
+      let receivedAny = false;
       for await (const chunk of stream) {
-        setAnswerText((prev) => prev + chunk);
+        receivedAny = true;
+        setAnswerText((prev) => stripPreamble(prev + chunk));
+      }
+      if (!receivedAny) {
+        setSynthesisError('AI overview unavailable from server - showing matching scripture');
       }
     } catch {
+      setSynthesisError('AI overview unavailable - showing matching scripture');
       onToast('Failed to synthesize answer');
     } finally {
       setIsSynthesizing(false);
@@ -544,6 +585,7 @@ export function SearchView({
                 e.stopPropagation();
                 searchRunIdRef.current++;
                 setQuery('');
+                setSearchDurationMs(null);
                 setIsPanelOpen(true);
                 inputRef.current?.focus();
               }}
@@ -797,8 +839,28 @@ export function SearchView({
         )
       )}
 
+      {/* Technical Diagnostics Bar (Shown only in Inspector Mode when results are present) */}
+      {isInspectorMode && passages.length > 0 && (
+        <div
+          class="flex items-center justify-between text-[9px] sm:text-[10px] mb-2 px-1 py-0.5 border-b border-dashed font-mono shrink-0 animate-fadeIn"
+          style={{
+            borderColor: 'var(--border-subtle)',
+            color: 'var(--text-subtle)',
+          }}
+        >
+          <span>
+            {searchOrigin === SearchOriginEnum.REMOTE ? 'OnServer search' : 'OnDevice search'}
+          </span>
+          {searchDurationMs !== null && (
+            <span class="text-emerald-500 dark:text-emerald-400 shrink-0">
+              {searchDurationMs}ms latency
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Synthesized Answer Card */}
-      {(answerText.length > 0 || isSynthesizing) && (() => {
+      {(answerText.length > 0 || isSynthesizing || !!synthesisError) && (() => {
         const isSynthesisActive =
           narrationState?.status !== 'idle' &&
           narrationState?.activeSegment?.id === 'synthesis:overview';
@@ -860,15 +922,30 @@ export function SearchView({
                 <span
                   class="text-[10px] px-2 py-0.5 rounded-full font-medium"
                   style={{
-                    backgroundColor: 'var(--badge-sem-bg)',
-                    color: 'var(--badge-sem-text)',
+                    backgroundColor: synthesisError ? 'var(--badge-ref-bg)' : 'var(--badge-sem-bg)',
+                    color: synthesisError ? 'var(--badge-ref-text)' : 'var(--badge-sem-text)',
                   }}
                 >
-                  Grounded Context
+                  {synthesisError ? 'Offline Fallback' : 'Grounded Context'}
                 </span>
               </div>
 
               <div class="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                {synthesisError && (
+                  <button
+                    type="button"
+                    onClick={() => setSynthesisError(null)}
+                    class="p-1 rounded hover:opacity-75 transition-opacity"
+                    style={{ color: 'var(--text-muted)' }}
+                    title="Dismiss note"
+                    aria-label="Dismiss note"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+
                 {narrator?.supported && answerText.length > 0 && !isSynthesizing && (
                   <button
                     type="button"
@@ -920,17 +997,23 @@ export function SearchView({
             </div>
 
             {!isSynthesisCollapsed && (
-              <div
-                class="text-sm leading-relaxed whitespace-pre-wrap font-serif max-h-72 overflow-y-auto pr-1"
-                style={{ color: 'var(--text-main)' }}
-              >
-                {isSynthesisActive
-                  ? renderHighlightedText(answerText, narrationState?.wordBoundary)
-                  : answerText}
-                {isSynthesizing && (
-                  <span class="inline-block w-1.5 h-4 ml-1 bg-amber-500 animate-pulse align-middle" />
-                )}
-              </div>
+              synthesisError ? (
+                <div class="text-xs leading-relaxed font-sans" style={{ color: 'var(--text-muted)' }}>
+                  {synthesisError}
+                </div>
+              ) : (
+                <div
+                  class="text-sm leading-relaxed whitespace-pre-wrap font-serif max-h-72 overflow-y-auto pr-1"
+                  style={{ color: 'var(--text-main)' }}
+                >
+                  {isSynthesisActive
+                    ? renderHighlightedText(answerText, narrationState?.wordBoundary)
+                    : answerText}
+                  {isSynthesizing && (
+                    <span class="inline-block w-1.5 h-4 ml-1 bg-amber-500 animate-pulse align-middle" />
+                  )}
+                </div>
+              )
             )}
 
             {/* Card Footer Actions aligned with passage cards */}
@@ -948,14 +1031,18 @@ export function SearchView({
                       : 'Collapse Scripture Synthesis'
                   }
                 >
-                  <span>{isSynthesisCollapsed ? '+ Expand overview' : '– Collapse overview'}</span>
+                  <span>{isSynthesisCollapsed ? '+ Expand overview' : '- Collapse overview'}</span>
                 </button>
               ) : (
                 <span />
               )}
 
               <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
-                Verified with cited passages below
+                {synthesisError
+                  ? 'Matching scripture passages below'
+                  : synthesisModel
+                    ? `Generated by ${synthesisModel}`
+                    : 'Generated by AI'}
               </span>
             </div>
           </div>

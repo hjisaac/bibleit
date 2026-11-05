@@ -10,6 +10,7 @@
     "baseUrl": ".",
     "paths": {
       "@bibleit/engine": ["../engine/src/index.ts"],
+      "@bibleit/api": ["../api/src/index.ts"],
       "minisearch": ["node_modules/minisearch"]
     },
     "resolveJsonModule": true,
