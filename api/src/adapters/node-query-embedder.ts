@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { env, pipeline, type FeatureExtractionPipeline } from '@huggingface/transformers';
@@ -17,7 +18,23 @@ export class NodeQueryEmbedder implements QueryEmbedder {
     this.modelId = modelId;
     this.dim = dim;
     this.queryPrefix = queryPrefix;
-    env.cacheDir = process.env.HF_HOME || path.join(os.homedir(), '.cache', 'huggingface', 'transformers');
+    const baseCache = process.env.HF_HOME
+      ? (process.env.HF_HOME.endsWith('transformers')
+          ? process.env.HF_HOME
+          : path.join(process.env.HF_HOME, 'transformers'))
+      : path.join(os.homedir(), '.cache', 'huggingface', 'transformers');
+
+    try {
+      fs.mkdirSync(baseCache, { recursive: true });
+      env.cacheDir = baseCache;
+    } catch {
+      // Fallback to tmpdir if container home directory is read-only
+      const tmpCache = path.join(os.tmpdir(), 'huggingface', 'transformers');
+      fs.mkdirSync(tmpCache, { recursive: true });
+      env.cacheDir = tmpCache;
+    }
+    env.allowLocalModels = true;
+    env.allowRemoteModels = true;
   }
 
   async hasModel(): Promise<boolean> {

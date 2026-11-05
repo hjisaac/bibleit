@@ -151,9 +151,14 @@ app.get('/', (c) => {
 
 app.get(API_ROUTES.HEALTH, (c) => {
   const providers = answerProvider.getProviderStatuses();
+  const subsystems = {
+    lexical: engine.isLexicalReady ?? isReady,
+    semantic: engine.isSemanticReady ?? false,
+  };
   const jsonPayload = {
     status: isReady ? 'ok' : 'initializing',
     ready: isReady,
+    subsystems,
     providers,
   };
 
@@ -168,7 +173,7 @@ app.get(API_ROUTES.HEALTH, (c) => {
     return c.json(jsonPayload, status);
   }
 
-  return c.html(renderHealthHtml(isReady, providers), status);
+  return c.html(renderHealthHtml(isReady, providers, subsystems), status);
 });
 
 const routes = app

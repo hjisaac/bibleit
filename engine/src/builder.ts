@@ -36,6 +36,14 @@ export class LocalEngine implements SearchEngine {
   private semanticReady = false;
   private currentSync: Promise<void> | null = null;
 
+  get isLexicalReady(): boolean {
+    return this.lexicalReady;
+  }
+
+  get isSemanticReady(): boolean {
+    return this.semanticReady;
+  }
+
   constructor(ports: LocalEnginePorts) {
     this.ports = ports;
     this.answers = ports.answers;

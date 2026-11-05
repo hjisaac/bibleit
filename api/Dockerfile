@@ -17,6 +17,10 @@ RUN pnpm --filter @bibleit/engine install --prod=false && \
     pnpm --filter @bibleit/api install --prod=false && \
     pnpm --filter @bibleit/api run build
 
+# Pre-download neural embedding model into image cache for instant cold starts
+ENV HF_HOME=/app/.cache/huggingface
+RUN node api/scripts/download-model.mjs
+
 EXPOSE 7860
 ENV PORT=7860
 ENV NODE_ENV=production

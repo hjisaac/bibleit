@@ -20,6 +20,8 @@ export interface SearchEngine {
   retrieve(query: string, k?: number): Promise<RetrievalResult>;
   answers: AnswerProvider;
   sync?(): Promise<void>;
+  isLexicalReady?: boolean;
+  isSemanticReady?: boolean;
 }
 
 export interface ArtifactStore {

@@ -119,6 +119,7 @@ export function renderHomeHtml(): string {
 export function renderHealthHtml(
   isReady: boolean,
   providers: Array<{ name: string; tier: 1 | 2; model?: string; status: string; cooldownRemainingSec?: number }> = [],
+  subsystems: { lexical: boolean; semantic: boolean } = { lexical: isReady, semantic: isReady },
 ): string {
   const operationalPill = '<span class="pill ok"><span class="dot"></span>operational</span>';
   const initPill = '<span class="pill init"><span class="dot"></span>initializing</span>';
@@ -165,15 +166,15 @@ export function renderHealthHtml(
       <div class="section-title" style="margin-top: 1.5rem;">Subsystems</div>
       <div class="item">
         <span class="name">Lexical Index</span>
-        ${isReady ? onPill : offPill}
+        ${subsystems.lexical ? onPill : offPill}
       </div>
       <div class="item">
         <span class="name">Vector Index</span>
-        ${isReady ? onPill : offPill}
+        ${subsystems.semantic ? onPill : offPill}
       </div>
       <div class="item">
         <span class="name">Neural Embedder</span>
-        ${isReady ? onPill : offPill}
+        ${subsystems.semantic ? onPill : offPill}
       </div>
 
       <div class="section-title" style="margin-top: 1.5rem;">LLM Providers</div>
