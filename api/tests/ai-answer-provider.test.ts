@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { parseCooldownMs, AiAnswerProvider } from '../src/adapters/ai-answer-provider';
@@ -118,11 +119,12 @@ describe('AiAnswerProvider candidate list and rotation', () => {
         });
       }
 
-      // Gemini endpoint succeeds with SSE stream
-      return new Response(
-        'data: {"choices":[{"index":0,"delta":{"content":"God is love"}}]}\n\ndata: [DONE]\n\n',
-        { status: 200, headers: { 'content-type': 'text/event-stream' } },
-      );
+      // Gemini endpoint succeeds with recorded cassette stream
+      const cassette = fs.readFileSync(new URL('./fixtures/gemini-stream-cassette.sse', import.meta.url), 'utf-8');
+      return new Response(cassette, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      });
     };
 
     try {

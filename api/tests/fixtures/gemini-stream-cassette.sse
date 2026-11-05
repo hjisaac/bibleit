@@ -1,0 +1,9 @@
+data: {"id":"chatcmpl-gemini-sample","object":"chat.completion.chunk","created":1741200000,"model":"gemini-3.5-flash-lite","choices":[{"index":0,"delta":{"role":"assistant","content":"Based on "}}]}
+
+data: {"id":"chatcmpl-gemini-sample","object":"chat.completion.chunk","created":1741200000,"model":"gemini-3.5-flash-lite","choices":[{"index":0,"delta":{"content":"1 John 4:8, "}}]}
+
+data: {"id":"chatcmpl-gemini-sample","object":"chat.completion.chunk","created":1741200000,"model":"gemini-3.5-flash-lite","choices":[{"index":0,"delta":{"content":"God is love [1 JOHN 4:8]."}}]}
+
+data: {"id":"chatcmpl-gemini-sample","object":"chat.completion.chunk","created":1741200000,"model":"gemini-3.5-flash-lite","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
