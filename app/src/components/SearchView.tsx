@@ -152,6 +152,15 @@ function isReferenceQuery(text: string): boolean {
   return /^\s*([1-3]?\s*[\p{L}\p{M}]+)\s+\d+(?::\d+)?(?:[-\u2013\u2014]\d+)?\s*$/u.test(trimmed);
 }
 
+function stripPreamble(text: string): string {
+  return text
+    .replace(
+      /^(?:>?\s*)?(?:based on (?:the )?(?:provided )?passages[,\s:]*|according to (?:the )?(?:provided )?(?:passages|scripture|bible)[,\s:]*|here is what the bible (?:says|teaches|states)[^:\n]*:?\s*)+/i,
+      '',
+    )
+    .replace(/^[\s:\-*]+/, '');
+}
+
 export function SearchView({
   engine,
   narrator,
@@ -401,7 +410,7 @@ export function SearchView({
       let receivedAny = false;
       for await (const chunk of stream) {
         receivedAny = true;
-        setAnswerText((prev) => prev + chunk);
+        setAnswerText((prev) => stripPreamble(prev + chunk));
       }
       if (!receivedAny) {
         setSynthesisError('AI overview unavailable from server - showing matching scripture');
