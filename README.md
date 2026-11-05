@@ -40,18 +40,19 @@ Experiment runs and benchmark metrics:
 
 </details>
 
-## Current Scope & Ongoing Work
+## Further Notes
 
-While `bibleit` delivers robust, offline-first hybrid retrieval across reference, keyword, and on-device semantic search, the project remains an active testbed for continued empirical optimization:
-- **Calibrated Abstention**: The search and answering pipelines retrieve and synthesize candidate passages across queries. Calibrated abstention (enabling the system to systematically detect unanswerable or weakly-supported questions and abstain from generating an answer) is not yet implemented in the app and is an active area for future grounding safeguards.
-- **Ingest & Chunking Explorations**: Further experimental sweeps across token boundaries, pericope grouping heuristics, and quantized embeddings are planned to continually refine retrieval quality, storage footprint, and edge latency.
+### Ongoing Work
 
-## Live Deployment
+- **Calibrated Abstention**: The app currently generates an overview for search queries without checking if the retrieved passages strongly support an answer. Adding abstention to avoid answering unsupported questions is planned for future work.
+- **Ingest and Chunking**: Additional experiments on chunk sizes, verse boundaries, and quantized embeddings are ongoing to improve search quality and reduce storage.
 
-The live web app is hosted on free-tier infrastructure:
-- **Cloud API**: Hosted on Render free tier. Free instances sleep after inactivity, so the initial search request may take 40 to 60 seconds while the server spins up. Subsequent requests run normally.
-- **Search Interaction**: Queries are submitted explicitly using Enter or the Search button (not search-as-you-type).
-- **Offline Fallback & On-Device Search**: When the cloud API is sleeping or unreachable, the app falls back to local in-browser search for downloaded assets. Reference and keyword search require downloaded scripture text. Local semantic search additionally requires downloading the embedding model and vector index. Users can also enable the "Device-only (Offline)" toggle in Settings at any time to keep all search entirely local.
+### Deployment
+
+For now, the live web app runs on free-tier hosting:
+- **Cold starts**: The cloud API runs on a free Render instance that sleeps when idle. The first search may take 40 to 60 seconds while the server wakes up. Later searches run normally.
+- **Search submission**: Searches run on submit (Enter key or Search button), not as you type.
+- **Offline search**: If the server is unreachable or sleeping, the app searches locally using downloaded text and vectors. You can also turn on "Device-only (Offline)" in Settings to keep all search local.
 
 ## Citation
 
