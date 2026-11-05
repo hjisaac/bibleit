@@ -193,8 +193,8 @@ export function SearchView({
   const [splitPoints, setSplitPoints] = useState<Record<string, number>>({});
 
   const [answerText, setAnswerText] = useState<string>(initialSearch.answerText);
-  const [synthesisProvider, setSynthesisProvider] = useState<string | null>(
-    () => initialSearch?.provider ?? null,
+  const [synthesisModel, setSynthesisModel] = useState<string | null>(
+    () => initialSearch?.model ?? initialSearch?.provider ?? null,
   );
   const [synthesisError, setSynthesisError] = useState<string | null>(null);
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
@@ -285,12 +285,12 @@ export function SearchView({
     if (!isReference && isAiEnabled) {
       if (!isOnline) {
         setAnswerText('');
-        setSynthesisProvider(null);
+        setSynthesisModel(null);
         setSynthesisError('AI overview unavailable offline - showing matching scripture');
         runSearch(trimmed);
       } else if (!engine.answers.available) {
         setAnswerText('');
-        setSynthesisProvider(null);
+        setSynthesisModel(null);
         setSynthesisError('AI overview unavailable in device-only mode - showing matching scripture');
         runSearch(trimmed);
       } else if (!isSynthesizing) {
@@ -300,7 +300,7 @@ export function SearchView({
     } else {
       setSynthesisError(null);
       setAnswerText('');
-      setSynthesisProvider(null);
+      setSynthesisModel(null);
       runSearch(trimmed);
     }
   };
@@ -314,9 +314,10 @@ export function SearchView({
       answerText,
       origin: searchOrigin,
       durationMs: searchDurationMs ?? undefined,
-      provider: synthesisProvider ?? undefined,
+      provider: synthesisModel ?? undefined,
+      model: synthesisModel ?? undefined,
     });
-  }, [query, passages, answerText, searchOrigin, searchDurationMs, synthesisProvider]);
+  }, [query, passages, answerText, searchOrigin, searchDurationMs, synthesisModel]);
 
   useEffect(() => {
     if (expandedCardKey === null) return;
@@ -399,7 +400,7 @@ export function SearchView({
     setIsPanelOpen(false);
     setIsSynthesizing(true);
     setAnswerText('');
-    setSynthesisProvider(null);
+    setSynthesisModel(null);
     setSynthesisError(null);
     setIsSynthesisCollapsed(false);
 
@@ -415,7 +416,8 @@ export function SearchView({
         return;
       }
       const stream = engine.answers.answer(trimmed, res, (meta) => {
-        if (meta.provider) setSynthesisProvider(meta.provider);
+        const modelName = meta.model || meta.provider;
+        if (modelName) setSynthesisModel(modelName);
       });
       let receivedAny = false;
       for await (const chunk of stream) {
@@ -847,8 +849,8 @@ export function SearchView({
           }}
         >
           <span>
-            {synthesisProvider
-              ? `${synthesisProvider} synthesis`
+            {synthesisModel
+              ? `${synthesisModel} synthesis`
               : isSynthesizing
                 ? 'ai synthesis'
                 : answerText.length > 0
