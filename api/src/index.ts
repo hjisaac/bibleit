@@ -39,6 +39,25 @@ import { renderHomeHtml, renderHealthHtml } from './views';
 initSentry();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Auto-load .env for local development
+if (typeof process.loadEnvFile === 'function') {
+  const envCandidates = [
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(__dirname, '../.env'),
+  ];
+  for (const envPath of envCandidates) {
+    if (fs.existsSync(envPath)) {
+      try {
+        process.loadEnvFile(envPath);
+        break;
+      } catch {
+        // Fallback silently if unreadable
+      }
+    }
+  }
+}
+
 const port = Number(process.env.PORT) || DEFAULT_PORT;
 const artifactBaseUrl = process.env.ARTIFACT_BASE_URL;
 const defaultDataDir = path.resolve(__dirname, '../../app/public/data');
