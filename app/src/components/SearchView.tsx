@@ -190,6 +190,7 @@ export function SearchView({
   const [splitPoints, setSplitPoints] = useState<Record<string, number>>({});
 
   const [answerText, setAnswerText] = useState<string>(initialSearch.answerText);
+  const [synthesisError, setSynthesisError] = useState<string | null>(null);
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
   const [isSynthesisCollapsed, setIsSynthesisCollapsed] = useState<boolean>(false);
   const [isSearching, setIsSearching] = useState<boolean>(false);
@@ -274,9 +275,22 @@ export function SearchView({
     lastSubmittedQueryRef.current = trimmed;
     setIsPanelOpen(false);
     inputRef.current?.blur();
-    if (isQuestion && isAiEnabled && engine.answers.available && isOnline && !isSynthesizing) {
-      void handleSynthesize();
+    if (isQuestion && isAiEnabled) {
+      if (!isOnline) {
+        setAnswerText('');
+        setSynthesisError('AI overview unavailable offline - showing matching scripture');
+        runSearch(trimmed);
+      } else if (!engine.answers.available) {
+        setAnswerText('');
+        setSynthesisError('AI overview unavailable in device-only mode - showing matching scripture');
+        runSearch(trimmed);
+      } else if (!isSynthesizing) {
+        setSynthesisError(null);
+        void handleSynthesize();
+      }
     } else {
+      setSynthesisError(null);
+      setAnswerText('');
       runSearch(trimmed);
     }
   };
@@ -375,6 +389,7 @@ export function SearchView({
     setIsPanelOpen(false);
     setIsSynthesizing(true);
     setAnswerText('');
+    setSynthesisError(null);
     setIsSynthesisCollapsed(false);
 
     try {
@@ -385,10 +400,16 @@ export function SearchView({
       setPassages(res.passages);
       setSearchOrigin(res.origin);
       const stream = engine.answers.answer(trimmed, res);
+      let receivedAny = false;
       for await (const chunk of stream) {
+        receivedAny = true;
         setAnswerText((prev) => prev + chunk);
       }
+      if (!receivedAny) {
+        setSynthesisError('AI overview unavailable from server - showing matching scripture');
+      }
     } catch {
+      setSynthesisError('AI overview unavailable - showing matching scripture');
       onToast('Failed to synthesize answer');
     } finally {
       setIsSynthesizing(false);
@@ -800,7 +821,7 @@ export function SearchView({
       )}
 
       {/* Synthesized Answer Card */}
-      {(answerText.length > 0 || isSynthesizing) && (() => {
+      {(answerText.length > 0 || isSynthesizing || !!synthesisError) && (() => {
         const isSynthesisActive =
           narrationState?.status !== 'idle' &&
           narrationState?.activeSegment?.id === 'synthesis:overview';
@@ -862,15 +883,30 @@ export function SearchView({
                 <span
                   class="text-[10px] px-2 py-0.5 rounded-full font-medium"
                   style={{
-                    backgroundColor: 'var(--badge-sem-bg)',
-                    color: 'var(--badge-sem-text)',
+                    backgroundColor: synthesisError ? 'var(--badge-ref-bg)' : 'var(--badge-sem-bg)',
+                    color: synthesisError ? 'var(--badge-ref-text)' : 'var(--badge-sem-text)',
                   }}
                 >
-                  Grounded Context
+                  {synthesisError ? 'Offline Fallback' : 'Grounded Context'}
                 </span>
               </div>
 
               <div class="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                {synthesisError && (
+                  <button
+                    type="button"
+                    onClick={() => setSynthesisError(null)}
+                    class="p-1 rounded hover:opacity-75 transition-opacity"
+                    style={{ color: 'var(--text-muted)' }}
+                    title="Dismiss note"
+                    aria-label="Dismiss note"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+
                 {narrator?.supported && answerText.length > 0 && !isSynthesizing && (
                   <button
                     type="button"
@@ -922,17 +958,23 @@ export function SearchView({
             </div>
 
             {!isSynthesisCollapsed && (
-              <div
-                class="text-sm leading-relaxed whitespace-pre-wrap font-serif max-h-72 overflow-y-auto pr-1"
-                style={{ color: 'var(--text-main)' }}
-              >
-                {isSynthesisActive
-                  ? renderHighlightedText(answerText, narrationState?.wordBoundary)
-                  : answerText}
-                {isSynthesizing && (
-                  <span class="inline-block w-1.5 h-4 ml-1 bg-amber-500 animate-pulse align-middle" />
-                )}
-              </div>
+              synthesisError ? (
+                <div class="text-xs leading-relaxed font-sans" style={{ color: 'var(--text-muted)' }}>
+                  {synthesisError}
+                </div>
+              ) : (
+                <div
+                  class="text-sm leading-relaxed whitespace-pre-wrap font-serif max-h-72 overflow-y-auto pr-1"
+                  style={{ color: 'var(--text-main)' }}
+                >
+                  {isSynthesisActive
+                    ? renderHighlightedText(answerText, narrationState?.wordBoundary)
+                    : answerText}
+                  {isSynthesizing && (
+                    <span class="inline-block w-1.5 h-4 ml-1 bg-amber-500 animate-pulse align-middle" />
+                  )}
+                </div>
+              )
             )}
 
             {/* Card Footer Actions aligned with passage cards */}
@@ -950,14 +992,14 @@ export function SearchView({
                       : 'Collapse Scripture Synthesis'
                   }
                 >
-                  <span>{isSynthesisCollapsed ? '+ Expand overview' : '– Collapse overview'}</span>
+                  <span>{isSynthesisCollapsed ? '+ Expand overview' : '- Collapse overview'}</span>
                 </button>
               ) : (
                 <span />
               )}
 
               <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
-                Verified with cited passages below
+                {synthesisError ? 'Matching scripture passages below' : 'Verified with cited passages below'}
               </span>
             </div>
           </div>

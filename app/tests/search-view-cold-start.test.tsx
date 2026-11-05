@@ -336,6 +336,23 @@ describe('SearchView Cold Start and Search Persistence', () => {
     ]);
   });
 
+  it('displays fallback note in overview card when question is asked while offline', async () => {
+    renderSearchView({ isOnline: false, isAiEnabled: true });
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'what is love?' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(screen.getByText('Offline Fallback')).toBeTruthy();
+    expect(screen.getByText('AI overview unavailable offline - showing matching scripture')).toBeTruthy();
+    expect(screen.getByText('Matching scripture passages below')).toBeTruthy();
+
+    // Dismiss note
+    const dismissBtn = screen.getByTitle('Dismiss note');
+    fireEvent.click(dismissBtn);
+    expect(screen.queryByText('AI overview unavailable offline - showing matching scripture')).toBeNull();
+  });
+
   it('opens Panel P when focusing the search input on an existing search', () => {
     const storedState = {
       query: 'Saved custom search',
