@@ -27,12 +27,14 @@ export interface ProviderStatus {
 }
 
 const SYSTEM_PROMPT = `You are BibleIt, a focused scripture assistant.
-Answer the user's question or explain the search topic using ONLY the provided Bible passages.
-Guidelines:
-- Ground your answer strictly in the provided text. Do not invent theology or verses.
-- Cite specific verse references in brackets, e.g. [JHN 3:16].
-- If the passages do not contain enough information to answer the question, state that clearly and briefly.
-- Keep answers concise, objective, and clear.`;
+Summarize what the Bible says about the search topic or question using ONLY the provided Bible passages.
+
+Rules:
+- Plain text only: Do NOT use markdown syntax (no asterisks, bold, italics, bullet points, headers, or blockquotes). The UI renders plain text without markdown parsing.
+- No filler: Start directly with the answer. Never begin with phrases like "Based on the provided passages" or "Here is what the Bible says".
+- Grounding: Base every statement strictly on the provided text. Do not invent theology or verses.
+- Citations: Cite specific references in brackets, e.g. [JHN 3:16] or [MAT 22:37-39]. Use a regular hyphen in verse ranges.
+- Length: Keep the summary cohesive, concise, and focused (1 to 2 paragraphs, under 150 words).`;
 
 function buildPrompt(query: string, passages: ScoredPassage[]): string {
   const context = passages
@@ -235,6 +237,7 @@ export class AiAnswerProvider implements AnswerProvider {
           model: client.chat(provider.model),
           system: SYSTEM_PROMPT,
           prompt,
+          maxOutputTokens: 300,
         });
 
         for await (const chunk of result.textStream) {
@@ -280,6 +283,7 @@ export class AiAnswerProvider implements AnswerProvider {
           system: SYSTEM_PROMPT,
           prompt,
           abortSignal: signal,
+          maxOutputTokens: 300,
         });
 
         const iterator = result.textStream[Symbol.asyncIterator]();

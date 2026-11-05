@@ -818,6 +818,29 @@ export function SearchView({
         )
       )}
 
+      {/* Technical Diagnostics Bar (Shown only in Inspector Mode when results are present) */}
+      {isInspectorMode && passages.length > 0 && (
+        <div
+          class="flex items-center justify-between text-[9px] sm:text-[10px] mb-2 px-1 py-0.5 border-b border-dashed font-mono shrink-0 animate-fadeIn"
+          style={{
+            borderColor: 'var(--border-subtle)',
+            color: 'var(--text-subtle)',
+          }}
+        >
+          <span>
+            Source:{' '}
+            <span>
+              {searchOrigin === SearchOriginEnum.REMOTE ? 'server' : 'device'}
+            </span>
+          </span>
+          {searchDurationMs !== null && (
+            <span class="text-emerald-500 dark:text-emerald-400 shrink-0">
+              {searchDurationMs}ms latency
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Synthesized Answer Card */}
       {(answerText.length > 0 || isSynthesizing || !!synthesisError) && (() => {
         const isSynthesisActive =
@@ -1003,29 +1026,6 @@ export function SearchView({
           </div>
         );
       })()}
-
-      {/* Technical Diagnostics Bar (Shown only in Inspector Mode when results are present) */}
-      {isInspectorMode && passages.length > 0 && (
-        <div
-          class="flex items-center justify-between text-[9px] sm:text-[10px] mb-2 px-1 py-0.5 border-b border-dashed font-mono shrink-0 animate-fadeIn"
-          style={{
-            borderColor: 'var(--border-subtle)',
-            color: 'var(--text-subtle)',
-          }}
-        >
-          <span>
-            Source:{' '}
-            <span>
-              {searchOrigin === SearchOriginEnum.REMOTE ? 'server' : 'device'}
-            </span>
-          </span>
-          {searchDurationMs !== null && (
-            <span class="text-emerald-500 dark:text-emerald-400 shrink-0">
-              {searchDurationMs}ms latency
-            </span>
-          )}
-        </div>
-      )}
 
       {/* Results Stream */}
       <div class="flex flex-col space-y-3 pb-4">
