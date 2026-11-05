@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HttpAnswerProvider } from '../src/adapters/http-answer-provider';
 import type { RetrievalResult } from '../src/core/types';
-import { API_ROUTES } from '@bibleit/engine';
+import { API_ROUTES, TELEMETRY_HEADERS } from '@bibleit/engine';
 
 describe('HttpAnswerProvider', () => {
   beforeEach(() => {
@@ -88,5 +88,36 @@ describe('HttpAnswerProvider', () => {
     }
 
     expect(chunks).toEqual([]);
+  });
+
+  it('notifies onMeta callback with provider telemetry headers', async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('Love is patient.'));
+        controller.close();
+      },
+    });
+
+    const headers = new Headers();
+    headers.set(TELEMETRY_HEADERS.PROVIDER, 'gemini');
+    headers.set(TELEMETRY_HEADERS.MODEL, 'gemini-3.5-flash-lite');
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      body: stream,
+      headers,
+    } as unknown as Response);
+
+    const provider = new HttpAnswerProvider('https://api.bibleit.test');
+    let capturedMeta: { provider?: string; model?: string } | undefined;
+    const chunks: string[] = [];
+    for await (const chunk of provider.answer('What is love?', mockContext, (meta) => {
+      capturedMeta = meta;
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual(['Love is patient.']);
+    expect(capturedMeta).toEqual({ provider: 'gemini', model: 'gemini-3.5-flash-lite' });
   });
 });

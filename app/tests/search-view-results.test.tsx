@@ -491,7 +491,8 @@ describe('SearchView Result Cards & User Actions', () => {
       JSON.stringify({
         query: 'rejoice',
         passages: samplePassages,
-        answerText: '',
+        answerText: 'Rejoice in the Lord always.',
+        provider: 'gemini',
         origin: 'remote',
         durationMs: 42,
       }),
@@ -499,8 +500,8 @@ describe('SearchView Result Cards & User Actions', () => {
 
     renderSearchView({ isInspectorMode: true });
 
-    expect(screen.getByText(/Source:/i)).toBeTruthy();
-    expect(screen.getByText('server')).toBeTruthy();
+    expect(screen.getByText(/gemini synthesis/i)).toBeTruthy();
+    expect(screen.getByText(/(on server search)/i)).toBeTruthy();
     expect(screen.getByText('42ms latency')).toBeTruthy();
   });
 });

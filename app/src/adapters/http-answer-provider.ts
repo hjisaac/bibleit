@@ -1,5 +1,6 @@
-import type { AnswerProvider } from '../core/ports';
+import type { AnswerMetadata, AnswerProvider } from '../core/ports';
 import type { RetrievalResult } from '../core/types';
+import { TELEMETRY_HEADERS } from '@bibleit/engine';
 import { BibleitApiClient } from './api-client';
 
 export class HttpAnswerProvider implements AnswerProvider {
@@ -19,13 +20,23 @@ export class HttpAnswerProvider implements AnswerProvider {
     return typeof navigator === 'undefined' || navigator.onLine;
   }
 
-  async *answer(query: string, context: RetrievalResult): AsyncIterable<string> {
+  async *answer(
+    query: string,
+    context: RetrievalResult,
+    onMeta?: (meta: AnswerMetadata) => void,
+  ): AsyncIterable<string> {
     if (!this.available || !this.client) return;
 
     try {
       const res = await this.client.generate(query, context.passages);
 
       if (!res.ok || !res.body) return;
+
+      const provider = res.headers?.get(TELEMETRY_HEADERS.PROVIDER) || undefined;
+      const model = res.headers?.get(TELEMETRY_HEADERS.MODEL) || undefined;
+      if (onMeta && (provider || model)) {
+        onMeta({ provider, model });
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();

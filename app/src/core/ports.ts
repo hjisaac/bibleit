@@ -120,10 +120,19 @@ export interface Ranker {
  * shows passages only). Swap: WorkerAnswerProvider (Cloudflare Worker → Claude),
  * DirectAnswerProvider (user-supplied key, direct browser call).
  */
+export interface AnswerMetadata {
+  provider?: string;
+  model?: string;
+}
+
 export interface AnswerProvider {
   readonly available: boolean;
   /** Streamed answer chunks; implementations must cite passages by reference. */
-  answer(query: string, context: RetrievalResult): AsyncIterable<string>;
+  answer(
+    query: string,
+    context: RetrievalResult,
+    onMeta?: (meta: AnswerMetadata) => void,
+  ): AsyncIterable<string>;
 }
 
 /**

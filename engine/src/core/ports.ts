@@ -63,9 +63,18 @@ export interface Ranker {
   ): ScoredPassage[];
 }
 
+export interface AnswerMetadata {
+  provider?: string;
+  model?: string;
+}
+
 export interface AnswerProvider {
   readonly available: boolean;
-  answer(query: string, context: RetrievalResult): AsyncIterable<string>;
+  answer(
+    query: string,
+    context: RetrievalResult,
+    onMeta?: (meta: AnswerMetadata) => void,
+  ): AsyncIterable<string>;
 }
 
 export interface AudioNarrator {

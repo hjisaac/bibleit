@@ -9,6 +9,7 @@ export interface StoredSearch {
   query: string;
   passages: ScoredPassage[];
   answerText: string;
+  provider?: string;
   origin?: SearchOriginEnum;
   durationMs?: number;
 }
@@ -80,6 +81,7 @@ export const $lastSearch = createPersistentStore<StoredSearch>(
             answerText: typeof parsed.answerText === 'string' ? parsed.answerText : '',
             origin: parsed.origin,
             durationMs: typeof parsed.durationMs === 'number' ? parsed.durationMs : undefined,
+            provider: typeof parsed.provider === 'string' ? parsed.provider : undefined,
           };
         }
       } catch {

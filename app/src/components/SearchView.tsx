@@ -193,6 +193,9 @@ export function SearchView({
   const [splitPoints, setSplitPoints] = useState<Record<string, number>>({});
 
   const [answerText, setAnswerText] = useState<string>(initialSearch.answerText);
+  const [synthesisProvider, setSynthesisProvider] = useState<string | null>(
+    () => initialSearch?.provider ?? null,
+  );
   const [synthesisError, setSynthesisError] = useState<string | null>(null);
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
   const [isSynthesisCollapsed, setIsSynthesisCollapsed] = useState<boolean>(false);
@@ -282,10 +285,12 @@ export function SearchView({
     if (!isReference && isAiEnabled) {
       if (!isOnline) {
         setAnswerText('');
+        setSynthesisProvider(null);
         setSynthesisError('AI overview unavailable offline - showing matching scripture');
         runSearch(trimmed);
       } else if (!engine.answers.available) {
         setAnswerText('');
+        setSynthesisProvider(null);
         setSynthesisError('AI overview unavailable in device-only mode - showing matching scripture');
         runSearch(trimmed);
       } else if (!isSynthesizing) {
@@ -295,6 +300,7 @@ export function SearchView({
     } else {
       setSynthesisError(null);
       setAnswerText('');
+      setSynthesisProvider(null);
       runSearch(trimmed);
     }
   };
@@ -308,8 +314,9 @@ export function SearchView({
       answerText,
       origin: searchOrigin,
       durationMs: searchDurationMs ?? undefined,
+      provider: synthesisProvider ?? undefined,
     });
-  }, [query, passages, answerText, searchOrigin, searchDurationMs]);
+  }, [query, passages, answerText, searchOrigin, searchDurationMs, synthesisProvider]);
 
   useEffect(() => {
     if (expandedCardKey === null) return;
@@ -392,6 +399,7 @@ export function SearchView({
     setIsPanelOpen(false);
     setIsSynthesizing(true);
     setAnswerText('');
+    setSynthesisProvider(null);
     setSynthesisError(null);
     setIsSynthesisCollapsed(false);
 
@@ -406,7 +414,9 @@ export function SearchView({
         setSynthesisError('No matching passages found to summarize');
         return;
       }
-      const stream = engine.answers.answer(trimmed, res);
+      const stream = engine.answers.answer(trimmed, res, (meta) => {
+        if (meta.provider) setSynthesisProvider(meta.provider);
+      });
       let receivedAny = false;
       for await (const chunk of stream) {
         receivedAny = true;
@@ -837,16 +847,24 @@ export function SearchView({
           }}
         >
           <span>
-            Source:{' '}
-            <span>
-              {searchOrigin === SearchOriginEnum.REMOTE ? 'server' : 'device'}
-            </span>
+            {synthesisProvider
+              ? `${synthesisProvider} synthesis`
+              : isSynthesizing
+                ? 'ai synthesis'
+                : answerText.length > 0
+                  ? 'ai synthesis'
+                  : ''}
           </span>
-          {searchDurationMs !== null && (
-            <span class="text-emerald-500 dark:text-emerald-400 shrink-0">
-              {searchDurationMs}ms latency
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span>
+              (on {searchOrigin === SearchOriginEnum.REMOTE ? 'server' : 'device'} search)
             </span>
-          )}
+            {searchDurationMs !== null && (
+              <span class="text-emerald-500 dark:text-emerald-400">
+                {searchDurationMs}ms latency
+              </span>
+            )}
+          </div>
         </div>
       )}
 
