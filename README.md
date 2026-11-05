@@ -42,6 +42,9 @@ Experiment runs and benchmark metrics:
 
 ## Further Notes
 
+<details>
+<summary>Ongoing work and deployment notes</summary>
+
 ### Ongoing Work
 
 - **Calibrated Abstention**: The app currently generates an overview for search queries without checking if the retrieved passages strongly support an answer. Adding abstention to avoid answering unsupported questions is planned for future work.
@@ -53,6 +56,8 @@ For now, the live web app runs on free-tier hosting:
 - **Cold starts**: The cloud API runs on a free Render instance that sleeps when idle. The first search may take 40 to 60 seconds while the server wakes up. Later searches run normally.
 - **Search submission**: Searches run on submit (Enter key or Search button), not as you type.
 - **Offline search**: If the server is unreachable or sleeping, the app searches locally using downloaded text and vectors. You can also turn on "Device-only (Offline)" in Settings to keep all search local.
+
+</details>
 
 ## Citation
 
