@@ -61,9 +61,16 @@ if (typeof process.loadEnvFile === 'function') {
 
 const port = Number(process.env.PORT) || DEFAULT_PORT;
 const artifactBaseUrl = process.env.ARTIFACT_BASE_URL;
-const defaultDataDir = path.resolve(__dirname, '../../app/public/data');
-const fallbackDataDir = path.resolve(process.cwd(), 'data');
-const dataDir = process.env.DATA_DIR || (fs.existsSync(defaultDataDir) ? defaultDataDir : fallbackDataDir);
+const candidateDirs = [
+  process.env.DATA_DIR,
+  path.resolve(__dirname, '../../app/public/data'),
+  path.resolve(__dirname, '../../../app/public/data'),
+  path.resolve(process.cwd(), 'data'),
+  path.resolve(process.cwd(), '../app/public/data'),
+  path.resolve(process.cwd(), 'app/public/data'),
+].filter(Boolean) as string[];
+
+const dataDir = candidateDirs.find((dir) => fs.existsSync(dir)) || candidateDirs[0]!;
 
 const store: ArtifactStore = artifactBaseUrl
   ? new HttpArtifactStore(artifactBaseUrl)
@@ -71,6 +78,7 @@ const store: ArtifactStore = artifactBaseUrl
 const embedder = new NodeQueryEmbedder();
 const answerProvider = new AiAnswerProvider();
 
+const eagerSemantic = process.env.EAGER_SEMANTIC === 'true';
 const engine: SearchEngine & HealthCheckable = new LocalEngine(
   {
     store,
@@ -81,7 +89,7 @@ const engine: SearchEngine & HealthCheckable = new LocalEngine(
     ranker: new RrfRanker(),
     answers: answerProvider,
   },
-  { eagerSemantic: true },
+  { eagerSemantic },
 );
 
 let isReady = false;

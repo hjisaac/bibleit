@@ -45,6 +45,11 @@ export class NodeQueryEmbedder implements QueryEmbedder {
     if (!this.extractorPromise) {
       this.extractorPromise = pipeline('feature-extraction', this.modelId, {
         dtype: 'q8',
+        session_options: {
+          intraOpNumThreads: 1,
+          interOpNumThreads: 1,
+          enableCpuMemArena: false,
+        },
       }) as Promise<FeatureExtractionPipeline>;
     }
     await this.extractorPromise;

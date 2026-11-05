@@ -25,5 +25,6 @@ EXPOSE 7860
 ENV PORT=7860
 ENV NODE_ENV=production
 ENV DATA_DIR=/app/data
+ENV NODE_OPTIONS="--max-old-space-size=256"
 
 CMD ["pnpm", "--filter", "@bibleit/api", "start"]

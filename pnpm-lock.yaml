@@ -35,6 +35,9 @@ importers:
       http-status-codes:
         specifier: ^2.3.0
         version: 2.3.0
+      minisearch:
+        specifier: ^7.2.0
+        version: 7.2.0
       pino:
         specifier: ^10.4.0
         version: 10.4.0
@@ -42,6 +45,9 @@ importers:
       '@types/node':
         specifier: ^20.11.0
         version: 20.19.43
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
       pino-pretty:
         specifier: ^13.2.0
         version: 13.2.0
