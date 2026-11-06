@@ -38,9 +38,11 @@ export function createDefaultEmbedder(): WorkerQueryEmbedder {
 import { WorkerSlmAnswerProvider } from './adapters/worker-slm-answer-provider';
 
 let defaultAnswerProvider: WorkerSlmAnswerProvider | null = null;
-export function createDefaultAnswerProvider(): AnswerProvider {
+export function createDefaultAnswerProvider(
+  isInstalled?: () => boolean,
+): WorkerSlmAnswerProvider {
   if (!defaultAnswerProvider) {
-    defaultAnswerProvider = new WorkerSlmAnswerProvider();
+    defaultAnswerProvider = new WorkerSlmAnswerProvider(isInstalled);
   }
   return defaultAnswerProvider;
 }

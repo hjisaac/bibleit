@@ -9,6 +9,8 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
   readonly modelId = 'HuggingFaceTB/SmolLM2-360M-Instruct';
 
   private worker: Worker | null = null;
+  private loadPromise: Promise<void> | null = null;
+  private loadReject: ((err: Error) => void) | null = null;
   private nextId = 1;
   private progressListeners = new Set<(fraction: number) => void>();
   private activeStreams = new Map<
@@ -20,7 +22,12 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
     }
   >();
 
+  constructor(private isInstalled?: () => boolean) {}
+
   get available(): boolean {
+    if (this.isInstalled && !this.isInstalled()) {
+      return false;
+    }
     return typeof Worker !== 'undefined';
   }
 
@@ -66,6 +73,55 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
         stream.onError(new Error(data.error));
       }
     }
+  }
+
+  async load(onProgress?: (fraction: number) => void): Promise<void> {
+    if (onProgress) this.progressListeners.add(onProgress);
+    if (this.loadPromise) return this.loadPromise;
+
+    const worker = this.getWorker();
+    this.loadPromise = new Promise<void>((resolve, reject) => {
+      this.loadReject = reject;
+      const handler = (e: MessageEvent) => {
+        if (!e.data) return;
+        if (e.data.type === 'loaded') {
+          worker.removeEventListener('message', handler);
+          this.loadReject = null;
+          resolve();
+        } else if (e.data.type === 'load_error') {
+          worker.removeEventListener('message', handler);
+          this.loadPromise = null;
+          this.loadReject = null;
+          reject(new Error(e.data.error));
+        }
+      };
+      worker.addEventListener('message', handler);
+      worker.postMessage({ type: 'load' });
+    });
+
+    return this.loadPromise;
+  }
+
+  cancelLoad(): void {
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
+    const reject = this.loadReject;
+    this.loadPromise = null;
+    this.loadReject = null;
+    if (reject) {
+      reject(new DOMException('The user aborted a request.', 'AbortError'));
+    }
+  }
+
+  async clear(): Promise<void> {
+    this.cancelLoad();
+    await clearSlmModelCache();
+  }
+
+  async hasModel(): Promise<boolean> {
+    return isSlmModelCached();
   }
 
   async *answer(
@@ -130,5 +186,44 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
       this.activeStreams.delete(id);
       worker.postMessage({ type: 'abort', id });
     }
+  }
+}
+
+export async function isSlmModelCached(): Promise<boolean> {
+  if (typeof caches === 'undefined') return false;
+  try {
+    const cacheNames = await caches.keys();
+    for (const name of cacheNames) {
+      if (name.includes('transformers') || name.includes('onnx')) {
+        const cache = await caches.open(name);
+        const keys = await cache.keys();
+        if (keys.some((k) => k.url.includes('SmolLM2-360M-Instruct'))) {
+          return true;
+        }
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export async function clearSlmModelCache(): Promise<void> {
+  if (typeof caches === 'undefined') return;
+  try {
+    const cacheNames = await caches.keys();
+    for (const name of cacheNames) {
+      if (name.includes('transformers') || name.includes('onnx')) {
+        const cache = await caches.open(name);
+        const keys = await cache.keys();
+        for (const req of keys) {
+          if (req.url.includes('SmolLM2-360M-Instruct')) {
+            await cache.delete(req);
+          }
+        }
+      }
+    }
+  } catch {
+    // Ignore cache deletion errors
   }
 }
