@@ -877,7 +877,7 @@ export function SearchView({
         >
           <span>
             {synthesisTtftMs !== null
-              ? `TTFT: ${synthesisTtftMs}ms${synthesisTokensPerSec !== null ? ` • ${synthesisTokensPerSec} tok/s` : isSynthesizing ? ' • streaming...' : ''}`
+              ? `TTFT: ${synthesisTtftMs}ms${synthesisTokensPerSec !== null ? ` (${synthesisTokensPerSec} tok/s)` : isSynthesizing ? ' (streaming...)' : ''}`
               : isSynthesizing
                 ? 'Generating overview...'
                 : searchOrigin === SearchOriginEnum.REMOTE
@@ -886,7 +886,7 @@ export function SearchView({
           </span>
           {searchDurationMs !== null && (
             <span class="text-emerald-500 dark:text-emerald-400 shrink-0">
-              {searchOrigin === SearchOriginEnum.REMOTE ? 'Server latency' : 'Device latency'}: {searchDurationMs}ms
+              {searchOrigin === SearchOriginEnum.REMOTE ? 'Server retrieval' : 'Device retrieval'}: {searchDurationMs}ms
             </span>
           )}
         </div>
