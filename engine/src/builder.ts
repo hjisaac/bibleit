@@ -15,13 +15,13 @@ import { ArrayVerseStore } from './adapters/array-verse-store';
 import { SearchOriginEnum, type Chunk, type RetrievalResult, type ScoredPassage, type VerseStore } from './core/types';
 
 export interface LocalEnginePorts {
-  store: ArtifactStore;
+  artifactStore: ArtifactStore;
   refParser: RefParser;
-  lexical: LexicalIndex;
-  embedder: QueryEmbedder;
-  vectors: VectorIndex;
+  lexicalIndex: LexicalIndex;
+  queryEmbedder: QueryEmbedder;
+  vectorIndex: VectorIndex;
   ranker: Ranker;
-  answers: AnswerProvider;
+  answerProvider: AnswerProvider;
   verseStore?: VerseStore;
 }
 
@@ -36,7 +36,7 @@ export interface LocalEngineOptions {
  */
 export class LocalEngine implements SearchEngine, HealthCheckable {
   public ready: Promise<void>;
-  public answers: AnswerProvider;
+  public answerProvider: AnswerProvider;
 
   private ports: LocalEnginePorts;
   private verseStore: VerseStore | null;
@@ -47,7 +47,7 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
 
   constructor(ports: LocalEnginePorts, options?: LocalEngineOptions) {
     this.ports = ports;
-    this.answers = ports.answers;
+    this.answerProvider = ports.answerProvider;
     this.verseStore = ports.verseStore ?? null;
 
     const baseReady = this.loadBase().catch((err) => {
@@ -97,14 +97,14 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
    * Returns an empty list when scripture data is uninstalled or storage is blocked.
    */
   private async loadBase(): Promise<Chunk[]> {
-    if (this.ports.store.hasVerses && !(await this.ports.store.hasVerses())) {
+    if (this.ports.artifactStore.hasVerses && !(await this.ports.artifactStore.hasVerses())) {
       this.verseStore = this.ports.verseStore ?? null;
       this.lexicalState = 'disabled';
       return [];
     }
     const [versesData, rawChunks] = await Promise.all([
-      this.ports.store.verses(),
-      this.ports.store.chunks(),
+      this.ports.artifactStore.verses(),
+      this.ports.artifactStore.chunks(),
     ]);
     this.verseStore = this.verseStore ?? new ArrayVerseStore(versesData);
 
@@ -112,7 +112,7 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
       ...c,
       text: this.verseStore!.getRange(c.book, c.start, c.end),
     }));
-    await this.ports.lexical.build(chunks);
+    await this.ports.lexicalIndex.build(chunks);
     this.lexicalState = 'ready';
     return chunks;
   }
@@ -126,28 +126,28 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
       this.semanticState = 'disabled';
       return;
     }
-    if (this.ports.store.hasEmbeddings && !(await this.ports.store.hasEmbeddings())) {
+    if (this.ports.artifactStore.hasEmbeddings && !(await this.ports.artifactStore.hasEmbeddings())) {
       this.semanticState = 'disabled';
       return;
     }
-    if (this.ports.embedder.hasModel && !(await this.ports.embedder.hasModel())) {
+    if (this.ports.queryEmbedder.hasModel && !(await this.ports.queryEmbedder.hasModel())) {
       this.semanticState = 'disabled';
       return;
     }
-    const manifest = await this.ports.store.manifest();
+    const manifest = await this.ports.artifactStore.manifest();
     // INVARIANT: query model must match corpus model (see QueryEmbedder docs).
-    if (this.ports.embedder.modelId !== manifest.embeddings.model) {
+    if (this.ports.queryEmbedder.modelId !== manifest.embeddings.model) {
       throw new Error(
-        `Embedder/corpus mismatch: engine has "${this.ports.embedder.modelId}", ` +
+        `Embedder/corpus mismatch: engine has "${this.ports.queryEmbedder.modelId}", ` +
           `artifacts were built with "${manifest.embeddings.model}". ` +
           `Update the app or re-run ingest.`,
       );
     }
     const [emb] = await Promise.all([
-      this.ports.store.embeddings(),
-      this.ports.embedder.load(),
+      this.ports.artifactStore.embeddings(),
+      this.ports.queryEmbedder.load(),
     ]);
-    await this.ports.vectors.build(manifest, chunks, emb.data, emb.scales);
+    await this.ports.vectorIndex.build(manifest, chunks, emb.data, emb.scales);
     this.semanticState = 'ready';
     this.semanticError = undefined;
   }
@@ -189,16 +189,16 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
             : [];
         })
       : [];
-    const lexical = this.lexicalState === 'ready' ? this.ports.lexical.search(query, k) : [];
+    const lexical = this.lexicalState === 'ready' ? this.ports.lexicalIndex.search(query, k) : [];
     let semantic: ScoredPassage[] = [];
     if (this.semanticState === 'ready') {
       try {
-        const vectorPromise = this.ports.embedder.embed(query);
+        const vectorPromise = this.ports.queryEmbedder.embed(query);
         const timeoutPromise = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Embedding timed out')), 5000),
         );
         const vector = await Promise.race([vectorPromise, timeoutPromise]);
-        semantic = this.ports.vectors.search(vector, k);
+        semantic = this.ports.vectorIndex.search(vector, k);
       } catch (err) {
         console.warn('[Semantic Search Error, degrading to lexical/ref]:', err);
       }

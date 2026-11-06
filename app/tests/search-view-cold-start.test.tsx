@@ -24,7 +24,7 @@ describe('SearchView Cold Start and Search Persistence', () => {
     mockEngine = {
       ready: Promise.resolve(),
       retrieve: (...args) => retrieveSpy(...args) as Promise<any>,
-      answers: {
+      answerProvider: {
         available: true,
         answer: async function* () {
           yield 'Synthesized test answer';

@@ -31,7 +31,7 @@ export interface SearchEngine {
   /** Resolves when the engine is usable (artifacts loaded / backend reachable). */
   ready: Promise<void>;
   retrieve(query: string, k?: number): Promise<RetrievalResult>;
-  answers: AnswerProvider;
+  answerProvider: AnswerProvider;
   sync?(): Promise<void>;
 }
 

@@ -288,7 +288,7 @@ export function SearchView({
         setSynthesisModel(null);
         setSynthesisError('AI overview unavailable offline - showing matching scripture');
         runSearch(trimmed);
-      } else if (!engine.answers.available) {
+      } else if (!engine.answerProvider.available) {
         setAnswerText('');
         setSynthesisModel(null);
         setSynthesisError('AI overview unavailable in device-only mode - showing matching scripture');
@@ -415,7 +415,7 @@ export function SearchView({
         setSynthesisError('No matching passages found to summarize');
         return;
       }
-      const stream = engine.answers.answer(trimmed, res, (meta) => {
+      const stream = engine.answerProvider.answer(trimmed, res, (meta) => {
         const modelName = meta.model || meta.provider;
         if (modelName) setSynthesisModel(modelName);
       });

@@ -15,7 +15,7 @@ const mockEngine: SearchEngine = {
     sources: { reference: [], lexical: [], semantic: [] },
     parsedRefs: [],
   }),
-  answers: {
+  answerProvider: {
     available: false,
     answer: async function* () {},
   },

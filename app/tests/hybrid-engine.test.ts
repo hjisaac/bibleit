@@ -34,7 +34,7 @@ describe('HybridEngine', () => {
     vi.restoreAllMocks();
     mockLocalEngine = {
       ready: Promise.resolve(),
-      answers: { available: false, answer: async function* () {} },
+      answerProvider: { available: false, answer: async function* () {} },
       retrieve: vi.fn().mockResolvedValue(mockLocalResult),
     };
   });
@@ -155,12 +155,12 @@ describe('HybridEngine', () => {
 
   it('wires HttpAnswerProvider when remoteUrl is present', () => {
     const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
-    expect(engine.answers.available).toBe(true);
+    expect(engine.answerProvider.available).toBe(true);
   });
 
   it('delegates answers to localEngine when remoteUrl is not configured', () => {
     const engine = new HybridEngine(mockLocalEngine, null);
-    expect(engine.answers).toBe(mockLocalEngine.answers);
+    expect(engine.answerProvider).toBe(mockLocalEngine.answerProvider);
   });
 
   it('HttpAnswerProvider fetches /api/v1/generate with query and passages', async () => {
@@ -184,7 +184,7 @@ describe('HybridEngine', () => {
 
     const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
     const chunks: string[] = [];
-    for await (const chunk of engine.answers.answer('who is God?', mockLocalResult)) {
+    for await (const chunk of engine.answerProvider.answer('who is God?', mockLocalResult)) {
       chunks.push(chunk);
     }
 

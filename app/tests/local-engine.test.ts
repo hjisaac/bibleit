@@ -70,13 +70,13 @@ describe('LocalEngine', () => {
     };
 
     return {
-      store: mockStore,
+      artifactStore: mockStore,
       refParser: mockRefParser,
-      lexical: mockLexical,
-      embedder: mockEmbedder,
-      vectors: mockVectors,
+      lexicalIndex: mockLexical,
+      queryEmbedder: mockEmbedder,
+      vectorIndex: mockVectors,
       ranker: mockRanker,
-      answers: mockAnswers,
+      answerProvider: mockAnswers,
       ...overrides,
     };
   }
@@ -129,14 +129,14 @@ describe('LocalEngine', () => {
     const scoredPassage: ScoredPassage = { chunk: dummyChunk, score: 0.9, source: 'lexical' };
 
     const ports = createMockPorts();
-    ports.lexical.search = vi.fn().mockReturnValue([scoredPassage]);
+    ports.lexicalIndex.search = vi.fn().mockReturnValue([scoredPassage]);
 
     const engine = new LocalEngine(ports);
     await engine.ready;
 
     const result = await engine.retrieve('loved');
     expect(result.origin).toBe(SearchOriginEnum.LOCAL);
-    expect(ports.lexical.search).toHaveBeenCalledWith('loved', 10);
+    expect(ports.lexicalIndex.search).toHaveBeenCalledWith('loved', 10);
     expect(result.passages).toContainEqual(scoredPassage);
   });
 
@@ -194,21 +194,21 @@ describe('LocalEngine', () => {
     const { MiniSearchLexicalIndex, RegexRefParser, RrfRanker, NullAnswerProvider } = await import('@bibleit/engine');
 
     const engine = new LocalEngine({
-      store,
+      artifactStore: store,
       refParser: new RegexRefParser(),
-      lexical: new MiniSearchLexicalIndex(),
-      embedder: {
+      lexicalIndex: new MiniSearchLexicalIndex(),
+      queryEmbedder: {
         modelId: 'mock-model',
         dim: 4,
         load: vi.fn().mockResolvedValue(undefined),
         embed: vi.fn().mockResolvedValue(new Float32Array([0, 0, 0, 0])),
       },
-      vectors: {
+      vectorIndex: {
         build: vi.fn().mockResolvedValue(undefined),
         search: vi.fn().mockReturnValue([]),
       },
       ranker: new RrfRanker(),
-      answers: new NullAnswerProvider(),
+      answerProvider: new NullAnswerProvider(),
     });
 
     await engine.ready;

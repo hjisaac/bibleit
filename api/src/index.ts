@@ -81,13 +81,13 @@ const answerProvider = new AiAnswerProvider();
 const eagerSemantic = process.env.EAGER_SEMANTIC === 'true';
 const engine: SearchEngine & HealthCheckable = new LocalEngine(
   {
-    store,
+    artifactStore: store,
     refParser: new RegexRefParser(),
-    lexical: new MiniSearchLexicalIndex(),
-    embedder,
-    vectors: new BruteForceVectorIndex(),
+    lexicalIndex: new MiniSearchLexicalIndex(),
+    queryEmbedder: embedder,
+    vectorIndex: new BruteForceVectorIndex(),
     ranker: new RrfRanker(),
-    answers: answerProvider,
+    answerProvider,
   },
   { eagerSemantic },
 );

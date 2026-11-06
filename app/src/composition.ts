@@ -39,18 +39,18 @@ import { env } from './env';
 import { HybridEngine } from './adapters/hybrid-engine';
 
 export function createDefaultEngine(
-  store: ArtifactStore = createDefaultArtifactStore(),
-  embedder: QueryEmbedder = createDefaultEmbedder(),
+  artifactStore: ArtifactStore = createDefaultArtifactStore(),
+  queryEmbedder: QueryEmbedder = createDefaultEmbedder(),
   isDeviceOnly?: () => boolean,
 ): SearchEngine {
   const localEngine = new LocalEngine({
-    store,
+    artifactStore,
     refParser: new RegexRefParser(),
-    lexical: new MiniSearchLexicalIndex(),
-    embedder,
-    vectors: new BruteForceVectorIndex(),
+    lexicalIndex: new MiniSearchLexicalIndex(),
+    queryEmbedder,
+    vectorIndex: new BruteForceVectorIndex(),
     ranker: new RrfRanker(),
-    answers: new NullAnswerProvider(),
+    answerProvider: new NullAnswerProvider(),
   });
 
   return new HybridEngine(localEngine, env.backendApiUrl, isDeviceOnly);

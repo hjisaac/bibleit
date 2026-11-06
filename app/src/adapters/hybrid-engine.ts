@@ -12,7 +12,7 @@ const REMOTE_COOLDOWN_MS = 20_000;
 
 export class HybridEngine implements SearchEngine {
   readonly ready: Promise<void>;
-  readonly answers: AnswerProvider;
+  readonly answerProvider: AnswerProvider;
   private localEngine: SearchEngine;
   private remoteUrl: string | null;
   private isDeviceOnly?: () => boolean;
@@ -30,9 +30,9 @@ export class HybridEngine implements SearchEngine {
     this.remoteUrl = remoteUrl?.trim().replace(/\/+$/, '') || null;
     this.isDeviceOnly = isDeviceOnly;
     this.ready = localEngine.ready;
-    this.answers = this.remoteUrl
+    this.answerProvider = this.remoteUrl
       ? new HttpAnswerProvider(this.remoteUrl, isDeviceOnly)
-      : localEngine.answers;
+      : localEngine.answerProvider;
     if (this.remoteUrl) {
       this.apiClient = new BibleitApiClient(this.remoteUrl);
     }
