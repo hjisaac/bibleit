@@ -197,6 +197,8 @@ export function SearchView({
     () => initialSearch?.model ?? initialSearch?.provider ?? null,
   );
   const [synthesisError, setSynthesisError] = useState<string | null>(null);
+  const [synthesisTtftMs, setSynthesisTtftMs] = useState<number | null>(() => initialSearch.ttftMs ?? null);
+  const [synthesisTokensPerSec, setSynthesisTokensPerSec] = useState<number | null>(() => initialSearch.tokensPerSec ?? null);
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
   const [isSynthesisCollapsed, setIsSynthesisCollapsed] = useState<boolean>(false);
   const [isSearching, setIsSearching] = useState<boolean>(false);
@@ -286,11 +288,15 @@ export function SearchView({
       if (!isOnline && !engine.answerProvider.available) {
         setAnswerText('');
         setSynthesisModel(null);
+        setSynthesisTtftMs(null);
+        setSynthesisTokensPerSec(null);
         setSynthesisError('AI overview unavailable offline - showing matching scripture');
         runSearch(trimmed);
       } else if (!engine.answerProvider.available) {
         setAnswerText('');
         setSynthesisModel(null);
+        setSynthesisTtftMs(null);
+        setSynthesisTokensPerSec(null);
         setSynthesisError('AI overview unavailable in device-only mode - showing matching scripture');
         runSearch(trimmed);
       } else if (!isSynthesizing) {
@@ -301,6 +307,8 @@ export function SearchView({
       setSynthesisError(null);
       setAnswerText('');
       setSynthesisModel(null);
+      setSynthesisTtftMs(null);
+      setSynthesisTokensPerSec(null);
       runSearch(trimmed);
     }
   };
@@ -316,8 +324,10 @@ export function SearchView({
       durationMs: searchDurationMs ?? undefined,
       provider: synthesisModel ?? undefined,
       model: synthesisModel ?? undefined,
+      ttftMs: synthesisTtftMs ?? undefined,
+      tokensPerSec: synthesisTokensPerSec ?? undefined,
     });
-  }, [query, passages, answerText, searchOrigin, searchDurationMs, synthesisModel]);
+  }, [query, passages, answerText, searchOrigin, searchDurationMs, synthesisModel, synthesisTtftMs, synthesisTokensPerSec]);
 
   useEffect(() => {
     if (expandedCardKey === null) return;
@@ -402,6 +412,8 @@ export function SearchView({
     setAnswerText('');
     setSynthesisModel(null);
     setSynthesisError(null);
+    setSynthesisTtftMs(null);
+    setSynthesisTokensPerSec(null);
     setIsSynthesisCollapsed(false);
 
     try {
@@ -415,6 +427,9 @@ export function SearchView({
         setSynthesisError('No matching passages found to summarize');
         return;
       }
+      const streamStartTime = performance.now();
+      let firstTokenTime: number | null = null;
+      let totalChars = 0;
       const stream = engine.answerProvider.answer(trimmed, res, (meta) => {
         const modelName = meta.model || meta.provider;
         if (modelName) setSynthesisModel(modelName);
@@ -422,7 +437,19 @@ export function SearchView({
       let receivedAny = false;
       for await (const chunk of stream) {
         receivedAny = true;
+        if (firstTokenTime === null) {
+          firstTokenTime = performance.now();
+          setSynthesisTtftMs(Math.round(firstTokenTime - streamStartTime));
+        }
+        totalChars += chunk.length;
         setAnswerText((prev) => stripPreamble(prev + chunk));
+      }
+      if (firstTokenTime !== null) {
+        const totalDurationSec = (performance.now() - streamStartTime) / 1000;
+        const estimatedTokens = Math.max(1, Math.round(totalChars / 4));
+        if (totalDurationSec > 0) {
+          setSynthesisTokensPerSec(Math.round(estimatedTokens / totalDurationSec));
+        }
       }
       if (!receivedAny) {
         setSynthesisError('AI overview unavailable - showing matching scripture');
@@ -849,11 +876,17 @@ export function SearchView({
           }}
         >
           <span>
-            {searchOrigin === SearchOriginEnum.REMOTE ? 'OnServer search' : 'OnDevice search'}
+            {synthesisTtftMs !== null
+              ? `TTFT: ${synthesisTtftMs}ms${synthesisTokensPerSec !== null ? ` • ${synthesisTokensPerSec} tok/s` : isSynthesizing ? ' • streaming...' : ''}`
+              : isSynthesizing
+                ? 'Generating overview...'
+                : searchOrigin === SearchOriginEnum.REMOTE
+                  ? 'OnServer search'
+                  : 'OnDevice search'}
           </span>
           {searchDurationMs !== null && (
             <span class="text-emerald-500 dark:text-emerald-400 shrink-0">
-              {searchDurationMs}ms latency
+              {searchOrigin === SearchOriginEnum.REMOTE ? 'Server latency' : 'Device latency'}: {searchDurationMs}ms
             </span>
           )}
         </div>
