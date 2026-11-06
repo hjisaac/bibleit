@@ -1,6 +1,7 @@
 import type { AnswerProvider, SearchEngine } from '../core/ports';
 import { SearchOriginEnum, type RetrievalResult } from '../core/types';
 import { HttpAnswerProvider } from './http-answer-provider';
+import { HybridAnswerProvider } from './hybrid-answer-provider';
 import { BibleitApiClient } from './api-client';
 
 /**
@@ -30,9 +31,14 @@ export class HybridEngine implements SearchEngine {
     this.remoteUrl = remoteUrl?.trim().replace(/\/+$/, '') || null;
     this.isDeviceOnly = isDeviceOnly;
     this.ready = localEngine.ready;
-    this.answerProvider = this.remoteUrl
+    const remoteAnswer = this.remoteUrl
       ? new HttpAnswerProvider(this.remoteUrl, isDeviceOnly)
-      : localEngine.answerProvider;
+      : null;
+    this.answerProvider = new HybridAnswerProvider(
+      remoteAnswer,
+      localEngine.answerProvider,
+      isDeviceOnly,
+    );
     if (this.remoteUrl) {
       this.apiClient = new BibleitApiClient(this.remoteUrl);
     }

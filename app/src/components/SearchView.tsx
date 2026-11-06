@@ -283,7 +283,7 @@ export function SearchView({
     inputRef.current?.blur();
     const isReference = isReferenceQuery(trimmed);
     if (!isReference && isAiEnabled) {
-      if (!isOnline) {
+      if (!isOnline && !engine.answerProvider.available) {
         setAnswerText('');
         setSynthesisModel(null);
         setSynthesisError('AI overview unavailable offline - showing matching scripture');
@@ -425,7 +425,7 @@ export function SearchView({
         setAnswerText((prev) => stripPreamble(prev + chunk));
       }
       if (!receivedAny) {
-        setSynthesisError('AI overview unavailable from server - showing matching scripture');
+        setSynthesisError('AI overview unavailable - showing matching scripture');
       }
     } catch {
       setSynthesisError('AI overview unavailable - showing matching scripture');

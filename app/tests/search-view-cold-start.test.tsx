@@ -336,8 +336,12 @@ describe('SearchView Cold Start and Search Persistence', () => {
     ]);
   });
 
-  it('displays fallback note in overview card when question is asked while offline', async () => {
-    renderSearchView({ isOnline: false, isAiEnabled: true });
+  it('displays fallback note in overview card when question is asked while offline and answerProvider is unavailable', async () => {
+    const offlineEngine: SearchEngine = {
+      ...mockEngine,
+      answerProvider: { available: false, answer: async function* () {} },
+    };
+    renderSearchView({ engine: offlineEngine, isOnline: false, isAiEnabled: true });
 
     const input = screen.getByRole('textbox') as HTMLInputElement;
     fireEvent.input(input, { target: { value: 'what is love?' } });
@@ -351,6 +355,30 @@ describe('SearchView Cold Start and Search Persistence', () => {
     const dismissBtn = screen.getByTitle('Dismiss note');
     fireEvent.click(dismissBtn);
     expect(screen.queryByText('AI overview unavailable offline - showing matching scripture')).toBeNull();
+  });
+
+  it('synthesizes answer offline when local answerProvider is available', async () => {
+    retrieveSpy.mockResolvedValueOnce({
+      query: 'what is love?',
+      passages: [
+        {
+          chunk: { book: '1CO', start: [13, 4], end: [13, 8], text: 'Love is patient, love is kind.' },
+          score: 1.0,
+          source: 'reference',
+        },
+      ],
+      sources: { reference: [], lexical: [], semantic: [] },
+      parsedRefs: [],
+    });
+    renderSearchView({ isOnline: false, isAiEnabled: true });
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'what is love?' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Synthesized test answer/)).toBeTruthy();
+    });
   });
 
   it('opens Panel P when focusing the search input on an existing search', () => {

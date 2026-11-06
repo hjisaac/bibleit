@@ -3,6 +3,7 @@
  * Swapping a component happens here and nowhere else.
  */
 import type {
+  AnswerProvider,
   ArtifactStore,
   AudioNarrator,
   QueryEmbedder,
@@ -14,7 +15,6 @@ import {
   MiniSearchLexicalIndex,
   BruteForceVectorIndex,
   RrfRanker,
-  NullAnswerProvider,
 } from '@bibleit/engine';
 
 import { OpfsArtifactStore } from './adapters/opfs-artifact-store';
@@ -35,6 +35,16 @@ export function createDefaultEmbedder(): WorkerQueryEmbedder {
   return defaultEmbedder;
 }
 
+import { WorkerSlmAnswerProvider } from './adapters/worker-slm-answer-provider';
+
+let defaultAnswerProvider: WorkerSlmAnswerProvider | null = null;
+export function createDefaultAnswerProvider(): AnswerProvider {
+  if (!defaultAnswerProvider) {
+    defaultAnswerProvider = new WorkerSlmAnswerProvider();
+  }
+  return defaultAnswerProvider;
+}
+
 import { env } from './env';
 import { HybridEngine } from './adapters/hybrid-engine';
 
@@ -42,6 +52,7 @@ export function createDefaultEngine(
   artifactStore: ArtifactStore = createDefaultArtifactStore(),
   queryEmbedder: QueryEmbedder = createDefaultEmbedder(),
   isDeviceOnly?: () => boolean,
+  answerProvider: AnswerProvider = createDefaultAnswerProvider(),
 ): SearchEngine {
   const localEngine = new LocalEngine({
     artifactStore,
@@ -50,7 +61,7 @@ export function createDefaultEngine(
     queryEmbedder,
     vectorIndex: new BruteForceVectorIndex(),
     ranker: new RrfRanker(),
-    answerProvider: new NullAnswerProvider(),
+    answerProvider,
   });
 
   return new HybridEngine(localEngine, env.backendApiUrl, isDeviceOnly);
