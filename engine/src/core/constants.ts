@@ -6,7 +6,7 @@ export const API_ROUTES = {
 } as const;
 
 export const TELEMETRY_HEADERS = {
-  PROVIDER: 'bibleit-provider',
-  MODEL: 'bibleit-model',
-  ATTEMPTS: 'bibleit-attempts',
+  PROVIDER: 'Bibleit-Provider',
+  MODEL: 'Bibleit-Model',
+  ATTEMPTS: 'Bibleit-Attempts',
 } as const;

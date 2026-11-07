@@ -264,6 +264,7 @@ const routes = app
   });
 
 export type AppType = typeof routes;
+export { app };
 
 process.on('uncaughtException', (err) => {
   captureCrash(err, { origin: 'uncaughtException' });
@@ -274,5 +275,7 @@ process.on('unhandledRejection', (reason) => {
   captureCrash(reason, { origin: 'unhandledRejection' });
 });
 
-logger.info({ port }, 'Server starting');
-serve({ fetch: app.fetch, port });
+if (process.env.NODE_ENV !== 'test') {
+  logger.info({ port }, 'Server starting');
+  serve({ fetch: app.fetch, port });
+}
