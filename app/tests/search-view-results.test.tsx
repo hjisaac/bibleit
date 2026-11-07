@@ -44,7 +44,7 @@ describe('SearchView Result Cards & User Actions', () => {
     mockEngine = {
       ready: Promise.resolve(),
       retrieve: (...args) => retrieveSpy(...args) as Promise<any>,
-      answers: {
+      answerProvider: {
         available: false,
         answer: async function* () {},
       },
@@ -413,7 +413,7 @@ describe('SearchView Result Cards & User Actions', () => {
     const emptyLocalEngine: SearchEngine = {
       ready: Promise.resolve(),
       retrieve: vi.fn().mockResolvedValue({ passages: [], parsedRefs: [], origin: 'local' }),
-      answers: { available: false, answer: async function* () {} },
+      answerProvider: { available: false, answer: async function* () {} },
     };
     const hybridEngine = new HybridEngine(emptyLocalEngine, 'https://api.bibleit.test');
 
