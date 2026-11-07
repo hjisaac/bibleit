@@ -274,6 +274,7 @@ export function SettingsView({
               • Chunks: {manifest ? `${manifest.embeddings.count.toLocaleString()} chunks (${manifest.chunks.strategy})` : '2,655 chunks (token_window)'}
             </div>
             <div>• Rank fusion: Reciprocal Rank Fusion (k=60)</div>
+            <div>• Generator: HuggingFaceTB/SmolLM2-360M-Instruct (360M, q4)</div>
           </div>
         )}
       </div>
