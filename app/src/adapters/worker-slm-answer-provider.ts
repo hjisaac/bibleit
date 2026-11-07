@@ -197,13 +197,13 @@ export async function isSlmModelCached(): Promise<boolean> {
       if (name.includes('transformers') || name.includes('onnx')) {
         const cache = await caches.open(name);
         const keys = await cache.keys();
-        if (
-          keys.some(
-            (k) =>
-              k.url.includes('SmolLM2-360M-Instruct') && k.url.includes('.onnx'),
-          )
-        ) {
-          return true;
+        for (const req of keys) {
+          if (req.url.includes('SmolLM2-360M-Instruct') && req.url.includes('.onnx')) {
+            const res = await cache.match(req);
+            if (res && res.ok) {
+              return true;
+            }
+          }
         }
       }
     }

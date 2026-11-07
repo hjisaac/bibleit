@@ -61,7 +61,15 @@ function createPipeline(device: 'webgpu' | 'wasm') {
 async function getGenerator() {
   if (!generatorPromise) {
     lastReportedProgress = 0;
-    const canUseGpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
+    let canUseGpu = false;
+    if (typeof navigator !== 'undefined' && 'gpu' in navigator && (navigator as any).gpu) {
+      try {
+        const adapter = await (navigator as any).gpu.requestAdapter();
+        canUseGpu = Boolean(adapter);
+      } catch {
+        canUseGpu = false;
+      }
+    }
     if (canUseGpu) {
       try {
         generatorPromise = createPipeline('webgpu');
