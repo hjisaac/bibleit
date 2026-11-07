@@ -881,13 +881,11 @@ export function SearchView({
           }}
         >
           <span>
-            {synthesisTtftMs !== null
-              ? `TTFT: ${synthesisTtftMs}ms${synthesisTokensPerSec !== null ? ` (${synthesisTokensPerSec} tok/s)` : isSynthesizing ? ' (streaming...)' : ''}`
-              : isSynthesizing
-                ? 'Generating overview...'
-                : searchOrigin === SearchOriginEnum.REMOTE
-                  ? 'OnServer search'
-                  : 'OnDevice search'}
+            {isSynthesizing && synthesisTtftMs === null
+              ? 'Generating...'
+              : synthesisTtftMs !== null
+                ? `TTFT: ${synthesisTtftMs}ms${synthesisTokensPerSec !== null ? ` (${synthesisTokensPerSec} tok/s)` : isSynthesizing ? ' (streaming...)' : ''}`
+                : 'TTFT: NA'}
           </span>
           {searchDurationMs !== null && (
             <span class="text-emerald-500 dark:text-emerald-400 shrink-0">
