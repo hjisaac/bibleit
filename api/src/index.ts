@@ -35,7 +35,7 @@ import {
 import { rateLimiter } from 'hono-rate-limiter';
 import type { Context } from 'hono';
 import { logger, initSentry, captureCrash } from './logger';
-import { renderHomeHtml, renderHealthHtml } from './views';
+import { renderHomeHtml, renderStatusHtml } from './views';
 
 initSentry();
 
@@ -162,6 +162,11 @@ app.get('/', (c) => {
 });
 
 app.get(API_ROUTES.HEALTH, (c) => {
+  const status = isReady ? StatusCodes.OK : StatusCodes.SERVICE_UNAVAILABLE;
+  return c.json({ status: isReady ? 'ok' : 'initializing' }, status);
+});
+
+app.get(API_ROUTES.STATUS, (c) => {
   const providers = answerProvider.getProviderStatuses();
   const health = 'getHealth' in engine ? (engine as HealthCheckable).getHealth() : null;
   const jsonPayload = {
@@ -182,7 +187,7 @@ app.get(API_ROUTES.HEALTH, (c) => {
     return c.json(jsonPayload, status);
   }
 
-  return c.html(renderHealthHtml(isReady, providers, health), status);
+  return c.html(renderStatusHtml(isReady, providers, health), status);
 });
 
 const routes = app

@@ -152,7 +152,7 @@ export function renderHealthHtml(
       : `<div class="item"><span class="name">None configured</span><span class="pill off"><span class="dot"></span>OFF</span></div>`;
 
   return renderPage(
-    'Health · bibleit',
+    'Status · bibleit',
     `<div class="report">
       <div class="section-title">Endpoints</div>
       <div class="item">
@@ -161,6 +161,10 @@ export function renderHealthHtml(
       </div>
       <div class="item">
         <span class="name">GET /health</span>
+        ${operationalPill}
+      </div>
+      <div class="item">
+        <span class="name">GET /status</span>
         ${operationalPill}
       </div>
       <div class="item">
@@ -192,3 +196,5 @@ export function renderHealthHtml(
     </div>`,
   );
 }
+
+export const renderStatusHtml = renderHealthHtml;
