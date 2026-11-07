@@ -20,6 +20,9 @@ import {
 import { OpfsArtifactStore } from './adapters/opfs-artifact-store';
 import { WorkerQueryEmbedder } from './adapters/worker-query-embedder';
 import { WebSpeechNarrator } from './adapters/web-speech-narrator';
+import { WorkerSlmAnswerProvider } from './adapters/worker-slm-answer-provider';
+import { HybridEngine } from './adapters/hybrid-engine';
+import { env } from './env';
 
 export { LocalEngine };
 
@@ -27,28 +30,23 @@ export function createDefaultArtifactStore(): ArtifactStore {
   return new OpfsArtifactStore();
 }
 
-let defaultEmbedder: WorkerQueryEmbedder | null = null;
-export function createDefaultEmbedder(): WorkerQueryEmbedder {
+let defaultEmbedder: QueryEmbedder | null = null;
+export function createDefaultEmbedder(): QueryEmbedder {
   if (!defaultEmbedder) {
     defaultEmbedder = new WorkerQueryEmbedder();
   }
   return defaultEmbedder;
 }
 
-import { WorkerSlmAnswerProvider } from './adapters/worker-slm-answer-provider';
-
-let defaultAnswerProvider: WorkerSlmAnswerProvider | null = null;
+let defaultAnswerProvider: AnswerProvider | null = null;
 export function createDefaultAnswerProvider(
   isInstalled?: () => boolean,
-): WorkerSlmAnswerProvider {
+): AnswerProvider {
   if (!defaultAnswerProvider) {
     defaultAnswerProvider = new WorkerSlmAnswerProvider(isInstalled);
   }
   return defaultAnswerProvider;
 }
-
-import { env } from './env';
-import { HybridEngine } from './adapters/hybrid-engine';
 
 export function createDefaultEngine(
   artifactStore: ArtifactStore = createDefaultArtifactStore(),

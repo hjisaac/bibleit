@@ -7,8 +7,6 @@ import {
   createDefaultNarrator,
   createDefaultAnswerProvider,
 } from './composition';
-import { isQueryModelCached, clearQueryModelCache } from './adapters/worker-query-embedder';
-import { isSlmModelCached, clearSlmModelCache } from './adapters/worker-slm-answer-provider';
 import { Header } from './components/Header';
 import { Navbar } from './components/Navbar';
 import { SearchView } from './components/SearchView';
@@ -187,23 +185,23 @@ export function App(): JSX.Element {
       $aiPackageStatus.set(has ? PackageStatusEnum.DOWNLOADED : PackageStatusEnum.NOT_DOWNLOADED);
       if (has) setAiProgress(100);
     });
-    isQueryModelCached().then((isCached) => {
+    embedder.hasModel?.().then((isCached) => {
       if (isCached) {
         $modelPackageStatus.set(PackageStatusEnum.DOWNLOADED);
         setModelProgress(100);
       }
     });
-    isSlmModelCached().then((isCached) => {
+    slmProvider.hasModel?.().then((isCached) => {
       if (isCached) {
         $slmPackageStatus.set(PackageStatusEnum.DOWNLOADED);
         setSlmProgress(100);
       }
     });
-  }, [store]);
+  }, [store, embedder, slmProvider]);
 
   // Subscribe to query embedder progress events
   useEffect(() => {
-    const unsub = embedder.onProgress((fraction) => {
+    const unsub = embedder.onProgress?.((fraction) => {
       if ($modelPackageStatus.get() !== PackageStatusEnum.DOWNLOADED) {
         $modelPackageStatus.set(PackageStatusEnum.DOWNLOADING);
         setModelProgress(Math.round(fraction * 100));
@@ -214,7 +212,7 @@ export function App(): JSX.Element {
 
   // Subscribe to SLM generator progress events
   useEffect(() => {
-    const unsub = slmProvider.onProgress((fraction) => {
+    const unsub = slmProvider.onProgress?.((fraction) => {
       if ($slmPackageStatus.get() !== PackageStatusEnum.DOWNLOADED) {
         $slmPackageStatus.set(PackageStatusEnum.DOWNLOADING);
         setSlmProgress(Math.round(fraction * 100));
@@ -225,20 +223,20 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     engine.ready.then(() => {
-      isQueryModelCached().then((isCached) => {
+      embedder.hasModel?.().then((isCached) => {
         if (isCached) {
           $modelPackageStatus.set(PackageStatusEnum.DOWNLOADED);
           setModelProgress(100);
         }
       });
-      isSlmModelCached().then((isCached) => {
+      slmProvider.hasModel?.().then((isCached) => {
         if (isCached) {
           $slmPackageStatus.set(PackageStatusEnum.DOWNLOADED);
           setSlmProgress(100);
         }
       });
     }).catch(() => {});
-  }, [engine]);
+  }, [engine, embedder, slmProvider]);
 
   const textAbortRef = useRef<AbortController | null>(null);
   const aiAbortRef = useRef<AbortController | null>(null);
@@ -357,7 +355,7 @@ export function App(): JSX.Element {
     $slmPackageStatus.set(PackageStatusEnum.DOWNLOADING);
     setSlmProgress(0);
     try {
-      await slmProvider.load((fraction) => setSlmProgress(Math.round(fraction * 100)));
+      await slmProvider.load?.((fraction) => setSlmProgress(Math.round(fraction * 100)));
       setSlmProgress(100);
       $slmPackageStatus.set(PackageStatusEnum.DOWNLOADED);
       showToast('On-device AI model installed in browser cache (190 MB)');
@@ -376,15 +374,13 @@ export function App(): JSX.Element {
 
   const handleCancelDownloadSlm = () => {
     isSlmAbortedRef.current = true;
-    slmProvider.cancelLoad();
+    slmProvider.cancelLoad?.();
   };
 
   const handleClearStorage = async () => {
     await store.clear();
     await embedder.clear?.();
-    await clearQueryModelCache();
-    await slmProvider.clear();
-    await clearSlmModelCache();
+    await slmProvider.clear?.();
     await engine.sync?.();
     $textPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     $aiPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);

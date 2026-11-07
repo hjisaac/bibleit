@@ -415,6 +415,7 @@ export function SearchView({
     setSynthesisTtftMs(null);
     setSynthesisTokensPerSec(null);
     setIsSynthesisCollapsed(false);
+    setHasSearched(true);
 
     try {
       const startTime = performance.now();
@@ -424,7 +425,11 @@ export function SearchView({
       setPassages(res.passages);
       setSearchOrigin(res.origin);
       if (res.passages.length === 0) {
-        setSynthesisError('No matching passages found to summarize');
+        if (res.origin !== SearchOriginEnum.REMOTE && offlineTextStatus !== PackageStatusEnum.DOWNLOADED) {
+          setSynthesisError(null);
+        } else {
+          setSynthesisError('No matching passages found to summarize');
+        }
         return;
       }
       const streamStartTime = performance.now();
