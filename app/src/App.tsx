@@ -5,8 +5,8 @@ import {
   createDefaultEmbedder,
   createDefaultEngine,
   createDefaultNarrator,
+  createDefaultAnswerProvider,
 } from './composition';
-import { isQueryModelCached, clearQueryModelCache } from './adapters/worker-query-embedder';
 import { Header } from './components/Header';
 import { Navbar } from './components/Navbar';
 import { SearchView } from './components/SearchView';
@@ -28,7 +28,12 @@ import {
   type NarrationState,
 } from './core/types';
 import { useStore } from '@nanostores/preact';
-import { $textPackageStatus, $aiPackageStatus, $modelPackageStatus } from './stores/packages';
+import {
+  $textPackageStatus,
+  $aiPackageStatus,
+  $modelPackageStatus,
+  $slmPackageStatus,
+} from './stores/packages';
 import {
   $theme,
   $activeTab,
@@ -42,9 +47,19 @@ import { $readerLocation, $savedVerses, type ReaderLocation } from './stores/rea
 export function App(): JSX.Element {
   const store = useMemo(() => createDefaultArtifactStore(), []);
   const embedder = useMemo(() => createDefaultEmbedder(), []);
+  const slmProvider = useMemo(
+    () => createDefaultAnswerProvider(() => $slmPackageStatus.get() === PackageStatusEnum.DOWNLOADED),
+    [],
+  );
   const engine = useMemo(
-    () => createDefaultEngine(store, embedder, () => $searchMode.get() === SearchModeEnum.DEVICE),
-    [store, embedder],
+    () =>
+      createDefaultEngine(
+        store,
+        embedder,
+        () => $searchMode.get() === SearchModeEnum.DEVICE,
+        slmProvider,
+      ),
+    [store, embedder, slmProvider],
   );
   const narrator = useMemo(() => createDefaultNarrator(), []);
   const [narrationState, setNarrationState] = useState<NarrationState>(() => narrator.getState());
@@ -83,6 +98,7 @@ export function App(): JSX.Element {
   const textPackageStatus = useStore($textPackageStatus);
   const aiPackageStatus = useStore($aiPackageStatus);
   const modelPackageStatus = useStore($modelPackageStatus);
+  const slmPackageStatus = useStore($slmPackageStatus);
   const [textProgress, setTextProgress] = useState<number>(() =>
     $textPackageStatus.get() === PackageStatusEnum.DOWNLOADED ? 100 : 0,
   );
@@ -91,6 +107,9 @@ export function App(): JSX.Element {
   );
   const [modelProgress, setModelProgress] = useState<number>(() =>
     $modelPackageStatus.get() === PackageStatusEnum.DOWNLOADED ? 100 : 0,
+  );
+  const [slmProgress, setSlmProgress] = useState<number>(() =>
+    $slmPackageStatus.get() === PackageStatusEnum.DOWNLOADED ? 100 : 0,
   );
   const hasSeenStorageBanner = useStore($hasSeenStorageBanner);
   const [highlightStorage, setHighlightStorage] = useState<boolean>(false);
@@ -153,6 +172,7 @@ export function App(): JSX.Element {
     if ($textPackageStatus.get() === PackageStatusEnum.DOWNLOADING) $textPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     if ($aiPackageStatus.get() === PackageStatusEnum.DOWNLOADING) $aiPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     if ($modelPackageStatus.get() === PackageStatusEnum.DOWNLOADING) $modelPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
+    if ($slmPackageStatus.get() === PackageStatusEnum.DOWNLOADING) $slmPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
   }, []);
 
   // Sync offline packages state with real OPFS and browser cache in background
@@ -165,17 +185,23 @@ export function App(): JSX.Element {
       $aiPackageStatus.set(has ? PackageStatusEnum.DOWNLOADED : PackageStatusEnum.NOT_DOWNLOADED);
       if (has) setAiProgress(100);
     });
-    isQueryModelCached().then((isCached) => {
+    embedder.hasModel?.().then((isCached) => {
       if (isCached) {
         $modelPackageStatus.set(PackageStatusEnum.DOWNLOADED);
         setModelProgress(100);
       }
     });
-  }, [store]);
+    slmProvider.hasModel?.().then((isCached) => {
+      if (isCached) {
+        $slmPackageStatus.set(PackageStatusEnum.DOWNLOADED);
+        setSlmProgress(100);
+      }
+    });
+  }, [store, embedder, slmProvider]);
 
   // Subscribe to query embedder progress events
   useEffect(() => {
-    const unsub = embedder.onProgress((fraction) => {
+    const unsub = embedder.onProgress?.((fraction) => {
       if ($modelPackageStatus.get() !== PackageStatusEnum.DOWNLOADED) {
         $modelPackageStatus.set(PackageStatusEnum.DOWNLOADING);
         setModelProgress(Math.round(fraction * 100));
@@ -184,16 +210,33 @@ export function App(): JSX.Element {
     return unsub;
   }, [embedder]);
 
+  // Subscribe to SLM generator progress events
+  useEffect(() => {
+    const unsub = slmProvider.onProgress?.((fraction) => {
+      if ($slmPackageStatus.get() !== PackageStatusEnum.DOWNLOADED) {
+        $slmPackageStatus.set(PackageStatusEnum.DOWNLOADING);
+        setSlmProgress(Math.round(fraction * 100));
+      }
+    });
+    return unsub;
+  }, [slmProvider]);
+
   useEffect(() => {
     engine.ready.then(() => {
-      isQueryModelCached().then((isCached) => {
+      embedder.hasModel?.().then((isCached) => {
         if (isCached) {
           $modelPackageStatus.set(PackageStatusEnum.DOWNLOADED);
           setModelProgress(100);
         }
       });
+      slmProvider.hasModel?.().then((isCached) => {
+        if (isCached) {
+          $slmPackageStatus.set(PackageStatusEnum.DOWNLOADED);
+          setSlmProgress(100);
+        }
+      });
     }).catch(() => {});
-  }, [engine]);
+  }, [engine, embedder, slmProvider]);
 
   const textAbortRef = useRef<AbortController | null>(null);
   const aiAbortRef = useRef<AbortController | null>(null);
@@ -305,17 +348,48 @@ export function App(): JSX.Element {
     embedder.cancelLoad?.();
   };
 
+  const isSlmAbortedRef = useRef(false);
+
+  const handleDownloadSlm = async () => {
+    isSlmAbortedRef.current = false;
+    $slmPackageStatus.set(PackageStatusEnum.DOWNLOADING);
+    setSlmProgress(0);
+    try {
+      await slmProvider.load?.((fraction) => setSlmProgress(Math.round(fraction * 100)));
+      setSlmProgress(100);
+      $slmPackageStatus.set(PackageStatusEnum.DOWNLOADED);
+      showToast('On-device AI model installed in browser cache (190 MB)');
+    } catch (err) {
+      if (isSlmAbortedRef.current || (err instanceof DOMException && err.name === 'AbortError')) {
+        $slmPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
+        setSlmProgress(0);
+        showToast('AI model download cancelled.');
+        return;
+      }
+      console.error('SLM download failed:', err);
+      showToast('AI model download interrupted. Check network and try again.');
+      $slmPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
+    }
+  };
+
+  const handleCancelDownloadSlm = () => {
+    isSlmAbortedRef.current = true;
+    slmProvider.cancelLoad?.();
+  };
+
   const handleClearStorage = async () => {
     await store.clear();
     await embedder.clear?.();
-    await clearQueryModelCache();
+    await slmProvider.clear?.();
     await engine.sync?.();
     $textPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     $aiPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     $modelPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
+    $slmPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     setTextProgress(0);
     setAiProgress(0);
     setModelProgress(0);
+    setSlmProgress(0);
     showToast('Offline storage and model cache cleared.');
   };
 
@@ -512,9 +586,11 @@ export function App(): JSX.Element {
             textPackageStatus={textPackageStatus}
             aiPackageStatus={aiPackageStatus}
             modelPackageStatus={modelPackageStatus}
+            slmPackageStatus={slmPackageStatus}
             textProgress={textProgress}
             aiProgress={aiProgress}
             modelProgress={modelProgress}
+            slmProgress={slmProgress}
             searchMode={searchMode}
             onToggleSearchMode={handleToggleSearchMode}
             highlightStorage={highlightStorage}
@@ -525,6 +601,8 @@ export function App(): JSX.Element {
             onCancelDownloadAi={handleCancelDownloadAi}
             onDownloadModel={handleDownloadModel}
             onCancelDownloadModel={handleCancelDownloadModel}
+            onDownloadSlm={handleDownloadSlm}
+            onCancelDownloadSlm={handleCancelDownloadSlm}
             onClearStorage={handleClearStorage}
           />
         )}

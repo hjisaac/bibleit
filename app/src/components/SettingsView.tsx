@@ -15,9 +15,11 @@ interface SettingsViewProps {
   textPackageStatus: PackageStatusEnum;
   aiPackageStatus: PackageStatusEnum;
   modelPackageStatus: PackageStatusEnum;
+  slmPackageStatus?: PackageStatusEnum;
   textProgress: number;
   aiProgress: number;
   modelProgress: number;
+  slmProgress?: number;
   searchMode?: SearchModeEnum;
   onToggleSearchMode?: (mode: SearchModeEnum) => void;
   highlightStorage?: boolean;
@@ -29,6 +31,8 @@ interface SettingsViewProps {
   onCancelDownloadAi?: () => void;
   onDownloadModel: () => void;
   onCancelDownloadModel?: () => void;
+  onDownloadSlm?: () => void;
+  onCancelDownloadSlm?: () => void;
   onClearStorage: () => void;
 }
 
@@ -45,9 +49,11 @@ export function SettingsView({
   textPackageStatus,
   aiPackageStatus,
   modelPackageStatus,
+  slmPackageStatus = PackageStatusEnum.NOT_DOWNLOADED,
   textProgress,
   aiProgress,
   modelProgress,
+  slmProgress = 0,
   searchMode = SearchModeEnum.AUTO,
   onToggleSearchMode,
   highlightStorage,
@@ -59,6 +65,8 @@ export function SettingsView({
   onCancelDownloadAi,
   onDownloadModel,
   onCancelDownloadModel,
+  onDownloadSlm,
+  onCancelDownloadSlm,
   onClearStorage,
 }: SettingsViewProps): JSX.Element {
   const storageSectionRef = useRef<HTMLDivElement>(null);
@@ -68,7 +76,8 @@ export function SettingsView({
   const hasDownloadedArtifacts =
     textPackageStatus === PackageStatusEnum.DOWNLOADED ||
     aiPackageStatus === PackageStatusEnum.DOWNLOADED ||
-    modelPackageStatus === PackageStatusEnum.DOWNLOADED;
+    modelPackageStatus === PackageStatusEnum.DOWNLOADED ||
+    slmPackageStatus === PackageStatusEnum.DOWNLOADED;
 
   // Active countdown ticker for auto-disarming clear confirmation
   useEffect(() => {
@@ -265,6 +274,7 @@ export function SettingsView({
               • Chunks: {manifest ? `${manifest.embeddings.count.toLocaleString()} chunks (${manifest.chunks.strategy})` : '2,655 chunks (token_window)'}
             </div>
             <div>• Rank fusion: Reciprocal Rank Fusion (k=60)</div>
+            <div>• Generator: HuggingFaceTB/SmolLM2-360M-Instruct (360M, q4)</div>
           </div>
         )}
       </div>
@@ -370,8 +380,14 @@ export function SettingsView({
               if (textPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 1.2;
               if (aiPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 2.1;
               if (modelPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 137;
+              if (slmPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 190;
               if (mb === 0) return '0 MB cached';
-              if (modelPackageStatus === PackageStatusEnum.DOWNLOADED) return `${mb.toFixed(1)} MB cached`;
+              if (
+                modelPackageStatus === PackageStatusEnum.DOWNLOADED ||
+                slmPackageStatus === PackageStatusEnum.DOWNLOADED
+              ) {
+                return `${mb.toFixed(1)} MB cached`;
+              }
               return `${mb.toFixed(1)} MB in OPFS`;
             })()}
           </span>
@@ -645,6 +661,92 @@ export function SettingsView({
                 }}
               >
                 Download (137 MB)
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Package 4: On-Device AI Summarizer */}
+        <div
+          class="p-3 rounded-xl border flex flex-col gap-2.5"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'var(--border-subtle)',
+          }}
+        >
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
+                  On-Device AI Summarizer
+                </span>
+                <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
+                  190 MB
+                </span>
+              </div>
+              <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                SmolLM2 360M Instruct on-device language model (Q4 ONNX). Generates grounded scripture summaries completely offline.
+              </p>
+            </div>
+
+            {slmPackageStatus === PackageStatusEnum.DOWNLOADED ? (
+              <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
+                ✓ Installed
+              </span>
+            ) : slmPackageStatus === PackageStatusEnum.DOWNLOADING ? (
+              <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
+                {slmProgress}%
+              </span>
+            ) : null}
+          </div>
+
+          {slmPackageStatus === PackageStatusEnum.DOWNLOADING && (
+            <div class="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden">
+              <div
+                class="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
+                style={{ width: `${slmProgress}%` }}
+              />
+            </div>
+          )}
+
+          <div class="flex items-center justify-between text-xs pt-1">
+            <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
+              {slmPackageStatus === PackageStatusEnum.DOWNLOADED
+                ? 'Ready for offline AI overviews'
+                : slmPackageStatus === PackageStatusEnum.DOWNLOADING
+                ? slmProgress >= 98
+                  ? 'Compiling and initializing model...'
+                  : `Downloading model weights (${slmProgress}%)...`
+                : 'Not stored locally'}
+            </span>
+            {slmPackageStatus === PackageStatusEnum.DOWNLOADING ? (
+              <button
+                type="button"
+                onClick={onCancelDownloadSlm}
+                class="px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors hover:opacity-80"
+                style={{
+                  borderColor: 'var(--border-subtle)',
+                  color: 'var(--text-muted)',
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                }}
+              >
+                Cancel
+              </button>
+            ) : slmPackageStatus !== PackageStatusEnum.DOWNLOADED ? (
+              <button
+                type="button"
+                onClick={onDownloadSlm}
+                disabled={!isStorageAvailable}
+                title={!isStorageAvailable ? 'Device storage disabled in Private Browsing' : undefined}
+                class={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                  isStorageAvailable ? 'hover:opacity-85' : 'opacity-50 cursor-not-allowed'
+                }`}
+                style={{
+                  backgroundColor: 'var(--accent)',
+                  color: '#FFFFFF',
+                }}
+              >
+                Download (190 MB)
               </button>
             ) : null}
           </div>

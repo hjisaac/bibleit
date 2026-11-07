@@ -88,6 +88,7 @@ export interface QueryEmbedder {
   load(onProgress?: (fraction: number) => void): Promise<void>;
   /** Cancels an in-progress model download, releasing worker memory and connections. */
   cancelLoad?(): void;
+  onProgress?(cb: (fraction: number) => void): () => void;
   embed(query: string): Promise<Float32Array>;
   hasModel?(): Promise<boolean>;
   clear?(): Promise<void>;
@@ -127,6 +128,11 @@ export interface AnswerMetadata {
 
 export interface AnswerProvider {
   readonly available: boolean;
+  load?(onProgress?: (fraction: number) => void): Promise<void>;
+  cancelLoad?(): void;
+  onProgress?(cb: (fraction: number) => void): () => void;
+  hasModel?(): Promise<boolean>;
+  clear?(): Promise<void>;
   /** Streamed answer chunks; implementations must cite passages by reference. */
   answer(
     query: string,

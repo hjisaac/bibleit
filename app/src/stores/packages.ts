@@ -16,3 +16,8 @@ export const $modelPackageStatus = persistentAtom<PackageStatusEnum>(
   PackageStatusEnum.NOT_DOWNLOADED,
 );
 
+export const $slmPackageStatus = persistentAtom<PackageStatusEnum>(
+  'bibleit_slm_status',
+  PackageStatusEnum.NOT_DOWNLOADED,
+);
+

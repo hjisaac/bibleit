@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HybridEngine } from '../src/adapters/hybrid-engine';
-import type { SearchEngine } from '../src/core/ports';
+import type { AnswerProvider, SearchEngine } from '../src/core/ports';
 import { SearchOriginEnum, type RetrievalResult } from '../src/core/types';
 import { API_ROUTES } from '@bibleit/engine';
 
@@ -160,7 +160,24 @@ describe('HybridEngine', () => {
 
   it('delegates answers to localEngine when remoteUrl is not configured', () => {
     const engine = new HybridEngine(mockLocalEngine, null);
-    expect(engine.answerProvider).toBe(mockLocalEngine.answerProvider);
+    expect(engine.answerProvider.available).toBe(mockLocalEngine.answerProvider.available);
+  });
+
+  it('falls back to localEngine answerProvider when remote fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Network error'));
+    const localAnswerMock: AnswerProvider = {
+      available: true,
+      answer: async function* () {
+        yield 'Local fallback answer';
+      },
+    };
+    mockLocalEngine.answerProvider = localAnswerMock;
+    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
+    const chunks: string[] = [];
+    for await (const chunk of engine.answerProvider.answer('love', mockLocalResult)) {
+      chunks.push(chunk);
+    }
+    expect(chunks).toEqual(['Local fallback answer']);
   });
 
   it('HttpAnswerProvider fetches /api/v1/generate with query and passages', async () => {
