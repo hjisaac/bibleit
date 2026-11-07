@@ -34,28 +34,45 @@ function buildChatPrompt(query: string, passages: Chunk[]): string {
 let generatorPromise: Promise<any> | null = null;
 let lastReportedProgress = 0;
 
+function createPipeline(device: 'webgpu' | 'wasm') {
+  return pipeline('text-generation', 'HuggingFaceTB/SmolLM2-360M-Instruct', {
+    dtype: 'q4',
+    device,
+    progress_callback: (item: any) => {
+      if (item.status === 'progress') {
+        const isModel = Boolean(item.file && item.file.includes('.onnx'));
+        const fileFrac =
+          typeof item.progress === 'number'
+            ? Math.min(Math.max(item.progress / 100, 0), 1)
+            : item.total > 0
+            ? Math.min(Math.max(item.loaded / item.total, 0), 1)
+            : 0;
+        // Tokenizer/config files represent ~2% of package; ONNX weights represent ~98%.
+        const totalFrac = isModel ? 0.02 + fileFrac * 0.96 : fileFrac * 0.02;
+        if (totalFrac > lastReportedProgress) {
+          lastReportedProgress = totalFrac;
+          self.postMessage({ type: 'progress', progress: totalFrac });
+        }
+      }
+    },
+  });
+}
+
 async function getGenerator() {
   if (!generatorPromise) {
     lastReportedProgress = 0;
-    const device = typeof navigator !== 'undefined' && 'gpu' in navigator ? 'webgpu' : 'wasm';
-    generatorPromise = pipeline('text-generation', 'HuggingFaceTB/SmolLM2-360M-Instruct', {
-      dtype: 'q4',
-      device,
-      progress_callback: (item: any) => {
-        if (item.status === 'progress') {
-          const frac =
-            typeof item.progress === 'number'
-              ? Math.min(Math.max(item.progress / 100, 0), 1)
-              : item.total > 0
-              ? Math.min(Math.max(item.loaded / item.total, 0), 1)
-              : 0;
-          if (frac > lastReportedProgress) {
-            lastReportedProgress = frac;
-            self.postMessage({ type: 'progress', progress: frac });
-          }
-        }
-      },
-    });
+    const canUseGpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
+    if (canUseGpu) {
+      try {
+        generatorPromise = createPipeline('webgpu');
+        await generatorPromise;
+        return generatorPromise;
+      } catch (err) {
+        console.warn('WebGPU pipeline failed, falling back to WASM:', err);
+        generatorPromise = null;
+      }
+    }
+    generatorPromise = createPipeline('wasm');
   }
   return generatorPromise;
 }

@@ -713,7 +713,9 @@ export function SettingsView({
               {slmPackageStatus === PackageStatusEnum.DOWNLOADED
                 ? 'Ready for offline AI overviews'
                 : slmPackageStatus === PackageStatusEnum.DOWNLOADING
-                ? 'Downloading model weights...'
+                ? slmProgress >= 98
+                  ? 'Compiling and initializing model...'
+                  : `Downloading model weights (${slmProgress}%)...`
                 : 'Not stored locally'}
             </span>
             {slmPackageStatus === PackageStatusEnum.DOWNLOADING ? (
