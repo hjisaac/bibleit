@@ -1,5 +1,4 @@
 import { pipeline, env, TextStreamer } from '@huggingface/transformers';
-import { renderChunk, type Chunk } from '@bibleit/engine';
 import { env as appEnv } from '../env';
 
 env.allowLocalModels = false;
@@ -23,10 +22,10 @@ Rules:
 - Citations: Cite specific references in brackets, e.g. [MAT 22:39] or [ROM 13:8-10]. Use a regular hyphen in verse ranges.
 - Length: Keep the summary cohesive, concise, and focused (1 to 2 paragraphs, under 150 words).`;
 
-function buildChatPrompt(query: string, passages: Chunk[]): string {
-  const context = passages
+function buildChatPrompt(query: string, passages: (string | { text?: string })[]): string {
+  const context = (passages || [])
     .slice(0, 5)
-    .map((c) => renderChunk(c))
+    .map((c) => (typeof c === 'string' ? c : c.text ?? ''))
     .join('\n\n');
 
   return `<|im_start|>system\n${SYSTEM_PROMPT}<|im_end|>\n<|im_start|>user\nPassages:\n${context}\n\nTopic / Question: ${query}\nDirect answer (plain text, no preamble):<|im_end|>\n<|im_start|>assistant\n`;
@@ -59,29 +58,46 @@ function createPipeline(device: 'webgpu' | 'wasm') {
   });
 }
 
+async function initGenerator() {
+  lastReportedProgress = 0;
+  // Firefox on Linux has unstable WebGPU compute shaders that hang compilation; bypass to WASM.
+  const isFirefox = typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent);
+  let canUseGpu = false;
+  if (!isFirefox && typeof navigator !== 'undefined' && 'gpu' in navigator && (navigator as any).gpu) {
+    try {
+      const adapter = await (navigator as any).gpu.requestAdapter();
+      canUseGpu = Boolean(adapter);
+    } catch {
+      canUseGpu = false;
+    }
+  }
+
+  if (canUseGpu) {
+    try {
+      const webgpuPromise = createPipeline('webgpu');
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('WebGPU pipeline init timeout')), 5000),
+      );
+      return await Promise.race([webgpuPromise, timeoutPromise]);
+    } catch (err) {
+      console.warn('WebGPU pipeline failed or timed out, falling back to WASM:', err);
+    }
+  }
+
+  return await createPipeline('wasm');
+}
+
 async function getGenerator() {
   if (!generatorPromise) {
-    lastReportedProgress = 0;
-    let canUseGpu = false;
-    if (typeof navigator !== 'undefined' && 'gpu' in navigator && (navigator as any).gpu) {
+    generatorPromise = (async () => {
       try {
-        const adapter = await (navigator as any).gpu.requestAdapter();
-        canUseGpu = Boolean(adapter);
-      } catch {
-        canUseGpu = false;
-      }
-    }
-    if (canUseGpu) {
-      try {
-        generatorPromise = createPipeline('webgpu');
-        await generatorPromise;
-        return generatorPromise;
+        return await initGenerator();
       } catch (err) {
-        console.warn('WebGPU pipeline failed, falling back to WASM:', err);
         generatorPromise = null;
+        lastReportedProgress = 0;
+        throw err;
       }
-    }
-    generatorPromise = createPipeline('wasm');
+    })();
   }
   return generatorPromise;
 }

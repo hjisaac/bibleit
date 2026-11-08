@@ -1,3 +1,4 @@
+import { renderChunk } from '@bibleit/engine';
 import type { AnswerMetadata, AnswerProvider } from '../core/ports';
 import type { RetrievalResult } from '../core/types';
 
@@ -45,7 +46,14 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
         type: 'module',
       });
       this.worker.onmessage = (e) => this.handleMessage(e.data);
-      this.worker.onerror = (e) => console.error('SLM worker error:', e);
+      this.worker.onerror = (e) => {
+        console.error('SLM worker error:', e);
+        const err = new Error(e.message || 'Worker execution error');
+        for (const [id, stream] of this.activeStreams) {
+          this.activeStreams.delete(id);
+          stream.onError(err);
+        }
+      };
     }
     return this.worker;
   }
@@ -166,7 +174,7 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
       },
     });
 
-    const passages = context.passages.slice(0, 5).map((p) => p.chunk);
+    const passages = context.passages.slice(0, 5).map((p) => renderChunk(p.chunk));
     worker.postMessage({ type: 'generate', id, query, passages });
 
     try {

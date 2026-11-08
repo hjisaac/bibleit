@@ -77,4 +77,29 @@ describe('WorkerSlmAnswerProvider', () => {
       expect.objectContaining({ type: 'generate', query: 'What is faith?' }),
     );
   });
+
+  it('rejects gracefully when worker triggers onerror', async () => {
+    class FailingWorker {
+      onmessage: ((e: MessageEvent) => void) | null = null;
+      onerror: ((e: any) => void) | null = null;
+      postMessage(msg: any) {
+        if (msg.type === 'generate') {
+          setTimeout(() => {
+            this.onerror?.(new ErrorEvent('error', { message: 'WASM crash' }));
+          }, 0);
+        }
+      }
+      terminate() {}
+    }
+
+    vi.stubGlobal('Worker', FailingWorker);
+    const provider = new WorkerSlmAnswerProvider();
+
+    await expect(async () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _ of provider.answer('test query', mockContext)) {
+        // should throw
+      }
+    }).rejects.toThrow('WASM crash');
+  });
 });
