@@ -13,6 +13,8 @@ export interface StoredSearch {
   model?: string;
   origin?: SearchOriginEnum;
   durationMs?: number;
+  ttftMs?: number;
+  tokensPerSec?: number;
 }
 
 const DEFAULT_STORED_SEARCH: StoredSearch = {
@@ -84,6 +86,8 @@ export const $lastSearch = createPersistentStore<StoredSearch>(
             durationMs: typeof parsed.durationMs === 'number' ? parsed.durationMs : undefined,
             provider: typeof parsed.provider === 'string' ? parsed.provider : undefined,
             model: typeof parsed.model === 'string' ? parsed.model : undefined,
+            ttftMs: typeof parsed.ttftMs === 'number' ? parsed.ttftMs : undefined,
+            tokensPerSec: typeof parsed.tokensPerSec === 'number' ? parsed.tokensPerSec : undefined,
           };
         }
       } catch {
