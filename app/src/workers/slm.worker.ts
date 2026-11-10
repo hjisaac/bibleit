@@ -60,30 +60,16 @@ function createPipeline(device: 'webgpu' | 'wasm') {
 
 async function initGenerator() {
   lastReportedProgress = 0;
-  // Firefox on Linux has unstable WebGPU compute shaders that hang compilation; bypass to WASM.
-  const isFirefox = typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent);
-  let canUseGpu = false;
-  if (!isFirefox && typeof navigator !== 'undefined' && 'gpu' in navigator && (navigator as any).gpu) {
+  if (typeof navigator !== 'undefined' && 'gpu' in navigator && (navigator as any).gpu) {
     try {
       const adapter = await (navigator as any).gpu.requestAdapter();
-      canUseGpu = Boolean(adapter);
+      if (adapter) {
+        return await createPipeline('webgpu');
+      }
     } catch {
-      canUseGpu = false;
+      // fall through to WASM
     }
   }
-
-  if (canUseGpu) {
-    try {
-      const webgpuPromise = createPipeline('webgpu');
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('WebGPU pipeline init timeout')), 5000),
-      );
-      return await Promise.race([webgpuPromise, timeoutPromise]);
-    } catch (err) {
-      console.warn('WebGPU pipeline failed or timed out, falling back to WASM:', err);
-    }
-  }
-
   return await createPipeline('wasm');
 }
 

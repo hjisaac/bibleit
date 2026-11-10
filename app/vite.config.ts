@@ -87,6 +87,11 @@ export default defineConfig(async ({ command, mode }) => {
   server: {
     port: 3000,
     host: true,
+    // Required for SharedArrayBuffer (ORT asyncify WASM) on http://localhost.
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+    },
   },
   test: {
     environment: 'jsdom',
