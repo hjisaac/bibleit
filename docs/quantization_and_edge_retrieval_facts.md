@@ -152,7 +152,7 @@ In `bibleit`, the search subsystem consists of three distinct data artifacts:
 - Executing this matrix multiplication on the browser's main UI thread violates the Core Web Vitals **Interaction to Next Paint (INP $\le 200\text{ ms}$)** threshold, freezing scroll gestures and keystroke animations.
 
 #### The Solution: Isolated Web Worker Pipeline
-- Inference is strictly isolated inside a dedicated Web Worker (`embedder.worker.ts`).
+- Inference is strictly isolated inside a dedicated Web Worker (`embedding.worker.ts`).
 - Communication with the main thread uses structured clone messaging passing zero-copy string payloads and Float32Array vector buffers.
 - The UI thread remains completely responsive at 60/120 FPS during neural inference.
 - **WASM Module Dynamic Resolution**: ONNX Runtime Web dynamically imports its threaded asyncify modules (`ort-wasm-simd-threaded.asyncify.mjs`). CDN URL configuration must be strictly sanitized against trailing whitespace and carriage returns to prevent `%20%20` URL-encoded module load errors.

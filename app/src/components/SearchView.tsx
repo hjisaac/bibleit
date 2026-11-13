@@ -290,14 +290,14 @@ export function SearchView({
         setSynthesisModel(null);
         setSynthesisTtftMs(null);
         setSynthesisTokensPerSec(null);
-        setSynthesisError('AI overview unavailable offline. Install the on-device model in Settings to enable.');
+        setSynthesisError('AI overview unavailable offline - showing matching scripture');
         runSearch(trimmed);
       } else if (!engine.answerProvider.available) {
         setAnswerText('');
         setSynthesisModel(null);
         setSynthesisTtftMs(null);
         setSynthesisTokensPerSec(null);
-        setSynthesisError('AI overview unavailable in device-only mode. Install the on-device model in Settings.');
+        setSynthesisError('AI overview unavailable in device-only mode - showing matching scripture');
         runSearch(trimmed);
       } else if (!isSynthesizing) {
         setSynthesisError(null);

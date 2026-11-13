@@ -498,7 +498,7 @@ describe('SearchView Result Cards & User Actions', () => {
       }),
     );
 
-    renderSearchView({ isInspectorMode: true });
+    renderSearchView({ isInspectorMode: true, isAiEnabled: true });
 
     expect(screen.getByText('TTFT: NA')).toBeTruthy();
     expect(screen.getByText('Server retrieval: 42ms')).toBeTruthy();
@@ -519,7 +519,7 @@ describe('SearchView Result Cards & User Actions', () => {
       }),
     );
 
-    renderSearchView({ isInspectorMode: true });
+    renderSearchView({ isInspectorMode: true, isAiEnabled: true });
 
     expect(screen.getByText('TTFT: 320ms (42 tok/s)')).toBeTruthy();
     expect(screen.getByText('Server retrieval: 120ms')).toBeTruthy();
