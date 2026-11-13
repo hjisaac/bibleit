@@ -440,8 +440,10 @@ export function SearchView({
         if (modelName) setSynthesisModel(modelName);
       });
       let receivedAny = false;
+      let tokenCount = 0;
       for await (const chunk of stream) {
         receivedAny = true;
+        tokenCount++;
         if (firstTokenTime === null) {
           firstTokenTime = performance.now();
           setSynthesisTtftMs(Math.round(firstTokenTime - streamStartTime));
@@ -450,10 +452,12 @@ export function SearchView({
         setAnswerText((prev) => stripPreamble(prev + chunk));
       }
       if (firstTokenTime !== null) {
-        const totalDurationSec = (performance.now() - streamStartTime) / 1000;
-        const estimatedTokens = Math.max(1, Math.round(totalChars / 4));
-        if (totalDurationSec > 0) {
-          setSynthesisTokensPerSec(Math.round(estimatedTokens / totalDurationSec));
+        const generationDurationSec = (performance.now() - firstTokenTime) / 1000;
+        const tokens = Math.max(tokenCount, Math.round(totalChars / 4));
+        if (generationDurationSec > 0.05) {
+          const rawRate = tokens / generationDurationSec;
+          const rate = rawRate >= 10 ? Math.round(rawRate) : Math.round(rawRate * 10) / 10;
+          setSynthesisTokensPerSec(rate);
         }
       }
       if (!receivedAny) {
