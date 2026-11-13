@@ -103,6 +103,12 @@ export default defineConfig(async ({ command, mode }) => {
       'Cross-Origin-Resource-Policy': 'cross-origin',
     },
   },
+  worker: {
+    format: 'es',
+  },
+  build: {
+    sourcemap: true,
+  },
   test: {
     environment: 'jsdom',
     globals: true,

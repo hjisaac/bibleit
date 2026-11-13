@@ -28,6 +28,8 @@ export interface LocalEnginePorts {
 export interface LocalEngineOptions {
   /** When true, ready waits for both base lexical and semantic embeddings. */
   eagerSemantic?: boolean;
+  /** Maximum duration in ms to wait for query embedding before degrading. Default: 30000ms. */
+  semanticTimeoutMs?: number;
 }
 
 /**
@@ -39,6 +41,7 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
   public answerProvider: AnswerProvider;
 
   private ports: LocalEnginePorts;
+  private options?: LocalEngineOptions;
   private verseStore: VerseStore | null;
   private lexicalState: SubsystemState = 'initializing';
   private semanticState: SubsystemState = 'initializing';
@@ -47,6 +50,7 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
 
   constructor(ports: LocalEnginePorts, options?: LocalEngineOptions) {
     this.ports = ports;
+    this.options = options;
     this.answerProvider = ports.answerProvider;
     this.verseStore = ports.verseStore ?? null;
 
@@ -192,16 +196,23 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
     const lexical = this.lexicalState === 'ready' ? this.ports.lexicalIndex.search(query, k) : [];
     let semantic: ScoredPassage[] = [];
     if (this.semanticState === 'ready') {
+      const timeoutMs = this.options?.semanticTimeoutMs ?? 30000;
+      const semStart = performance.now();
       try {
         const vectorPromise = this.ports.queryEmbedder.embed(query);
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Embedding timed out')), 5000),
+          setTimeout(() => reject(new Error(`Embedding timed out after ${timeoutMs}ms`)), timeoutMs),
         );
         const vector = await Promise.race([vectorPromise, timeoutPromise]);
         semantic = this.ports.vectorIndex.search(vector, k);
+        const semDuration = Math.round(performance.now() - semStart);
+        console.debug(`[LocalEngine] Semantic search completed in ${semDuration}ms (${semantic.length} matches)`);
       } catch (err) {
-        console.warn('[Semantic Search Error, degrading to lexical/ref]:', err);
+        const semDuration = Math.round(performance.now() - semStart);
+        console.warn(`[LocalEngine] Semantic search failed after ${semDuration}ms:`, err);
       }
+    } else {
+      console.debug(`[LocalEngine] Semantic search bypassed (state: ${this.semanticState}${this.semanticError ? ', error: ' + this.semanticError : ''})`);
     }
     return {
       parsedRefs,

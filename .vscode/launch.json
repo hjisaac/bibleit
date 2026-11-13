@@ -10,6 +10,21 @@
       "cwd": "${workspaceFolder}/ingest",
       "console": "integratedTerminal",
       "justMyCode": true
+    },
+    {
+      "name": "Debug bibleit (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/app",
+      "sourceMaps": true
+    },
+    {
+      "name": "Debug bibleit (Firefox)",
+      "type": "firefox",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/app"
     }
   ]
 }

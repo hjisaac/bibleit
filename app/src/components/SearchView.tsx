@@ -249,6 +249,15 @@ export function SearchView({
           setSearchDurationMs(duration);
           setPassages(res.passages);
           setSearchOrigin(res.origin);
+          console.groupCollapsed(`[Search Pipeline] "${trimmed}" -> ${res.passages.length} results in ${duration}ms (${res.origin})`);
+          console.log('Origin:', res.origin);
+          console.log('Parsed references:', res.parsedRefs);
+          console.log('Passages returned:', res.passages.map(p => ({
+            citation: `${p.chunk.book} ${p.chunk.start[0]}:${p.chunk.start[1]}`,
+            source: p.source,
+            score: p.score,
+          })));
+          console.groupEnd();
         }
       })
       .catch((err) => {
