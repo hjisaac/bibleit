@@ -197,7 +197,6 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
     let semantic: ScoredPassage[] = [];
     if (this.semanticState === 'ready') {
       const timeoutMs = this.options?.semanticTimeoutMs ?? 30000;
-      const semStart = performance.now();
       try {
         const vectorPromise = this.ports.queryEmbedder.embed(query);
         const timeoutPromise = new Promise<never>((_, reject) =>
@@ -205,14 +204,9 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
         );
         const vector = await Promise.race([vectorPromise, timeoutPromise]);
         semantic = this.ports.vectorIndex.search(vector, k);
-        const semDuration = Math.round(performance.now() - semStart);
-        console.debug(`[LocalEngine] Semantic search completed in ${semDuration}ms (${semantic.length} matches)`);
       } catch (err) {
-        const semDuration = Math.round(performance.now() - semStart);
-        console.warn(`[LocalEngine] Semantic search failed after ${semDuration}ms:`, err);
+        console.warn('[Semantic Search Error, degrading to lexical/ref]:', err);
       }
-    } else {
-      console.debug(`[LocalEngine] Semantic search bypassed (state: ${this.semanticState}${this.semanticError ? ', error: ' + this.semanticError : ''})`);
     }
     return {
       parsedRefs,
