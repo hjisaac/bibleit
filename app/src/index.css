@@ -80,19 +80,3 @@ body {
   color: var(--text-main);
   transition: background-color 0.2s ease, color 0.2s ease;
 }
-
-@keyframes border-breathe {
-  0%, 100% {
-    border-color: var(--border-subtle);
-    box-shadow: 0 0 0 0 rgba(217, 119, 6, 0);
-  }
-  50% {
-    border-color: rgba(217, 119, 6, 0.5);
-    box-shadow: 0 0 12px -2px rgba(217, 119, 6, 0.2);
-  }
-}
-
-.animate-border-breathe {
-  animation: border-breathe 2s ease-in-out infinite;
-}
-
