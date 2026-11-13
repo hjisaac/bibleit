@@ -8,6 +8,15 @@
       "url": "http://localhost:3000",
       "webRoot": "${workspaceFolder}",
       "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "skipFiles": [
+        "<node_internals>/**",
+        "**/node_modules/**",
+        "https://**"
+      ],
       "sourceMapPathOverrides": {
         "/src/*": "${workspaceFolder}/app/src/*",
         "/@fs/*": "/*"
@@ -20,6 +29,15 @@
       "port": 9222,
       "webRoot": "${workspaceFolder}",
       "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "skipFiles": [
+        "<node_internals>/**",
+        "**/node_modules/**",
+        "https://**"
+      ],
       "sourceMapPathOverrides": {
         "/src/*": "${workspaceFolder}/app/src/*",
         "/@fs/*": "/*"
