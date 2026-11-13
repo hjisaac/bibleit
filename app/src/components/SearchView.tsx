@@ -330,6 +330,17 @@ export function SearchView({
   }, [query, passages, answerText, searchOrigin, searchDurationMs, synthesisModel, synthesisTtftMs, synthesisTokensPerSec]);
 
   useEffect(() => {
+    if (!isAiEnabled) {
+      setIsSynthesizing(false);
+      setAnswerText('');
+      setSynthesisError(null);
+      setSynthesisModel(null);
+      setSynthesisTtftMs(null);
+      setSynthesisTokensPerSec(null);
+    }
+  }, [isAiEnabled]);
+
+  useEffect(() => {
     if (expandedCardKey === null) return;
     const passage = passages.find((p) => getChunkKey(p.chunk) === expandedCardKey);
     if (!passage || surroundingVerses[expandedCardKey]) return;
@@ -405,7 +416,7 @@ export function SearchView({
 
   const handleSynthesize = async () => {
     const trimmed = query.trim();
-    if (!trimmed || isSynthesizing) return;
+    if (!trimmed || isSynthesizing || !isAiEnabled) return;
     lastSubmittedQueryRef.current = trimmed;
     setIsPanelOpen(false);
     setIsSynthesizing(true);

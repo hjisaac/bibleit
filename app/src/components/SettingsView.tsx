@@ -206,11 +206,11 @@ export function SettingsView({
             <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
               <span>AI Scripture Overview</span>
               <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-mono font-medium">
-                LLM
+                AI
               </span>
             </div>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              Generate grounded AI overviews when searching topics and questions (requires internet).
+              Generate grounded scripture summaries when searching topics and questions.
             </p>
           </div>
 
