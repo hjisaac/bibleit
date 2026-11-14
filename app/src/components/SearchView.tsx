@@ -235,6 +235,7 @@ export function SearchView({
       return;
     }
     setIsSearching(true);
+    setPassages([]);
     setHasSearched(true);
     const startTime = performance.now();
     void engine
@@ -417,6 +418,8 @@ export function SearchView({
     lastSubmittedQueryRef.current = trimmed;
     setIsPanelOpen(false);
     setIsSynthesizing(true);
+    setIsSearching(true);
+    setPassages([]);
     setAnswerText('');
     setSynthesisModel(null);
     setSynthesisError(null);
@@ -432,6 +435,7 @@ export function SearchView({
       setSearchDurationMs(duration);
       setPassages(res.passages);
       setSearchOrigin(res.origin);
+      setIsSearching(false);
       if (res.passages.length === 0) {
         if (res.origin !== SearchOriginEnum.REMOTE && offlineTextStatus !== PackageStatusEnum.DOWNLOADED) {
           onToast('Scripture text not downloaded. Install in Settings to enable search.');
@@ -473,6 +477,7 @@ export function SearchView({
     } catch {
       onToast('AI overview unavailable: showing matching scripture');
     } finally {
+      setIsSearching(false);
       setIsSynthesizing(false);
     }
   };
@@ -778,42 +783,6 @@ export function SearchView({
         </div>
       )}
 
-      {/* Active Search Skeleton State */}
-      {isSearching && (
-        <div class="flex flex-col space-y-3 pb-4 animate-fadeIn" aria-label="Loading search results">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              class="p-4 rounded-2xl border transition-all"
-              style={{
-                backgroundColor: 'var(--bg-surface)',
-                borderColor: 'var(--border-subtle)',
-              }}
-            >
-              <div class="flex items-center justify-between mb-2.5">
-                <div class="skeleton-box h-4 w-28 rounded-full" />
-                <div class="flex items-center gap-2">
-                  <div class="skeleton-box h-4 w-4 rounded" />
-                  <div class="skeleton-box h-4 w-4 rounded" />
-                </div>
-              </div>
-              <div class="space-y-2 py-1">
-                <div class="skeleton-box h-3.5 w-full" />
-                <div class="skeleton-box h-3.5 w-[94%]" />
-                <div class="skeleton-box h-3.5 w-[68%]" />
-              </div>
-              <div
-                class="mt-3 flex items-center justify-between pt-2 border-t border-dashed"
-                style={{ borderColor: 'var(--border-subtle)' }}
-              >
-                <div class="skeleton-box h-3 w-20 rounded" />
-                <div class="skeleton-box h-3 w-14 rounded" />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Active Download Progress Card */}
       {offlineTextStatus === PackageStatusEnum.DOWNLOADING && (
         <div
@@ -928,7 +897,42 @@ export function SearchView({
 
       {/* Results Stream */}
       <div class="flex flex-col space-y-3 pb-4">
-        {passages.map((p, cardIdx) => {
+        {isSearching && (
+          <div class="flex flex-col space-y-3 animate-fadeIn" aria-label="Loading retrieved passages">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                class="p-4 rounded-2xl border transition-all"
+                style={{
+                  backgroundColor: 'var(--bg-surface)',
+                  borderColor: 'var(--border-subtle)',
+                }}
+              >
+                <div class="flex items-center justify-between mb-2.5">
+                  <div class="skeleton-box h-5 w-32 rounded-lg" />
+                  <div class="flex items-center gap-1.5">
+                    <div class="skeleton-box h-6 w-6 rounded-full" />
+                    <div class="skeleton-box h-6 w-6 rounded-full" />
+                  </div>
+                </div>
+                <div class="space-y-2 py-1">
+                  <div class="skeleton-box h-3.5 w-full" />
+                  <div class="skeleton-box h-3.5 w-[94%]" />
+                  <div class="skeleton-box h-3.5 w-[68%]" />
+                </div>
+                <div
+                  class="mt-3 flex items-center justify-between pt-2 border-t border-dashed"
+                  style={{ borderColor: 'var(--border-subtle)' }}
+                >
+                  <div class="skeleton-box h-3 w-20 rounded" />
+                  <div class="skeleton-box h-3 w-12 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!isSearching && passages.map((p, cardIdx) => {
           const chunkKey = getChunkKey(p.chunk);
           const isExpanded = expandedCardKey === chunkKey;
           const refString = formatCitation(p.chunk.book, p.chunk.start, p.chunk.end);

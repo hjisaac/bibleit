@@ -524,6 +524,56 @@ describe('SearchView Result Cards & User Actions', () => {
     expect(screen.getByText('TTFT: 320ms (42 tok/s)')).toBeTruthy();
     expect(screen.getByText('Server retrieval: 120ms')).toBeTruthy();
   });
+
+  it('renders retrieved passage card skeletons while search retrieval is in-flight', async () => {
+    let resolveRetrieve: (value: any) => void = () => {};
+    retrieveSpy.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRetrieve = resolve;
+      }),
+    );
+
+    renderSearchView({ isAiEnabled: false });
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'righteousness' } });
+    const form = input.closest('form')!;
+    fireEvent.submit(form);
+
+    expect(screen.getByLabelText('Loading retrieved passages')).toBeDefined();
+
+    resolveRetrieve({
+      query: 'righteousness',
+      passages: samplePassages,
+      sources: { reference: [], lexical: [], semantic: samplePassages },
+      parsedRefs: [],
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Loading retrieved passages')).toBeNull();
+      expect(screen.getByText('Philippians 4:4–7')).toBeDefined();
+    });
+  });
+
+  it('renders Grounded Summary badge with ghost border styling', () => {
+    localStorage.setItem(
+      'bibleit_last_search',
+      JSON.stringify({
+        query: 'peace',
+        passages: samplePassages,
+        answerText: 'Peace be with you.',
+        origin: 'remote',
+      }),
+    );
+
+    renderSearchView({ isAiEnabled: true });
+
+    const badge = screen.getByText('Grounded Summary').parentElement!;
+    expect(badge.className).toContain('border');
+    expect(badge.style.backgroundColor).toBe('var(--badge-ai-bg)');
+    expect(badge.style.borderColor).toBe('var(--badge-ai-border)');
+    expect(badge.style.color).toBe('var(--badge-ai-text)');
+  });
 });
 
 
