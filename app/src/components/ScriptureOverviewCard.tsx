@@ -109,10 +109,9 @@ export function ScriptureOverviewCard({
       >
         <div class="flex items-center gap-2">
           <span
-            class="text-[10px] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1 border"
+            class="text-[10px] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"
             style={{
               backgroundColor: 'var(--badge-ai-bg)',
-              borderColor: 'var(--badge-ai-border)',
               color: 'var(--badge-ai-text)',
             }}
           >

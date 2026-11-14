@@ -555,7 +555,7 @@ describe('SearchView Result Cards & User Actions', () => {
     });
   });
 
-  it('renders Grounded Summary badge with ghost border styling', () => {
+  it('renders Grounded Summary badge with restored palette styling', () => {
     localStorage.setItem(
       'bibleit_last_search',
       JSON.stringify({
@@ -569,9 +569,7 @@ describe('SearchView Result Cards & User Actions', () => {
     renderSearchView({ isAiEnabled: true });
 
     const badge = screen.getByText('Grounded Summary').parentElement!;
-    expect(badge.className).toContain('border');
     expect(badge.style.backgroundColor).toBe('var(--badge-ai-bg)');
-    expect(badge.style.borderColor).toBe('var(--badge-ai-border)');
     expect(badge.style.color).toBe('var(--badge-ai-text)');
   });
 });
