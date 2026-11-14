@@ -5,6 +5,7 @@ import { HybridEngine } from '../src/adapters/hybrid-engine';
 import type { SearchEngine, AudioNarrator } from '../src/core/ports';
 import type { ComponentProps } from 'preact';
 import { getChunkKey, PackageStatusEnum, type ScoredPassage } from '../src/core/types';
+import { FALLBACK_TOAST_DURATION_MS } from '../src/constants';
 
 type SearchViewProps = ComponentProps<typeof SearchView>;
 
@@ -593,7 +594,7 @@ describe('SearchView Result Cards & User Actions', () => {
     await waitFor(() => {
       expect(onToastSpy).toHaveBeenCalledWith(
         'Search server timed out: showing on-device results',
-        4500,
+        FALLBACK_TOAST_DURATION_MS,
       );
     });
   });

@@ -25,6 +25,7 @@ import {
   SEARCH_STORAGE_KEY,
 } from '../stores/search';
 import { ScriptureOverviewCard } from './ScriptureOverviewCard';
+import { FALLBACK_TOAST_DURATION_MS } from '../constants';
 
 export { MAX_HISTORY_ITEMS, SEARCH_HISTORY_KEY, SEARCH_STORAGE_KEY };
 
@@ -247,9 +248,9 @@ export function SearchView({
           setPassages(res.passages);
           setSearchOrigin(res.origin);
           if (res.fallbackReason === 'timeout') {
-            onToast('Search server timed out: showing on-device results', 4500);
+            onToast('Search server timed out: showing on-device results', FALLBACK_TOAST_DURATION_MS);
           } else if (res.fallbackReason === 'error') {
-            onToast('Search server unreachable: showing on-device results', 4500);
+            onToast('Search server unreachable: showing on-device results', FALLBACK_TOAST_DURATION_MS);
           }
         }
       })
@@ -442,9 +443,9 @@ export function SearchView({
       setSearchOrigin(res.origin);
       setIsSearching(false);
       if (res.fallbackReason === 'timeout') {
-        onToast('Search server timed out: showing on-device results', 4500);
+        onToast('Search server timed out: showing on-device results', FALLBACK_TOAST_DURATION_MS);
       } else if (res.fallbackReason === 'error') {
-        onToast('Search server unreachable: showing on-device results', 4500);
+        onToast('Search server unreachable: showing on-device results', FALLBACK_TOAST_DURATION_MS);
       }
       if (res.passages.length === 0) {
         if (res.origin !== SearchOriginEnum.REMOTE && offlineTextStatus !== PackageStatusEnum.DOWNLOADED) {

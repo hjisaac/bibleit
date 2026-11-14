@@ -17,6 +17,7 @@ import { BookSelectorModal } from './components/BookSelectorModal';
 import { HelpModal } from './components/HelpModal';
 import { FeedbackModal } from './components/FeedbackModal';
 import { AudioPlayerBar } from './components/AudioPlayerBar';
+import { DEFAULT_TOAST_DURATION_MS } from './constants';
 import { useHeadroom } from './core/headroom';
 import {
   PackageStatusEnum,
@@ -461,7 +462,7 @@ export function App(): JSX.Element {
 
   const toastTimerRef = useRef<number | null>(null);
 
-  const showToast = (message: string, durationMs = 3800) => {
+  const showToast = (message: string, durationMs = DEFAULT_TOAST_DURATION_MS) => {
     if (toastTimerRef.current !== null) {
       clearTimeout(toastTimerRef.current);
     }
