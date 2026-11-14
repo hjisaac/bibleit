@@ -61,6 +61,7 @@ describe('HybridEngine', () => {
 
     expect(result.passages[0]?.chunk.text).toContain('For God so loved the world');
     expect(result.origin).toBe(SearchOriginEnum.LOCAL);
+    expect(result.fallbackReason).toBe('error');
     expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
   });
 
@@ -114,6 +115,7 @@ describe('HybridEngine', () => {
 
     expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
     expect(result.passages[0]?.chunk.text).toContain('For God so loved the world');
+    expect(result.fallbackReason).toBe('timeout');
     vi.useRealTimers();
   });
 

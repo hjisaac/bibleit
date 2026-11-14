@@ -572,6 +572,31 @@ describe('SearchView Result Cards & User Actions', () => {
     expect(badge.style.backgroundColor).toBe('var(--badge-ai-bg)');
     expect(badge.style.color).toBe('var(--badge-ai-text)');
   });
+
+  it('triggers onToast with extended duration when search result falls back due to server timeout', async () => {
+    retrieveSpy.mockResolvedValueOnce({
+      query: 'grace',
+      passages: samplePassages,
+      sources: { reference: [], lexical: [], semantic: samplePassages },
+      parsedRefs: [],
+      origin: 'local',
+      fallbackReason: 'timeout',
+    });
+
+    renderSearchView({ isAiEnabled: false });
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'grace' } });
+    const form = input.closest('form')!;
+    fireEvent.submit(form);
+
+    await waitFor(() => {
+      expect(onToastSpy).toHaveBeenCalledWith(
+        'Search server timed out: showing on-device results',
+        4500,
+      );
+    });
+  });
 });
 
 

@@ -461,7 +461,7 @@ export function App(): JSX.Element {
 
   const toastTimerRef = useRef<number | null>(null);
 
-  const showToast = (message: string) => {
+  const showToast = (message: string, durationMs = 3800) => {
     if (toastTimerRef.current !== null) {
       clearTimeout(toastTimerRef.current);
     }
@@ -469,7 +469,7 @@ export function App(): JSX.Element {
     toastTimerRef.current = window.setTimeout(() => {
       setToastMessage(null);
       toastTimerRef.current = null;
-    }, 2200);
+    }, durationMs);
   };
 
   const handleOpenReader = (book: string, chapter: number, verse: number) => {

@@ -79,6 +79,8 @@ export interface RetrievalResult {
   parsedRefs: RefRange[];
   /** Execution origin declared by the engine resolving the query. */
   origin?: SearchOriginEnum;
+  /** Optional reason if degraded to local engine after remote failure. */
+  fallbackReason?: 'timeout' | 'error';
 }
 
 // ---------------------------------------------------------------------------

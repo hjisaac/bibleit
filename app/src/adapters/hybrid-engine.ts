@@ -57,6 +57,8 @@ export class HybridEngine implements SearchEngine {
       typeof navigator !== 'undefined' &&
       navigator.onLine;
 
+    let fallbackReason: 'timeout' | 'error' | undefined;
+
     if (canAttemptRemote && this.apiClient) {
       try {
         const controller = new AbortController();
@@ -73,10 +75,21 @@ export class HybridEngine implements SearchEngine {
         }
       } catch (err) {
         this.remoteDownUntil = Date.now() + REMOTE_COOLDOWN_MS;
+        const isTimeout =
+          (err instanceof DOMException && err.name === 'AbortError') ||
+          (err instanceof Error && err.name === 'AbortError');
+        fallbackReason = isTimeout ? 'timeout' : 'error';
         console.warn('[HybridEngine] Remote search unavailable; falling back to local engine:', err);
       }
     }
 
-    return this.localEngine.retrieve(query, k);
+    const localResult = await this.localEngine.retrieve(query, k);
+    if (fallbackReason) {
+      return {
+        ...localResult,
+        fallbackReason,
+      };
+    }
+    return localResult;
   }
 }

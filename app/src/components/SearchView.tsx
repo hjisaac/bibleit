@@ -51,7 +51,7 @@ interface SearchViewProps {
     citation: string;
     text: string;
   }) => void;
-  onToast: (message: string) => void;
+  onToast: (message: string, durationMs?: number) => void;
 }
 
 export function renderHighlightedText(
@@ -246,6 +246,11 @@ export function SearchView({
           setSearchDurationMs(duration);
           setPassages(res.passages);
           setSearchOrigin(res.origin);
+          if (res.fallbackReason === 'timeout') {
+            onToast('Search server timed out: showing on-device results', 4500);
+          } else if (res.fallbackReason === 'error') {
+            onToast('Search server unreachable: showing on-device results', 4500);
+          }
         }
       })
       .catch((err) => {
@@ -436,6 +441,11 @@ export function SearchView({
       setPassages(res.passages);
       setSearchOrigin(res.origin);
       setIsSearching(false);
+      if (res.fallbackReason === 'timeout') {
+        onToast('Search server timed out: showing on-device results', 4500);
+      } else if (res.fallbackReason === 'error') {
+        onToast('Search server unreachable: showing on-device results', 4500);
+      }
       if (res.passages.length === 0) {
         if (res.origin !== SearchOriginEnum.REMOTE && offlineTextStatus !== PackageStatusEnum.DOWNLOADED) {
           onToast('Scripture text not downloaded. Install in Settings to enable search.');
