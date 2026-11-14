@@ -6,7 +6,7 @@ env.allowLocalModels = false;
 
 const r2Base = appEnv.r2Url;
 if (env.backends?.onnx?.wasm) {
-  env.backends.onnx.wasm.numThreads = 1;
+  env.backends.onnx.wasm.numThreads = appEnv.numThreads;
   env.backends.onnx.wasm.wasmPaths = {
     mjs: `${r2Base}/ort-wasm-simd-threaded.asyncify.mjs`,
     wasm: `${r2Base}/ort-wasm-simd-threaded.asyncify.wasm`,

@@ -12,7 +12,14 @@ import type {
   VectorIndex,
 } from './core/ports';
 import { ArrayVerseStore } from './adapters/array-verse-store';
-import { SearchOriginEnum, type Chunk, type RetrievalResult, type ScoredPassage, type VerseStore } from './core/types';
+import {
+  SearchOriginEnum,
+  SubsystemStateEnum,
+  type Chunk,
+  type RetrievalResult,
+  type ScoredPassage,
+  type VerseStore,
+} from './core/types';
 
 export interface LocalEnginePorts {
   artifactStore: ArtifactStore;
@@ -43,8 +50,8 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
   private ports: LocalEnginePorts;
   private options?: LocalEngineOptions;
   private verseStore: VerseStore | null;
-  private lexicalState: SubsystemState = 'initializing';
-  private semanticState: SubsystemState = 'initializing';
+  private lexicalState: SubsystemState = SubsystemStateEnum.INITIALIZING;
+  private semanticState: SubsystemState = SubsystemStateEnum.INITIALIZING;
   private semanticError?: string;
   private currentSync: Promise<void> | null = null;
 
@@ -56,7 +63,7 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
 
     const baseReady = this.loadBase().catch((err) => {
       console.warn('[Base Index Init Error]:', err);
-      this.lexicalState = 'error';
+      this.lexicalState = SubsystemStateEnum.ERROR;
       return [];
     });
 
@@ -66,7 +73,7 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
         await this.loadSemantic(chunks);
       } catch (err) {
         console.warn('[Semantic Index Init Error]:', err);
-        this.semanticState = 'error';
+        this.semanticState = SubsystemStateEnum.ERROR;
         this.semanticError = err instanceof Error ? err.message : String(err);
         if (err instanceof Error && err.message.startsWith('Embedder/corpus mismatch:')) {
           throw err;
@@ -83,7 +90,7 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
 
   getHealth(): EngineHealth {
     return {
-      ready: this.lexicalState === 'ready',
+      ready: this.lexicalState === SubsystemStateEnum.READY,
       subsystems: {
         lexical: {
           state: this.lexicalState,
@@ -101,9 +108,10 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
    * Returns an empty list when scripture data is uninstalled or storage is blocked.
    */
   private async loadBase(): Promise<Chunk[]> {
-    if (this.ports.artifactStore.hasVerses && !(await this.ports.artifactStore.hasVerses())) {
+    const hasVerses = (await this.ports.artifactStore.hasVerses?.()) ?? true;
+    if (!hasVerses) {
       this.verseStore = this.ports.verseStore ?? null;
-      this.lexicalState = 'disabled';
+      this.lexicalState = SubsystemStateEnum.DISABLED;
       return [];
     }
     const [versesData, rawChunks] = await Promise.all([
@@ -117,7 +125,7 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
       text: this.verseStore!.getRange(c.book, c.start, c.end),
     }));
     await this.ports.lexicalIndex.build(chunks);
-    this.lexicalState = 'ready';
+    this.lexicalState = SubsystemStateEnum.READY;
     return chunks;
   }
 
@@ -126,16 +134,10 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
    * Skips index initialization if precomputed vectors or the query model are missing.
    */
   private async loadSemantic(chunks: Chunk[]): Promise<void> {
-    if (chunks.length === 0) {
-      this.semanticState = 'disabled';
-      return;
-    }
-    if (this.ports.artifactStore.hasEmbeddings && !(await this.ports.artifactStore.hasEmbeddings())) {
-      this.semanticState = 'disabled';
-      return;
-    }
-    if (this.ports.queryEmbedder.hasModel && !(await this.ports.queryEmbedder.hasModel())) {
-      this.semanticState = 'disabled';
+    const hasEmbeddings = (await this.ports.artifactStore.hasEmbeddings?.()) ?? true;
+    const hasModel = (await this.ports.queryEmbedder.hasModel?.()) ?? true;
+    if (chunks.length === 0 || !hasEmbeddings || !hasModel) {
+      this.semanticState = SubsystemStateEnum.DISABLED;
       return;
     }
     const manifest = await this.ports.artifactStore.manifest();
@@ -152,7 +154,7 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
       this.ports.queryEmbedder.load(),
     ]);
     await this.ports.vectorIndex.build(manifest, chunks, emb.data, emb.scales);
-    this.semanticState = 'ready';
+    this.semanticState = SubsystemStateEnum.READY;
     this.semanticError = undefined;
   }
 
@@ -193,9 +195,9 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
             : [];
         })
       : [];
-    const lexical = this.lexicalState === 'ready' ? this.ports.lexicalIndex.search(query, k) : [];
+    const lexical = this.lexicalState === SubsystemStateEnum.READY ? this.ports.lexicalIndex.search(query, k) : [];
     let semantic: ScoredPassage[] = [];
-    if (this.semanticState === 'ready') {
+    if (this.semanticState === SubsystemStateEnum.READY) {
       const timeoutMs = this.options?.semanticTimeoutMs ?? 30000;
       try {
         const vectorPromise = this.ports.queryEmbedder.embed(query);

@@ -101,4 +101,19 @@ describe('AudioPlayerBar', () => {
     expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' });
     document.body.removeChild(activeCard);
   });
+
+  it('cycles playback rate through 0.5x', () => {
+    render(
+      <AudioPlayerBar
+        narrator={mockNarrator}
+        state={{ ...activeState, rate: 1.5 }}
+        isNavbarVisible={true}
+        onNavigateToSegment={vi.fn()}
+      />,
+    );
+
+    const speedBtn = screen.getByRole('button', { name: 'Playback speed 1.5x' });
+    fireEvent.click(speedBtn);
+    expect(mockNarrator.setRate).toHaveBeenCalledWith(0.5);
+  });
 });

@@ -404,7 +404,7 @@ describe('SearchView Result Cards & User Actions', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/You're currently offline/i)).toBeTruthy();
-      expect(screen.getByText(/An internet connection is required to search online/i)).toBeTruthy();
+      expect(screen.getByText(/We couldn't connect to the search server/i)).toBeTruthy();
     });
   });
 

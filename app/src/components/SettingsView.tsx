@@ -217,6 +217,7 @@ export function SettingsView({
           <label class="relative inline-flex items-center cursor-pointer shrink-0">
             <input
               type="checkbox"
+              aria-label="AI Scripture Overview"
               checked={isAiEnabled}
               onChange={(e) => onToggleAi((e.target as HTMLInputElement).checked)}
               class="sr-only peer"
@@ -250,6 +251,7 @@ export function SettingsView({
           <label class="relative inline-flex items-center cursor-pointer shrink-0">
             <input
               type="checkbox"
+              aria-label="Retrieval Inspector Mode"
               checked={isInspectorMode}
               onChange={(e) => onToggleInspector((e.target as HTMLInputElement).checked)}
               class="sr-only peer"
@@ -303,6 +305,7 @@ export function SettingsView({
           <label class="relative inline-flex items-center cursor-pointer shrink-0">
             <input
               type="checkbox"
+              aria-label="Pericope Headings"
               checked={showHeadings}
               onChange={(e) => onToggleHeadings((e.target as HTMLInputElement).checked)}
               class="sr-only peer"
@@ -844,7 +847,7 @@ export function SettingsView({
           }}
         >
           <option selected>World English Bible (WEB) - Public Domain</option>
-          <option>Louis Segond 1910 (LSG) - Domaine Public (Français)</option>
+          {/* <option>Louis Segond 1910 (LSG) - Domaine Public (Français)</option> */}
         </select>
       </div>
 

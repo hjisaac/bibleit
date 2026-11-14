@@ -24,6 +24,7 @@ import {
   SEARCH_HISTORY_KEY,
   SEARCH_STORAGE_KEY,
 } from '../stores/search';
+import { ScriptureOverviewCard } from './ScriptureOverviewCard';
 
 export { MAX_HISTORY_ITEMS, SEARCH_HISTORY_KEY, SEARCH_STORAGE_KEY };
 
@@ -53,7 +54,7 @@ interface SearchViewProps {
   onToast: (message: string) => void;
 }
 
-function renderHighlightedText(
+export function renderHighlightedText(
   text: string,
   boundary: NarrationWordBoundary | null | undefined,
 ): JSX.Element | string {
@@ -145,11 +146,6 @@ function getChunkSectionViews(
       text: p.chunk.text,
     },
   ];
-}
-
-function isReferenceQuery(text: string): boolean {
-  const trimmed = text.trim();
-  return /^\s*([1-3]?\s*[\p{L}\p{M}]+)\s+\d+(?::\d+)?(?:[-\u2013\u2014]\d+)?\s*$/u.test(trimmed);
 }
 
 function stripPreamble(text: string): string {
@@ -283,21 +279,22 @@ export function SearchView({
     lastSubmittedQueryRef.current = trimmed;
     setIsPanelOpen(false);
     inputRef.current?.blur();
-    const isReference = isReferenceQuery(trimmed);
-    if (!isReference && isAiEnabled) {
+    if (isAiEnabled) {
       if (!isOnline && !engine.answerProvider.available) {
         setAnswerText('');
         setSynthesisModel(null);
         setSynthesisTtftMs(null);
         setSynthesisTokensPerSec(null);
-        setSynthesisError('AI overview unavailable offline - showing matching scripture');
+        setSynthesisError(null);
+        onToast('AI overview unavailable offline: showing matching scripture');
         runSearch(trimmed);
       } else if (!engine.answerProvider.available) {
         setAnswerText('');
         setSynthesisModel(null);
         setSynthesisTtftMs(null);
         setSynthesisTokensPerSec(null);
-        setSynthesisError('AI overview unavailable in device-only mode - showing matching scripture');
+        setSynthesisError(null);
+        onToast('AI overview unavailable in device-only mode: showing matching scripture');
         runSearch(trimmed);
       } else if (!isSynthesizing) {
         setSynthesisError(null);
@@ -437,10 +434,9 @@ export function SearchView({
       setSearchOrigin(res.origin);
       if (res.passages.length === 0) {
         if (res.origin !== SearchOriginEnum.REMOTE && offlineTextStatus !== PackageStatusEnum.DOWNLOADED) {
-          setSynthesisError('Scripture text not downloaded. Install in Settings to enable search and synthesis.');
-        } else {
-          setSynthesisError('No matching passages found to summarize');
+          onToast('Scripture text not downloaded. Install in Settings to enable search.');
         }
+        setIsSynthesizing(false);
         return;
       }
       const streamStartTime = performance.now();
@@ -472,11 +468,10 @@ export function SearchView({
         }
       }
       if (!receivedAny) {
-        setSynthesisError('AI overview unavailable - showing matching scripture');
+        onToast('AI overview unavailable: showing matching scripture');
       }
     } catch {
-      setSynthesisError('AI overview unavailable - showing matching scripture');
-      onToast('Failed to synthesize answer');
+      onToast('AI overview unavailable: showing matching scripture');
     } finally {
       setIsSynthesizing(false);
     }
@@ -653,40 +648,23 @@ export function SearchView({
         </div>
       </form>
 
-      {/* Scripture Navigator Strip (Compact: appears only when query is purely a book name) */}
+      {/* Scripture Navigator Strip (Compact: book name & chapter buttons) */}
       {matchedBook && (
         <div
           class="mb-2.5 px-3 py-2 rounded-xl border flex items-center gap-2.5 animate-fadeIn shrink-0 overflow-hidden"
           style={{
-            backgroundColor: 'var(--bg-surface-elevated)',
-            borderColor: 'var(--border-subtle)',
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'color-mix(in srgb, var(--border-subtle) 50%, transparent)',
           }}
         >
           <button
             type="button"
             onClick={() => onOpenReader(matchedBook.id, 1, 1)}
-            class="flex items-center gap-1.5 shrink-0 text-xs font-semibold hover:opacity-80 transition-opacity text-left cursor-pointer"
+            class="shrink-0 text-xs font-semibold hover:opacity-80 transition-opacity text-left cursor-pointer hover:underline"
             style={{ color: 'var(--text-main)' }}
             title={`Read ${matchedBook.name} 1:1`}
           >
-            <svg
-              class="w-3.5 h-3.5 shrink-0"
-              style={{ color: 'var(--accent)' }}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-              />
-            </svg>
-            <span class="hover:underline">{matchedBook.name}</span>
-            <span class="text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>
-              ({matchedBook.chapters} ch)
-            </span>
+            {matchedBook.name}
           </button>
 
           <div class="h-4 w-px shrink-0" style={{ backgroundColor: 'var(--border-subtle)' }} />
@@ -697,9 +675,9 @@ export function SearchView({
                 key={ch}
                 type="button"
                 onClick={() => onOpenReader(matchedBook.id, ch, 1)}
-                class="shrink-0 w-6 h-6 rounded-md border flex items-center justify-center font-medium transition-all hover:ring-1 hover:ring-amber-500/40 hover:bg-amber-500/10"
+                class="shrink-0 w-6 h-6 rounded-md border flex items-center justify-center font-medium transition-all hover:opacity-80"
                 style={{
-                  backgroundColor: 'var(--bg-surface)',
+                  backgroundColor: 'var(--bg-surface-elevated)',
                   borderColor: 'var(--border-subtle)',
                   color: 'var(--text-main)',
                 }}
@@ -711,7 +689,6 @@ export function SearchView({
           </div>
         </div>
       )}
-
 
       {/* Guidance Panel P (Shown on cold start or when search is focused/empty) */}
       {isPanelOpen && (
@@ -801,13 +778,39 @@ export function SearchView({
         </div>
       )}
 
-      {/* Active Search Loading State */}
+      {/* Active Search Skeleton State */}
       {isSearching && (
-        <div class="py-12 flex flex-col items-center justify-center text-center animate-fadeIn">
-          <div class="w-6 h-6 border-2 border-amber-600 border-t-transparent rounded-full animate-spin mb-2" />
-          <p class="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-            Searching scripture...
-          </p>
+        <div class="flex flex-col space-y-3 pb-4 animate-fadeIn" aria-label="Loading search results">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              class="p-4 rounded-2xl border transition-all"
+              style={{
+                backgroundColor: 'var(--bg-surface)',
+                borderColor: 'var(--border-subtle)',
+              }}
+            >
+              <div class="flex items-center justify-between mb-2.5">
+                <div class="skeleton-box h-4 w-28 rounded-full" />
+                <div class="flex items-center gap-2">
+                  <div class="skeleton-box h-4 w-4 rounded" />
+                  <div class="skeleton-box h-4 w-4 rounded" />
+                </div>
+              </div>
+              <div class="space-y-2 py-1">
+                <div class="skeleton-box h-3.5 w-full" />
+                <div class="skeleton-box h-3.5 w-[94%]" />
+                <div class="skeleton-box h-3.5 w-[68%]" />
+              </div>
+              <div
+                class="mt-3 flex items-center justify-between pt-2 border-t border-dashed"
+                style={{ borderColor: 'var(--border-subtle)' }}
+              >
+                <div class="skeleton-box h-3 w-20 rounded" />
+                <div class="skeleton-box h-3 w-14 rounded" />
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -846,32 +849,28 @@ export function SearchView({
 
       {/* No Results & Error States */}
       {!isPanelOpen && !isSearching && hasSearched && query.trim().length > 0 && passages.length === 0 && offlineTextStatus !== PackageStatusEnum.DOWNLOADING && (
-        !isOnline && offlineTextStatus !== PackageStatusEnum.DOWNLOADED ? (
+        (!isOnline || searchOrigin !== SearchOriginEnum.REMOTE) && offlineTextStatus !== PackageStatusEnum.DOWNLOADED ? (
           <div class="py-12 sm:py-16 flex flex-col items-center justify-center text-center animate-fadeIn max-w-sm mx-auto px-4">
-            <div class="w-10 h-10 rounded-full flex items-center justify-center mb-3 bg-stone-500/10 text-stone-500">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 4.243a9 9 0 01-12.728 0m0 0l2.829-2.829m-2.829 2.829L3 21m2.828-12.536a5 5 0 017.072 0" />
-              </svg>
+            <div
+              class={`w-10 h-10 rounded-full flex items-center justify-center mb-3 ${
+                !isOnline ? 'bg-stone-500/10 text-stone-500' : 'bg-amber-500/10 text-amber-600'
+              }`}
+            >
+              {!isOnline ? (
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 4.243a9 9 0 01-12.728 0m0 0l2.829-2.829m-2.829 2.829L3 21m2.828-12.536a5 5 0 017.072 0" />
+                </svg>
+              ) : (
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              )}
             </div>
             <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
-              You're currently offline
+              {!isOnline ? "You're currently offline" : 'Search service currently unavailable'}
             </p>
             <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-              An internet connection is required to search online. Tap above to set up scripture, or visit Settings to save it for offline search.
-            </p>
-          </div>
-        ) : searchOrigin !== SearchOriginEnum.REMOTE && offlineTextStatus !== PackageStatusEnum.DOWNLOADED ? (
-          <div class="py-12 sm:py-16 flex flex-col items-center justify-center text-center animate-fadeIn max-w-sm mx-auto px-4">
-            <div class="w-10 h-10 rounded-full flex items-center justify-center mb-3 bg-amber-500/10 text-amber-600">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
-              Search service currently unavailable
-            </p>
-            <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-              We couldn't connect to the search server. Try again later, or tap above to set up scripture for offline search.
+              We couldn't connect to the search server. Save scripture to search offline or try again later.
             </p>
           </div>
         ) : (
@@ -896,14 +895,12 @@ export function SearchView({
           }}
         >
           <span>
-            {isSynthesizing && synthesisTtftMs === null
-              ? 'Generating...'
-              : synthesisTtftMs !== null
-                ? `TTFT: ${synthesisTtftMs}ms${synthesisTokensPerSec !== null ? ` (${synthesisTokensPerSec} tok/s)` : isSynthesizing ? ' (streaming...)' : ''}`
-                : 'TTFT: NA'}
+            {passages.length > 1
+              ? `RRF score: ${passages[0]!.score.toFixed(4)} - ${passages[passages.length - 1]!.score.toFixed(4)}`
+              : `RRF score: ${passages[0]!.score.toFixed(4)}`}
           </span>
           {searchDurationMs !== null && (
-            <span class="text-emerald-500 dark:text-emerald-400 shrink-0">
+            <span class="shrink-0">
               {searchOrigin === SearchOriginEnum.REMOTE ? 'Server retrieval' : 'Device retrieval'}: {searchDurationMs}ms
             </span>
           )}
@@ -911,194 +908,23 @@ export function SearchView({
       )}
 
       {/* Synthesized Answer Card */}
-      {isAiEnabled && (answerText.length > 0 || isSynthesizing || !!synthesisError) && (() => {
-        const isSynthesisActive =
-          narrationState?.status !== 'idle' &&
-          narrationState?.activeSegment?.id === 'synthesis:overview';
-        const isSynthesisPlaying = isSynthesisActive && narrationState?.status === 'playing';
-
-        const handleToggleSynthesisNarration = () => {
-          if (!narrator || !narrator.supported || !answerText) return;
-          if (isSynthesisActive) {
-            if (isSynthesisPlaying) {
-              narrator.pause();
-            } else {
-              narrator.resume();
-            }
-            return;
-          }
-          const firstPassage = passages[0];
-          narrator.play([
-            {
-              id: 'synthesis:overview',
-              citation: 'Scripture Synthesis',
-              text: answerText,
-              book: firstPassage?.chunk.book ?? 'GEN',
-              chapter: firstPassage?.chunk.start[0] ?? 1,
-              verse: firstPassage?.chunk.start[1] ?? 1,
-            },
-          ]);
-        };
-
-        return (
-          <div
-            id={isSynthesisActive ? 'search-active-narrating-card' : undefined}
-            data-segment-id="synthesis:overview"
-            class={`mb-4 p-4 rounded-2xl border transition-all animate-fadeIn ${
-              isSynthesisActive ? 'ring-2 ring-amber-500/50' : ''
-            }`}
-            style={{
-              backgroundColor: 'var(--bg-surface-elevated)',
-              borderColor: 'var(--accent)',
-            }}
-          >
-            <div
-              class={`flex items-center justify-between ${
-                isSynthesisCollapsed ? 'mb-0 cursor-pointer' : 'mb-2.5'
-              }`}
-              onClick={isSynthesisCollapsed ? () => setIsSynthesisCollapsed(false) : undefined}
-            >
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-semibold flex items-center gap-1.5" style={{ color: 'var(--accent)' }}>
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M13 10V3L4 14h7v7l9-11h-7z"
-                    />
-                  </svg>
-                  <span>Scripture Synthesis</span>
-                </span>
-                <span
-                  class="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                  style={{
-                    backgroundColor: synthesisError ? 'var(--badge-ref-bg)' : 'var(--badge-sem-bg)',
-                    color: synthesisError ? 'var(--badge-ref-text)' : 'var(--badge-sem-text)',
-                  }}
-                >
-                  {synthesisError ? 'Offline Fallback' : 'Grounded Context'}
-                </span>
-              </div>
-
-              <div class="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                {synthesisError && (
-                  <button
-                    type="button"
-                    onClick={() => setSynthesisError(null)}
-                    class="p-1 rounded hover:opacity-75 transition-opacity"
-                    style={{ color: 'var(--text-muted)' }}
-                    title="Dismiss note"
-                    aria-label="Dismiss note"
-                  >
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
-
-                {narrator?.supported && answerText.length > 0 && !isSynthesizing && (
-                  <button
-                    type="button"
-                    onClick={handleToggleSynthesisNarration}
-                    title={isSynthesisPlaying ? 'Pause narration' : 'Listen to synthesis'}
-                    aria-label={
-                      isSynthesisPlaying ? 'Pause Scripture Synthesis' : 'Listen to Scripture Synthesis'
-                    }
-                    class="p-1 rounded hover:opacity-75 transition-opacity"
-                    style={{ color: isSynthesisActive ? 'var(--text-main)' : 'var(--text-muted)' }}
-                  >
-                    {isSynthesisPlaying ? (
-                      <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z" />
-                      </svg>
-                    ) : (
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                )}
-
-                {answerText.length > 0 && !isSynthesizing && (
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(answerText)}
-                    class="p-1 rounded hover:opacity-75 transition-opacity"
-                    style={{ color: 'var(--text-muted)' }}
-                    title="Copy answer"
-                    aria-label="Copy Scripture Synthesis"
-                  >
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {!isSynthesisCollapsed && (
-              synthesisError ? (
-                <div class="text-xs leading-relaxed font-sans" style={{ color: 'var(--text-muted)' }}>
-                  {synthesisError}
-                </div>
-              ) : (
-                <div
-                  class="text-sm leading-relaxed whitespace-pre-wrap font-serif max-h-72 overflow-y-auto pr-1"
-                  style={{ color: 'var(--text-main)' }}
-                >
-                  {isSynthesisActive
-                    ? renderHighlightedText(answerText, narrationState?.wordBoundary)
-                    : answerText}
-                  {isSynthesizing && (
-                    <span class="inline-block w-1.5 h-4 ml-1 bg-amber-500 animate-pulse align-middle" />
-                  )}
-                </div>
-              )
-            )}
-
-            {/* Card Footer Actions aligned with passage cards */}
-            <div class="mt-2.5 flex items-center justify-between text-xs">
-              {answerText.length > 0 && !isSynthesizing ? (
-                <button
-                  type="button"
-                  onClick={() => setIsSynthesisCollapsed(!isSynthesisCollapsed)}
-                  class="font-medium flex items-center gap-1 hover:underline"
-                  style={{ color: 'var(--text-muted)' }}
-                  title={isSynthesisCollapsed ? 'Expand overview' : 'Collapse overview'}
-                  aria-label={
-                    isSynthesisCollapsed
-                      ? 'Expand Scripture Synthesis'
-                      : 'Collapse Scripture Synthesis'
-                  }
-                >
-                  <span>{isSynthesisCollapsed ? '+ Expand overview' : '- Collapse overview'}</span>
-                </button>
-              ) : (
-                <span />
-              )}
-
-              <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
-                {synthesisError
-                  ? 'Matching scripture passages below'
-                  : synthesisModel
-                    ? `Generated by ${synthesisModel}`
-                    : 'Generated by AI'}
-              </span>
-            </div>
-          </div>
-        );
-      })()}
+      <ScriptureOverviewCard
+        isAiEnabled={isAiEnabled}
+        answerText={answerText}
+        isSynthesizing={isSynthesizing}
+        synthesisError={synthesisError}
+        synthesisModel={synthesisModel}
+        isSynthesisCollapsed={isSynthesisCollapsed}
+        onToggleCollapse={() => setIsSynthesisCollapsed(!isSynthesisCollapsed)}
+        onDismissError={() => setSynthesisError(null)}
+        onCopyAnswer={copyToClipboard}
+        narrator={narrator}
+        narrationState={narrationState}
+        firstPassage={passages[0]}
+        isInspectorMode={isInspectorMode}
+        synthesisTtftMs={synthesisTtftMs}
+        synthesisTokensPerSec={synthesisTokensPerSec}
+      />
 
       {/* Results Stream */}
       <div class="flex flex-col space-y-3 pb-4">
@@ -1136,9 +962,17 @@ export function SearchView({
                 borderColor: 'var(--border-subtle)',
               }}
             >
-              {/* Header: Badges & Actions */}
+              {/* Header: Badges & Actions (title joins this row when badges are hidden) */}
               <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-1.5">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  {!isInspectorMode && (
+                    <h2
+                      class="font-serif text-lg font-semibold tracking-tight"
+                      style={{ color: 'var(--text-main)' }}
+                    >
+                      {refString}
+                    </h2>
+                  )}
                   {isInspectorMode && (
                     <span
                       class="text-[10px] font-semibold px-2 py-0.5 rounded-full"
@@ -1175,7 +1009,7 @@ export function SearchView({
                   )}
                 </div>
 
-                <div class="flex items-center gap-1.5">
+                <div class="flex items-center gap-1.5 shrink-0">
                   {narrator?.supported && (
                     <button
                       type="button"
@@ -1267,15 +1101,16 @@ export function SearchView({
                 </div>
               </div>
 
-              {/* Title & Scripture Citation Hierarchy */}
-              <div class="mb-1.5">
-                <h2
-                  class="font-serif text-lg font-semibold tracking-tight"
-                  style={{ color: 'var(--text-main)' }}
-                >
-                  {refString}
-                </h2>
-              </div>
+              {isInspectorMode && (
+                <div class="mb-1.5">
+                  <h2
+                    class="font-serif text-lg font-semibold tracking-tight"
+                    style={{ color: 'var(--text-main)' }}
+                  >
+                    {refString}
+                  </h2>
+                </div>
+              )}
 
               <div
                 class={`relative font-serif text-[17px] leading-relaxed transition-[max-height] duration-300 ease-in-out ${

@@ -33,7 +33,10 @@ describe('SearchView Cold Start and Search Persistence', () => {
     };
   });
 
-  function renderSearchView(overrides: Partial<SearchViewProps> = {}) {
+  function renderSearchView(
+    overrides: Partial<SearchViewProps> = {},
+    rerenderFn?: (ui: preact.JSX.Element) => void,
+  ) {
     const props: SearchViewProps = {
       engine: mockEngine,
       isOnline: true,
@@ -47,6 +50,10 @@ describe('SearchView Cold Start and Search Persistence', () => {
       onToast: vi.fn(),
       ...overrides,
     };
+    if (rerenderFn) {
+      rerenderFn(<SearchView {...props} />);
+      return { rerender: rerenderFn };
+    }
     return render(<SearchView {...props} />);
   }
 
@@ -189,7 +196,7 @@ describe('SearchView Cold Start and Search Persistence', () => {
     expect(history[0]).toBe('Matthew 5:14');
   });
 
-  it('shows book navigator on keystroke without calling retrieve until Enter is pressed', () => {
+  it('shows book proposition on keystroke without calling retrieve until Enter is pressed', () => {
     renderSearchView();
     retrieveSpy.mockClear();
 
@@ -330,31 +337,27 @@ describe('SearchView Cold Start and Search Persistence', () => {
     expect(playSpy).toHaveBeenCalledWith([
       expect.objectContaining({
         id: 'synthesis:overview',
-        citation: 'Scripture Synthesis',
+        citation: 'Grounded Summary',
         text: 'Jesus taught that our Heavenly Father knows all our needs.',
       }),
     ]);
   });
 
-  it('displays fallback note in overview card when question is asked while offline and answerProvider is unavailable', async () => {
+  it('shows toast notification and hides overview card when question is asked while offline and answerProvider is unavailable', async () => {
     const offlineEngine: SearchEngine = {
       ...mockEngine,
       answerProvider: { available: false, answer: async function* () {} },
     };
-    renderSearchView({ engine: offlineEngine, isOnline: false, isAiEnabled: true });
+    const onToastSpy = vi.fn();
+    renderSearchView({ engine: offlineEngine, isOnline: false, isAiEnabled: true, onToast: onToastSpy });
 
     const input = screen.getByRole('textbox') as HTMLInputElement;
     fireEvent.input(input, { target: { value: 'what is love?' } });
     fireEvent.keyDown(input, { key: 'Enter' });
 
-    expect(screen.getByText('Offline Fallback')).toBeTruthy();
-    expect(screen.getByText('AI overview unavailable offline - showing matching scripture')).toBeTruthy();
-    expect(screen.getByText('Matching scripture passages below')).toBeTruthy();
-
-    // Dismiss note
-    const dismissBtn = screen.getByTitle('Dismiss note');
-    fireEvent.click(dismissBtn);
-    expect(screen.queryByText('AI overview unavailable offline - showing matching scripture')).toBeNull();
+    expect(onToastSpy).toHaveBeenCalledWith('AI overview unavailable offline: showing matching scripture');
+    expect(screen.queryByText('Offline Fallback')).toBeNull();
+    expect(screen.queryByText('Scripture Synthesis')).toBeNull();
   });
 
   it('synthesizes answer offline when local answerProvider is available', async () => {
@@ -493,7 +496,103 @@ describe('SearchView Cold Start and Search Persistence', () => {
     expect(retrieveSpy).toHaveBeenCalledWith('Love your neighbor');
     await waitFor(() => {
       expect(screen.getByText('Synthesized test answer')).toBeTruthy();
-      expect(screen.getByText('Scripture Synthesis')).toBeTruthy();
+      expect(screen.getByText('Grounded Summary')).toBeTruthy();
+    });
+  });
+
+  it('triggers AI overview synthesis on exact scripture reference queries when isAiEnabled is true', async () => {
+    retrieveSpy.mockResolvedValue({
+      query: 'Psalm 23',
+      passages: [
+        {
+          chunk: { book: 'PSA', start: [23, 1], end: [23, 6], text: 'Yahweh is my shepherd; I shall lack nothing.' },
+          score: 1.0,
+          source: 'reference',
+        },
+      ],
+      sources: { reference: [], lexical: [], semantic: [] },
+      parsedRefs: [],
+    });
+
+    renderSearchView({ isAiEnabled: true });
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'Psalm 23' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(retrieveSpy).toHaveBeenCalledWith('Psalm 23');
+    await waitFor(() => {
+      expect(screen.getByText('Synthesized test answer')).toBeTruthy();
+      expect(screen.getByText('Grounded Summary')).toBeTruthy();
+    });
+  });
+
+  it('bypasses AI overview synthesis and only performs retrieval when isAiEnabled is false', async () => {
+    retrieveSpy.mockResolvedValue({
+      query: 'Love your neighbor',
+      passages: [
+        {
+          chunk: { book: 'MAT', start: [22, 39], end: [22, 40], text: 'Love your neighbor as yourself.' },
+          score: 0.9,
+          source: 'semantic',
+        },
+      ],
+      sources: { reference: [], lexical: [], semantic: [] },
+      parsedRefs: [],
+    });
+
+    const answerSpy = vi.fn(async function* () {
+      yield 'Should not be called';
+    });
+    mockEngine.answerProvider.answer = answerSpy;
+
+    renderSearchView({ isAiEnabled: false });
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'Love your neighbor' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(retrieveSpy).toHaveBeenCalledWith('Love your neighbor');
+    await waitFor(() => {
+      expect(screen.getByText('Love your neighbor as yourself.')).toBeTruthy();
+    });
+    expect(answerSpy).not.toHaveBeenCalled();
+    expect(screen.queryByText('Grounded Summary')).toBeNull();
+  });
+
+  it('clears active synthesis and overview text when isAiEnabled transitions from true to false', async () => {
+    retrieveSpy.mockResolvedValue({
+      query: 'Love your neighbor',
+      passages: [
+        {
+          chunk: { book: 'MAT', start: [22, 39], end: [22, 40], text: 'Love your neighbor as yourself.' },
+          score: 0.9,
+          source: 'semantic',
+        },
+      ],
+      sources: { reference: [], lexical: [], semantic: [] },
+      parsedRefs: [],
+    });
+
+    mockEngine.answerProvider.answer = async function* () {
+      yield 'Synthesized test answer';
+    };
+
+    const { rerender } = renderSearchView({ isAiEnabled: true }) as { rerender: (ui: preact.JSX.Element) => void };
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'Love your neighbor' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(screen.getByText('Synthesized test answer')).toBeTruthy();
+    });
+
+    renderSearchView({ isAiEnabled: false }, rerender);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Synthesized test answer')).toBeNull();
+      expect(screen.queryByText('Grounded Summary')).toBeNull();
     });
   });
 });

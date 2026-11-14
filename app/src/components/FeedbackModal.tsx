@@ -268,13 +268,13 @@ export function FeedbackModal({
 
         {/* Footer Actions */}
         <div
-          class="pt-3 border-t flex items-center justify-end shrink-0"
+          class="pt-3 border-t shrink-0"
           style={{ borderColor: 'var(--border-subtle)' }}
         >
           <button
             type="submit"
             disabled={isSubmitting || !message.trim()}
-            class="px-4 py-1.5 rounded-xl text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-45"
+            class="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-white flex items-center justify-center transition-opacity hover:opacity-90 disabled:opacity-45 cursor-pointer shadow-sm"
             style={{ backgroundColor: 'var(--accent)' }}
           >
             {isSubmitting ? 'Sending...' : 'Send Feedback'}

@@ -65,6 +65,13 @@ export enum SearchOriginEnum {
   REMOTE = 'remote',
 }
 
+export enum SubsystemStateEnum {
+  READY = 'ready',
+  INITIALIZING = 'initializing',
+  ERROR = 'error',
+  DISABLED = 'disabled',
+}
+
 /** Final, merged result the UI renders. */
 export interface RetrievalResult {
   passages: ScoredPassage[];

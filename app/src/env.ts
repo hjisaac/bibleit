@@ -9,8 +9,22 @@ function requireEnv(key: string, value: string | undefined): string {
   return clean;
 }
 
+const MAX_RECOMMENDED_LOCAL_THREADS = 4;
+
+function resolveLocalNumThreads(): number {
+  const isIsolated = typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : false;
+  const isMultiThreadSupported = typeof SharedArrayBuffer !== 'undefined' && isIsolated;
+  if (!isMultiThreadSupported) return 1;
+  const total = typeof navigator !== 'undefined' && navigator.hardwareConcurrency
+    ? navigator.hardwareConcurrency
+    : 1;
+  return Math.min(MAX_RECOMMENDED_LOCAL_THREADS, total);
+}
+
 export const env = {
   feedbackEmail: requireEnv('VITE_FEEDBACK_EMAIL', import.meta.env.VITE_FEEDBACK_EMAIL),
   r2Url: requireEnv('VITE_CLOUDFLARE_R2_URL', import.meta.env.VITE_CLOUDFLARE_R2_URL).replace(/\/+$/, ''),
   backendApiUrl: (import.meta.env.VITE_BACKEND_API_URL?.trim() || '').replace(/\/+$/, ''),
+  numThreads: resolveLocalNumThreads(),
 } as const;
+

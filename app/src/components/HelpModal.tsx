@@ -35,6 +35,11 @@ const SECTIONS: HelpSection[] = [
     summary: 'AI overviews strictly anchored to retrieved verses with exact citations.',
   },
   {
+    id: 'audio',
+    title: 'Audio Narration & Playback',
+    summary: 'Listen to any passage, search result, or summary with natural speech.',
+  },
+  {
     id: 'storage',
     title: 'Offline Storage & Privacy',
     summary: 'Zero remote tracking. Your texts and embeddings stay on your device.',
@@ -170,8 +175,9 @@ export function HelpModal({ isOpen, onClose, onOpenFeedback }: HelpModalProps): 
                         <ul class="list-disc list-inside space-y-1 pl-1">
                           <li><b>Exact verse:</b> <code>John 3:16</code>, <code>Philippians 4:7</code></li>
                           <li><b>Full chapter:</b> <code>Genesis 1</code>, <code>Psalm 23</code></li>
-                          <li><b>As-you-type navigator:</b> Typing a prefix like <code>Rom</code> reveals a 1–16 chapter strip to jump directly with 1 tap.</li>
-                          <li><b>Visual book picker:</b> In the Reader tab, tap the book title to open the 2-tap 66-book selector.</li>
+                          <li><b>As-you-type navigator:</b> Typing a prefix like <code>Rom</code> reveals a 1-16 chapter strip to jump directly with 1 tap.</li>
+                          <li><b>Visual book picker:</b> In the Reader tab, tap the book title to open the 66-book selector.</li>
+                          <li><b>Bookmarks:</b> Tap the bookmark icon on any passage or card to save verses locally in the Saved tab.</li>
                         </ul>
                       </div>
                     )}
@@ -185,6 +191,7 @@ export function HelpModal({ isOpen, onClose, onOpenFeedback }: HelpModalProps): 
                           <li><b>Keyword match (BM25):</b> Fast lexical search for exact terms and phrases (e.g. <code>armor of God</code>).</li>
                           <li><b>Semantic search:</b> Conceptual embeddings find passages by meaning even when words differ (e.g. <code>peace in anxiety</code>).</li>
                           <li><b>Reciprocal Rank Fusion:</b> Both lists merge into a single ranked result stream.</li>
+                          <li><b>Retrieval Inspector:</b> Enable Inspector Mode in Settings to inspect cosine scores, BM25 signals, and retrieval timings.</li>
                         </ul>
                       </div>
                     )}
@@ -192,21 +199,34 @@ export function HelpModal({ isOpen, onClose, onOpenFeedback }: HelpModalProps): 
                     {sec.id === 'rag' && (
                       <div class="space-y-1.5">
                         <p>
-                          When you type a thematic question (e.g. <i>"What did Jesus teach about worry?"</i>), an on-demand <b>Synthesize</b> banner appears.
+                          When search runs, bibleit generates a <b>Grounded Summary</b> anchored strictly to retrieved scripture passages with exact chapter and verse citations.
                         </p>
                         <p>
-                          The synthesis is strictly grounded on the retrieved Bible passages and cites exact chapter/verse references. The source verses remain immediately below for verification.
+                          You can toggle AI summaries on or off in Settings, and install the on-device language model for completely offline generation.
                         </p>
+                      </div>
+                    )}
+
+                    {sec.id === 'audio' && (
+                      <div class="space-y-1.5">
+                        <p>
+                          Listen to scripture hands-free with built-in speech narration:
+                        </p>
+                        <ul class="list-disc list-inside space-y-1 pl-1">
+                          <li><b>One-tap listening:</b> Tap the speaker icon on any passage card, AI summary, or chapter header to begin.</li>
+                          <li><b>Speed controls:</b> Cycle playback speed between 0.5x, 0.75x, 1x, 1.25x, and 1.5x in the bottom audio bar.</li>
+                          <li><b>Active tracking:</b> The audio bar follows along and automatically scrolls to the card or verse currently being spoken.</li>
+                        </ul>
                       </div>
                     )}
 
                     {sec.id === 'storage' && (
                       <div class="space-y-1.5">
                         <p>
-                          All scripture data, indexes, and quantized vector matrices run on your device via the browser’s <b>Origin Private File System (OPFS)</b>.
+                          All scripture data, indexes, and on-device models run locally via the browser's <b>Origin Private File System (OPFS)</b>.
                         </p>
                         <p>
-                          Search queries are never sent to external tracking servers. You can manage or clear cached data anytime from the <b>Settings</b> tab.
+                          Search queries and readings remain strictly on your device. You can download or clear offline packages anytime in the <b>Settings</b> tab.
                         </p>
                       </div>
                     )}
@@ -218,27 +238,24 @@ export function HelpModal({ isOpen, onClose, onOpenFeedback }: HelpModalProps): 
         </div>
 
         {/* Footer */}
-        <div
-          class="pt-3 border-t flex items-center justify-between gap-2 shrink-0"
-          style={{ borderColor: 'var(--border-subtle)' }}
-        >
-          {onOpenFeedback ? (
+        {onOpenFeedback && (
+          <div
+            class="pt-3 border-t shrink-0"
+            style={{ borderColor: 'var(--border-subtle)' }}
+          >
             <button
               type="button"
               onClick={() => {
                 onClose();
                 onOpenFeedback();
               }}
-              class="px-3.5 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition-opacity hover:opacity-85"
+              class="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-white flex items-center justify-center gap-1.5 transition-opacity hover:opacity-90 cursor-pointer shadow-sm"
               style={{
-                backgroundColor: 'var(--bg-surface-elevated)',
-                borderColor: 'var(--border-subtle)',
-                color: 'var(--text-main)',
+                backgroundColor: 'var(--accent)',
               }}
             >
               <svg
-                class="w-3.5 h-3.5 shrink-0"
-                style={{ color: 'var(--text-muted)' }}
+                class="w-3.5 h-3.5 shrink-0 text-white/80"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -252,18 +269,8 @@ export function HelpModal({ isOpen, onClose, onOpenFeedback }: HelpModalProps): 
               </svg>
               <span>Send Feedback</span>
             </button>
-          ) : (
-            <div />
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            class="px-4 py-1.5 rounded-xl text-xs font-medium text-white transition-opacity hover:opacity-90"
-            style={{ backgroundColor: 'var(--accent)' }}
-          >
-            Got it
-          </button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

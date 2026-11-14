@@ -62,3 +62,18 @@ test-e2e:
 # Run python ingest pipeline test suite
 test-ingest:
     cd ingest && uv run pytest -q
+
+# Benchmark on-device inference speed (embedding and SLM generation)
+bench-inference *args="":
+    pnpm --prefix app benchmark:inference {{args}}
+
+# Benchmark SLM text generation inference latency and throughput
+bench-generation *args="":
+    pnpm --prefix app benchmark:generation {{args}}
+
+# Compare SmolLM2-135M vs SmolLM2-360M side by side
+bench-compare *args="":
+    pnpm --prefix app benchmark:compare {{args}}
+
+
+

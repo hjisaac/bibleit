@@ -1,11 +1,11 @@
-import { pipeline, env, TextStreamer } from '@huggingface/transformers';
+import { pipeline, env, TextStreamer, DynamicCache, type Tensor } from '@huggingface/transformers';
 import { env as appEnv } from '../env';
 
 env.allowLocalModels = false;
 
 const r2Base = appEnv.r2Url;
 if (env.backends?.onnx?.wasm) {
-  env.backends.onnx.wasm.numThreads = 1;
+  env.backends.onnx.wasm.numThreads = appEnv.numThreads;
   env.backends.onnx.wasm.wasmPaths = {
     mjs: `${r2Base}/ort-wasm-simd-threaded.asyncify.mjs`,
     wasm: `${r2Base}/ort-wasm-simd-threaded.asyncify.wasm`,
@@ -22,14 +22,60 @@ Rules:
 - Citations: Cite specific references in brackets, e.g. [MAT 22:39] or [ROM 13:8-10]. Use a regular hyphen in verse ranges.
 - Length: Keep the summary cohesive, concise, and focused (1 to 2 paragraphs, under 150 words).`;
 
+const SYSTEM_PREFIX = `<|im_start|>system\n${SYSTEM_PROMPT}<|im_end|>\n<|im_start|>user\n`;
+
 function buildChatPrompt(query: string, passages: (string | { text?: string })[]): string {
   const context = (passages || [])
     .slice(0, 5)
     .map((c) => (typeof c === 'string' ? c : c.text ?? ''))
     .join('\n\n');
 
-  return `<|im_start|>system\n${SYSTEM_PROMPT}<|im_end|>\n<|im_start|>user\nPassages:\n${context}\n\nTopic / Question: ${query}\nDirect answer (plain text, no preamble):<|im_end|>\n<|im_start|>assistant\n`;
+  return `${SYSTEM_PREFIX}Passages:\n${context}\n\nTopic / Question: ${query}\nDirect answer (plain text, no preamble):<|im_end|>\n<|im_start|>assistant\n`;
 }
+
+let systemPromptCacheEntries: Record<string, Tensor> | null = null;
+let systemPromptCachePromise: Promise<void> | null = null;
+
+async function warmSystemPromptCache(generator: any): Promise<void> {
+  if (systemPromptCacheEntries) return;
+  if (!systemPromptCachePromise) {
+    systemPromptCachePromise = (async () => {
+      try {
+        const sysInputs = generator.tokenizer(SYSTEM_PREFIX, { add_special_tokens: false });
+        const sysOutputs = await generator.model(sysInputs);
+        const entries: Record<string, Tensor> = {};
+        for (let i = 0; i < 32; i++) {
+          const k = sysOutputs[`present.${i}.key`];
+          const v = sysOutputs[`present.${i}.value`];
+          if (k && v) {
+            entries[`past_key_values.${i}.key`] = k;
+            entries[`past_key_values.${i}.value`] = v;
+          }
+        }
+        if (Object.keys(entries).length > 0) {
+          systemPromptCacheEntries = entries;
+        }
+      } catch {
+        systemPromptCacheEntries = null;
+      }
+    })();
+  }
+  await systemPromptCachePromise;
+}
+
+function getClonedSystemPromptCache(): DynamicCache | null {
+  if (!systemPromptCacheEntries) return null;
+  try {
+    const cloned: Record<string, Tensor> = {};
+    for (const key in systemPromptCacheEntries) {
+      cloned[key] = (systemPromptCacheEntries[key] as any).clone();
+    }
+    return new DynamicCache(cloned);
+  } catch {
+    return null;
+  }
+}
+
 
 let generatorPromise: Promise<any> | null = null;
 let lastReportedProgress = 0;
@@ -96,7 +142,8 @@ self.onmessage = async (e: MessageEvent) => {
 
   if (data.type === 'load') {
     try {
-      await getGenerator();
+      const generator = await getGenerator();
+      await warmSystemPromptCache(generator);
       self.postMessage({ type: 'progress', progress: 1.0 });
       self.postMessage({ type: 'loaded' });
     } catch (err) {
@@ -118,6 +165,7 @@ self.onmessage = async (e: MessageEvent) => {
       if (!activeGenerations.has(id)) return;
 
       const prompt = buildChatPrompt(data.query, data.passages);
+      const prefixCache = getClonedSystemPromptCache();
 
       const streamer = new TextStreamer(generator.tokenizer, {
         skip_prompt: true,
@@ -129,13 +177,26 @@ self.onmessage = async (e: MessageEvent) => {
         },
       });
 
-      await generator(prompt, {
-        max_new_tokens: 220,
-        temperature: 0.2,
-        top_p: 0.9,
-        do_sample: false,
-        streamer,
-      });
+      if (prefixCache && generator.model?.generate) {
+        const inputs = generator.tokenizer(prompt, { add_special_tokens: false });
+        await generator.model.generate({
+          ...inputs,
+          past_key_values: prefixCache,
+          max_new_tokens: 150,
+          temperature: 0.2,
+          top_p: 0.9,
+          do_sample: false,
+          streamer,
+        });
+      } else {
+        await generator(prompt, {
+          max_new_tokens: 150,
+          temperature: 0.2,
+          top_p: 0.9,
+          do_sample: false,
+          streamer,
+        });
+      }
 
       if (activeGenerations.has(id)) {
         activeGenerations.delete(id);

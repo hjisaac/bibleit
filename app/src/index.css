@@ -18,6 +18,8 @@ body.theme-paper {
   --badge-sem-text: #92400E;
   --badge-key-bg: #F1F5F9;
   --badge-key-text: #334155;
+  --badge-ai-bg: #F5F3FF;
+  --badge-ai-text: #6D28D9;
 }
 
 body.theme-sepia {
@@ -36,6 +38,8 @@ body.theme-sepia {
   --badge-sem-text: #734F1A;
   --badge-key-bg: #E7DFD5;
   --badge-key-text: #4E4237;
+  --badge-ai-bg: #EDE9FE;
+  --badge-ai-text: #5B21B6;
 }
 
 body.theme-obsidian {
@@ -54,6 +58,8 @@ body.theme-obsidian {
   --badge-sem-text: #FDE68A;
   --badge-key-bg: #1E293B;
   --badge-key-text: #CBD5E1;
+  --badge-ai-bg: #2E1065;
+  --badge-ai-text: #DDD6FE;
 }
 
 html,
@@ -79,4 +85,55 @@ body {
   background-color: var(--bg-page);
   color: var(--text-main);
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+@keyframes gradient-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.border-gradient-animated {
+  border-color: transparent !important;
+  background-image:
+    linear-gradient(var(--bg-surface-elevated), var(--bg-surface-elevated)),
+    linear-gradient(90deg, #f59e0b, #ec4899, #8b5cf6, #10b981, #f59e0b) !important;
+  background-origin: border-box !important;
+  background-clip: padding-box, border-box !important;
+  background-size: 100% 100%, 300% 300% !important;
+  animation: gradient-flow 4s ease infinite !important;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0.45;
+  }
+}
+
+.skeleton-box {
+  background-color: var(--border-subtle);
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+  border-radius: 0.375rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .border-gradient-animated,
+  .skeleton-box {
+    animation: none !important;
+  }
+  .skeleton-box {
+    opacity: 0.6;
+  }
 }
