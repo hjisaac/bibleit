@@ -280,3 +280,6 @@ paper/
 
 # Local task tracking
 TODO.md
+
+# Investigation & benchmark scratch scripts
+app/scripts/

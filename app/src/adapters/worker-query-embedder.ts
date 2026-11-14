@@ -20,11 +20,23 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
       if (typeof Worker === 'undefined') {
         throw new Error('Web Workers not supported in this runtime');
       }
-      this.worker = new Worker(new URL('../workers/embedder.worker.ts', import.meta.url), {
+      this.worker = new Worker(new URL('../workers/embedding.worker.ts', import.meta.url), {
         type: 'module',
       });
       this.worker.onmessage = (e) => this.handleMessage(e.data);
-      this.worker.onerror = (e) => console.error('Embedder worker error:', e);
+      this.worker.onerror = (e) => {
+        console.error('Embedder worker error:', e);
+        const err = new Error(e.message || 'Worker execution error');
+        if (this.loadReject) {
+          this.loadReject(err);
+          this.loadPromise = null;
+          this.loadReject = null;
+        }
+        for (const req of this.pending.values()) {
+          req.reject(err);
+        }
+        this.pending.clear();
+      };
     }
     return this.worker;
   }

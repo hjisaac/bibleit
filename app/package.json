@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "benchmark:inference": "node scripts/benchmark-inference.mjs",
+    "benchmark:generation": "node scripts/benchmark-generation.mjs",
+    "benchmark:compare": "node scripts/compare-models.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.2",

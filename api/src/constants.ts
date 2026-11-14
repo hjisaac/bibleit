@@ -6,3 +6,5 @@ export const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 export const MAX_QUERY_LENGTH = 500;
 export const MAX_PASSAGES = 5;
 export const MAX_PASSAGE_TEXT_LENGTH = 2000;
+export const BACKEND_ONNX_NUM_THREADS = 1;
+

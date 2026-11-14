@@ -59,14 +59,44 @@ describe('HelpModal - Single Section Accordion Behavior', () => {
     expect(screen.queryByText(/Jump directly to any passage by typing canonical citations/i)).toBeNull();
   });
 
-  it('invokes onClose when clicking Got It or close button', () => {
+  it('invokes onClose when clicking close button or backdrop', () => {
     const onClose = vi.fn();
     render(<HelpModal isOpen={true} onClose={onClose} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Got it/i }));
+    fireEvent.click(screen.getByTitle('Close guide'));
     expect(onClose).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByTitle('Close guide'));
+    fireEvent.click(screen.getByRole('dialog'));
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it('invokes onClose and onOpenFeedback when clicking Send Feedback', () => {
+    const onClose = vi.fn();
+    const onOpenFeedback = vi.fn();
+    render(<HelpModal isOpen={true} onClose={onClose} onOpenFeedback={onOpenFeedback} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Send Feedback/i }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onOpenFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders and expands the Audio Narration & Playback section', () => {
+    render(<HelpModal isOpen={true} onClose={vi.fn()} />);
+
+    const audioButton = screen.getByRole('button', { name: /Audio Narration & Playback/i });
+    fireEvent.click(audioButton);
+
+    expect(screen.getByText(/Listen to scripture hands-free with built-in speech narration/i)).toBeTruthy();
+    expect(screen.getByText(/0.5x, 0.75x, 1x, 1.25x, and 1.5x/i)).toBeTruthy();
+  });
+
+  it('renders and expands the Grounded Scripture Synthesis section with updated info', () => {
+    render(<HelpModal isOpen={true} onClose={vi.fn()} />);
+
+    const ragButton = screen.getByRole('button', { name: /Grounded Scripture Synthesis/i });
+    fireEvent.click(ragButton);
+
+    expect(screen.getByText(/bibleit generates a/i)).toBeTruthy();
+    expect(screen.getByText(/install the on-device language model/i)).toBeTruthy();
   });
 });

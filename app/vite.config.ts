@@ -87,6 +87,27 @@ export default defineConfig(async ({ command, mode }) => {
   server: {
     port: 3000,
     host: true,
+    // Required for SharedArrayBuffer (ORT asyncify WASM) and worker loading on http://localhost.
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    },
+  },
+  preview: {
+    port: 3000,
+    host: true,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    },
+  },
+  worker: {
+    format: 'es',
+  },
+  build: {
+    sourcemap: true,
   },
   test: {
     environment: 'jsdom',

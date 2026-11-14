@@ -2,7 +2,7 @@ import type { JSX } from 'preact';
 import type { AudioNarrator } from '../core/ports';
 import type { NarrationState } from '../core/types';
 
-const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5] as const;
+const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5] as const;
 
 interface AudioPlayerBarProps {
   narrator: AudioNarrator;

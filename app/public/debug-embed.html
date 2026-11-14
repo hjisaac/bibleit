@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Embedder Inference Benchmark & Debugger</title>
+  <style>
+    body {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background: #18181b;
+      color: #f4f4f5;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { font-size: 1.25rem; color: #fbbf24; margin-bottom: 16px; }
+    .card {
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      background: #18181b;
+      border: 1px solid #52525b;
+      color: #fafafa;
+      padding: 8px 12px;
+      font-family: inherit;
+      border-radius: 4px;
+      margin-bottom: 12px;
+    }
+    button {
+      background: #d97706;
+      color: #ffffff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-family: inherit;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    pre {
+      background: #18181b;
+      border: 1px solid #3f3f46;
+      padding: 12px;
+      border-radius: 4px;
+      max-height: 400px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+    .badge-ok { background: #065f46; color: #34d399; }
+    .badge-busy { background: #78350f; color: #fde68a; }
+  </style>
+</head>
+<body>
+  <h1>Query Embedder Inference Isolation Harness</h1>
+
+  <div class="card">
+    <label for="queryInput"><strong>Test Query:</strong></label>
+    <input id="queryInput" type="text" value="search_query: What did Jesus teach about worry?" />
+    
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <button id="btnLoad">1. Load Model</button>
+      <button id="btnEmbed">2. Run Inference</button>
+      <button id="btnClear" style="background: #3f3f46;">Clear Logs</button>
+      <span id="statusBadge" class="badge badge-busy">Idle</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <strong>Benchmark & Diagnostic Logs:</strong>
+    <pre id="logs">[Ready] Open DevTools (F12) -> Sources / Debugger to inspect embedding.worker.ts</pre>
+  </div>
+
+  <script type="module">
+    const logsEl = document.getElementById('logs');
+    const statusBadge = document.getElementById('statusBadge');
+    const queryInput = document.getElementById('queryInput');
+    const btnLoad = document.getElementById('btnLoad');
+    const btnEmbed = document.getElementById('btnEmbed');
+    const btnClear = document.getElementById('btnClear');
+
+    function log(msg) {
+      const time = new Date().toISOString().substring(11, 23);
+      logsEl.textContent += `\n[${time}] ${msg}`;
+      logsEl.scrollTop = logsEl.scrollHeight;
+      console.log(`[Harness ${time}]`, msg);
+    }
+
+    function setStatus(text, ok) {
+      statusBadge.textContent = text;
+      statusBadge.className = 'badge ' + (ok ? 'badge-ok' : 'badge-busy');
+    }
+
+    btnClear.onclick = () => {
+      logsEl.textContent = '[Logs cleared]';
+    };
+
+    log('Instantiating isolated worker: /src/workers/embedding.worker.ts');
+    let worker;
+    try {
+      worker = new Worker(new URL('../src/workers/embedding.worker.ts', import.meta.url), {
+        type: 'module',
+      });
+      log('Worker instance created successfully.');
+    } catch (e) {
+      log('CRITICAL: Failed to instantiate Worker: ' + (e.message || e));
+    }
+
+    let loadStartTime = 0;
+    let embedStartTime = 0;
+
+    worker.onmessage = (e) => {
+      const data = e.data;
+      if (!data) return;
+
+      if (data.type === 'progress') {
+        const pct = Math.round(data.progress * 100);
+        setStatus(`Loading Model: ${pct}%`, false);
+        log(`Model download/cache progress: ${pct}%`);
+      } else if (data.type === 'loaded') {
+        const elapsed = Math.round(performance.now() - loadStartTime);
+        setStatus('Model Loaded', true);
+        log(`SUCCESS: Model loaded and pipeline initialized in ${elapsed}ms.`);
+      } else if (data.type === 'load_error') {
+        setStatus('Load Error', false);
+        log(`ERROR loading model: ${data.error}`);
+      } else if (data.type === 'embed_result') {
+        const elapsed = Math.round(performance.now() - embedStartTime);
+        setStatus(`Inference: ${elapsed}ms`, true);
+        const vec = data.vector;
+        const norm = Math.sqrt(vec.reduce((sum, v) => sum + v * v, 0));
+        log(`SUCCESS: Embedding generated in ${elapsed}ms!`);
+        log(`- Vector dim: ${vec.length}`);
+        log(`- L2 Norm: ${norm.toFixed(4)} (normalized: ${Math.abs(norm - 1.0) < 0.01})`);
+        log(`- Sample floats [0..4]: [${Array.from(vec.slice(0, 5)).map(v => v.toFixed(4)).join(', ')}]`);
+      } else if (data.type === 'embed_error') {
+        setStatus('Embed Error', false);
+        log(`ERROR in embedding inference: ${data.error}`);
+      }
+    };
+
+    worker.onerror = (e) => {
+      log(`WORKER ONERROR: ${e.message || 'Unknown error'} (${e.filename}:${e.lineno})`);
+      setStatus('Worker Error', false);
+    };
+
+    btnLoad.onclick = () => {
+      setStatus('Loading Model...', false);
+      loadStartTime = performance.now();
+      log('Sending { type: "load" } to worker...');
+      worker.postMessage({ type: 'load' });
+    };
+
+    btnEmbed.onclick = () => {
+      const text = queryInput.value.trim();
+      if (!text) return;
+      setStatus('Running Inference...', false);
+      embedStartTime = performance.now();
+      log(`Sending { type: "embed", text: "${text}" } to worker...`);
+      worker.postMessage({ type: 'embed', id: 1, text });
+    };
+  </script>
+</body>
+</html>

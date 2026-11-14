@@ -2,17 +2,20 @@
  * The seams. Every runtime component implements one of these interfaces.
  * Swapping a component for perf = new adapter + one line in composition.
  */
-import type {
-  Chunk,
-  Manifest,
-  NarrationSegment,
-  NarrationState,
-  RawChunk,
-  RefRange,
-  RetrievalResult,
-  ScoredPassage,
-  VerseCorpusData,
+import {
+  type Chunk,
+  type Manifest,
+  type NarrationSegment,
+  type NarrationState,
+  type RawChunk,
+  type RefRange,
+  type RetrievalResult,
+  type ScoredPassage,
+  SubsystemStateEnum,
+  type VerseCorpusData,
 } from './types';
+
+export { SubsystemStateEnum };
 
 export interface SearchEngine {
   /** Resolves when the engine is usable (artifacts loaded / backend reachable). */
@@ -22,7 +25,7 @@ export interface SearchEngine {
   sync?(): Promise<void>;
 }
 
-export type SubsystemState = 'ready' | 'initializing' | 'error' | 'disabled';
+export type SubsystemState = SubsystemStateEnum | 'ready' | 'initializing' | 'error' | 'disabled';
 
 export interface SubsystemHealth {
   state: SubsystemState;

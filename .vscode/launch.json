@@ -2,6 +2,60 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Debug bibleit (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}",
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "skipFiles": [
+        "<node_internals>/**",
+        "**/node_modules/**",
+        "https://**"
+      ],
+      "sourceMapPathOverrides": {
+        "/src/*": "${workspaceFolder}/app/src/*",
+        "/@fs/*": "/*"
+      }
+    },
+    {
+      "name": "Attach to Chrome (Port 9222)",
+      "type": "chrome",
+      "request": "attach",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}",
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],
+      "skipFiles": [
+        "<node_internals>/**",
+        "**/node_modules/**",
+        "https://**"
+      ],
+      "sourceMapPathOverrides": {
+        "/src/*": "${workspaceFolder}/app/src/*",
+        "/@fs/*": "/*"
+      }
+    },
+    {
+      "name": "Debug bibleit (Firefox)",
+      "type": "firefox",
+      "request": "launch",
+      "reAttach": true,
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}",
+      "firefoxExecutable": "/home/hjisaac/.local/bin/firefox",
+      "pathMappings": [
+        { "url": "http://localhost:3000/src", "path": "${workspaceFolder}/app/src" }
+      ]
+    },
+    {
       "name": "Python: Current File (ingest venv)",
       "type": "debugpy",
       "request": "launch",

@@ -3,6 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { env, pipeline, type FeatureExtractionPipeline } from '@huggingface/transformers';
 import type { QueryEmbedder } from '@bibleit/engine';
+import { BACKEND_ONNX_NUM_THREADS } from '../constants';
+
 
 export class NodeQueryEmbedder implements QueryEmbedder {
   readonly modelId: string;
@@ -46,8 +48,8 @@ export class NodeQueryEmbedder implements QueryEmbedder {
       this.extractorPromise = pipeline('feature-extraction', this.modelId, {
         dtype: 'q8',
         session_options: {
-          intraOpNumThreads: 1,
-          interOpNumThreads: 1,
+          intraOpNumThreads: BACKEND_ONNX_NUM_THREADS,
+          interOpNumThreads: BACKEND_ONNX_NUM_THREADS,
           enableCpuMemArena: false,
         },
       }) as Promise<FeatureExtractionPipeline>;

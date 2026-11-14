@@ -206,17 +206,18 @@ export function SettingsView({
             <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
               <span>AI Scripture Overview</span>
               <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-mono font-medium">
-                LLM
+                AI
               </span>
             </div>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              Generate grounded AI overviews when searching topics and questions (requires internet).
+              Generate grounded scripture summaries when searching topics and questions.
             </p>
           </div>
 
           <label class="relative inline-flex items-center cursor-pointer shrink-0">
             <input
               type="checkbox"
+              aria-label="AI Scripture Overview"
               checked={isAiEnabled}
               onChange={(e) => onToggleAi((e.target as HTMLInputElement).checked)}
               class="sr-only peer"
@@ -250,6 +251,7 @@ export function SettingsView({
           <label class="relative inline-flex items-center cursor-pointer shrink-0">
             <input
               type="checkbox"
+              aria-label="Retrieval Inspector Mode"
               checked={isInspectorMode}
               onChange={(e) => onToggleInspector((e.target as HTMLInputElement).checked)}
               class="sr-only peer"
@@ -303,6 +305,7 @@ export function SettingsView({
           <label class="relative inline-flex items-center cursor-pointer shrink-0">
             <input
               type="checkbox"
+              aria-label="Pericope Headings"
               checked={showHeadings}
               onChange={(e) => onToggleHeadings((e.target as HTMLInputElement).checked)}
               class="sr-only peer"
@@ -844,7 +847,7 @@ export function SettingsView({
           }}
         >
           <option selected>World English Bible (WEB) - Public Domain</option>
-          <option>Louis Segond 1910 (LSG) - Domaine Public (Français)</option>
+          {/* <option>Louis Segond 1910 (LSG) - Domaine Public (Français)</option> */}
         </select>
       </div>
 

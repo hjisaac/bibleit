@@ -384,8 +384,17 @@ export function ReaderView({
         </div>
 
         {isLoading && (
-          <div class="py-12 text-center text-sm font-sans" style={{ color: 'var(--text-muted)' }}>
-            Loading chapter text...
+          <div class="space-y-4 py-4 animate-fadeIn" aria-label="Loading chapter text">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} class="space-y-2">
+                <div class="flex items-center gap-2">
+                  <div class="skeleton-box h-3 w-5 rounded" />
+                  <div class="skeleton-box h-3.5 w-[92%]" />
+                </div>
+                <div class="skeleton-box h-3.5 w-full" />
+                <div class="skeleton-box h-3.5 w-[75%]" />
+              </div>
+            ))}
           </div>
         )}
 
