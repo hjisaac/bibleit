@@ -35,9 +35,12 @@ describe('French & English Multi-Translation Support', () => {
   it('localizes book names properly by locale', () => {
     expect(getLocalizedBookName('GEN', 'en')).toBe('Genesis');
     expect(getLocalizedBookName('GEN', 'fr')).toBe('Genèse');
+    expect(getLocalizedBookName('ROM', 'en')).toBe('Romans');
+    expect(getLocalizedBookName('ROM', 'fr')).toBe('Romains');
     expect(getLocalizedBookName('REV', 'en')).toBe('Revelation');
     expect(getLocalizedBookName('REV', 'fr')).toBe('Apocalypse');
     expect(getLocalizedBookName('JHN', 'fr')).toBe('Jean');
+    expect(getLocalizedBookName('MRK', 'fr')).toBe('Marc');
   });
 
   it('matches French book names in prefix lookup in O(1)', () => {
@@ -46,6 +49,14 @@ describe('French & English Multi-Translation Support', () => {
     expect(findBookByPrefix('jean')?.id).toBe('JHN');
     expect(findBookByPrefix('apocalypse')?.id).toBe('REV');
     expect(findBookByPrefix('matthieu')?.id).toBe('MAT');
+    expect(findBookByPrefix('rom', 'fr')?.id).toBe('ROM');
+    expect(findBookByPrefix('romains', 'fr')?.id).toBe('ROM');
+    expect(findBookByPrefix('mc', 'fr')?.id).toBe('MRK');
+    expect(findBookByPrefix('lc', 'fr')?.id).toBe('LUK');
+    expect(findBookByPrefix('nb', 'fr')?.id).toBe('NUM');
+    expect(findBookByPrefix('1r', 'fr')?.id).toBe('1KI');
+    expect(findBookByPrefix('1p', 'fr')?.id).toBe('1PE');
+    expect(findBookByPrefix('ap', 'fr')?.id).toBe('REV');
   });
 
   it('provides matching manifests for both WEB and LSG', () => {

@@ -1,6 +1,12 @@
 import type { RefParser } from '../core/ports';
 import type { RefRange } from '../core/types';
-import { BIBLE_BOOKS, type BibleBook } from '../core/bible-books';
+import {
+  BIBLE_BOOKS,
+  FRENCH_BOOK_ALIASES,
+  FRENCH_BOOK_NAMES,
+  stripAccents,
+  type BibleBook,
+} from '../core/bible-books';
 
 /**
  * Builds a lookup map from lowercase aliases to canonical BibleBook metadata.
@@ -15,8 +21,22 @@ export function buildBookAliasMap(
   for (const b of books) {
     aliasMap.set(b.id.toLowerCase(), b);
     aliasMap.set(b.name.toLowerCase(), b);
+    aliasMap.set(stripAccents(b.name.toLowerCase()), b);
     for (const alias of b.aliases) {
       aliasMap.set(alias.toLowerCase(), b);
+      aliasMap.set(stripAccents(alias.toLowerCase()), b);
+    }
+    const frName = FRENCH_BOOK_NAMES[b.id];
+    if (frName) {
+      aliasMap.set(frName.toLowerCase(), b);
+      aliasMap.set(stripAccents(frName.toLowerCase()), b);
+    }
+    const frAliases = FRENCH_BOOK_ALIASES[b.id];
+    if (frAliases) {
+      for (const alias of frAliases) {
+        aliasMap.set(alias.toLowerCase(), b);
+        aliasMap.set(stripAccents(alias.toLowerCase()), b);
+      }
     }
   }
 
@@ -32,14 +52,14 @@ export function buildBookAliasMap(
 export class RegexRefParser implements RefParser {
   private aliasMap: Map<string, BibleBook>;
 
-  // Regex pattern:
+  // Regex pattern (unicode-safe word boundaries for accented characters e.g. Ésaïe):
   // Group 1: Book name/alias (letters, numbers like 1/2/3, and spaces)
   // Group 2: Chapter number
   // Group 3: Optional verse portion (:start[-end])
   // Group 4: Start verse number
   // Group 5: Optional end verse number
   private static readonly REF_PATTERN =
-    /\b([1-3]?\s*[\p{L}\p{M}]+)\s+(\d+)(?::(\d+)(?:[-–—](\d+))?)?\b/gu;
+    /(?<![\p{L}\p{N}])([1-3]?\s*[\p{L}\p{M}]+)\s+(\d+)(?::(\d+)(?:[-–—](\d+))?)?(?![\p{L}\p{N}])/gu;
 
   constructor(aliasMap?: Map<string, BibleBook>) {
     this.aliasMap = aliasMap ?? buildBookAliasMap();
@@ -63,7 +83,7 @@ export class RegexRefParser implements RefParser {
 
       // Normalize internal whitespace (e.g., "1  cor" -> "1 cor")
       const normalizedBook = rawBook.replace(/\s+/g, ' ');
-      const book = this.aliasMap.get(normalizedBook);
+      const book = this.aliasMap.get(normalizedBook) ?? this.aliasMap.get(stripAccents(normalizedBook));
       if (!book) continue;
 
       const chapter = parseInt(chapterStr, 10);

@@ -611,5 +611,29 @@ describe('SearchView Cold Start and Search Persistence', () => {
 
     $localeSetting.set('en');
   });
+
+  it('renders localized book proposition and chapter buttons in French when typing book prefix', async () => {
+    const { $isMultilingualEnabled, $localeSetting } = await import('../src/stores/i18n');
+    $isMultilingualEnabled.set(true);
+    $localeSetting.set('fr');
+
+    const onOpenReader = vi.fn();
+    renderSearchView({ onOpenReader });
+
+    const input = screen.getByRole('textbox');
+    fireEvent.input(input, { target: { value: 'rom' } });
+
+    const bookBtn = await screen.findByRole('button', { name: 'Romains' });
+    expect(bookBtn).toBeTruthy();
+    expect(bookBtn.getAttribute('title')).toContain('Romains 1:1');
+
+    const ch1Btn = screen.getByRole('button', { name: '1' });
+    expect(ch1Btn.getAttribute('title')).toContain('Romains 1');
+
+    fireEvent.click(ch1Btn);
+    expect(onOpenReader).toHaveBeenCalledWith('ROM', 1, 1);
+
+    $localeSetting.set('en');
+  });
 });
 

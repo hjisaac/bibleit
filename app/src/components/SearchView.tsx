@@ -11,7 +11,7 @@ import {
   SearchOriginEnum,
   type ScoredPassage,
 } from '../core/types';
-import { BIBLE_BOOKS_BY_ID, findBookByPrefix } from '../core/bible-books';
+import { findBookByPrefix, getLocalizedBookName } from '../core/bible-books';
 import { formatCitation } from '@bibleit/engine';
 import { resolveVerseText } from '../adapters/book-store';
 import { getPopularTopics, getSearchSuggestions } from '../core/starter-topics';
@@ -125,12 +125,12 @@ export function renderHighlightedText(
   );
 }
 
-function buildPassageSegments(passageList: ScoredPassage[]): NarrationSegment[] {
+function buildPassageSegments(passageList: ScoredPassage[], locale?: string): NarrationSegment[] {
   return passageList.map((p) => {
     const key = getChunkKey(p.chunk);
     return {
       id: `chunk-${key}`,
-      citation: formatCitation(p.chunk.book, p.chunk.start, p.chunk.end),
+      citation: formatCitation(p.chunk.book, p.chunk.start, p.chunk.end, locale),
       text: p.chunk.text,
       book: p.chunk.book,
       chapter: p.chunk.start[0],
@@ -368,7 +368,7 @@ export function SearchView({
     }
   };
 
-  const matchedBook = findBookByPrefix(query);
+  const matchedBook = findBookByPrefix(query, currentLocale);
 
   useEffect(() => {
     $lastSearch.set({
@@ -716,46 +716,49 @@ export function SearchView({
       </form>
 
       {/* Scripture Navigator Strip (Compact: book name & chapter buttons) */}
-      {matchedBook && (
-        <div
-          class="mb-2.5 px-3 py-2 rounded-xl border flex items-center gap-2.5 animate-fadeIn shrink-0 overflow-hidden"
-          style={{
-            backgroundColor: 'var(--bg-surface)',
-            borderColor: 'color-mix(in srgb, var(--border-subtle) 50%, transparent)',
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => onOpenReader(matchedBook.id, 1, 1)}
-            class="shrink-0 text-xs font-semibold hover:opacity-80 transition-opacity text-left cursor-pointer hover:underline"
-            style={{ color: 'var(--text-main)' }}
-            title={t.readBookAria({ book: matchedBook.name })}
+      {matchedBook && (() => {
+        const bookName = getLocalizedBookName(matchedBook.id, currentLocale);
+        return (
+          <div
+            class="mb-2.5 px-3 py-2 rounded-xl border flex items-center gap-2.5 animate-fadeIn shrink-0 overflow-hidden"
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              borderColor: 'color-mix(in srgb, var(--border-subtle) 50%, transparent)',
+            }}
           >
-            {matchedBook.name}
-          </button>
+            <button
+              type="button"
+              onClick={() => onOpenReader(matchedBook.id, 1, 1)}
+              class="shrink-0 text-xs font-semibold hover:opacity-80 transition-opacity text-left cursor-pointer hover:underline"
+              style={{ color: 'var(--text-main)' }}
+              title={t.readBookAria({ book: bookName })}
+            >
+              {bookName}
+            </button>
 
-          <div class="h-4 w-px shrink-0" style={{ backgroundColor: 'var(--border-subtle)' }} />
+            <div class="h-4 w-px shrink-0" style={{ backgroundColor: 'var(--border-subtle)' }} />
 
-          <div class="flex items-center gap-1 overflow-x-auto text-[11px] no-scrollbar py-0.5">
-            {Array.from({ length: matchedBook.chapters }, (_, i) => i + 1).map((ch) => (
-              <button
-                key={ch}
-                type="button"
-                onClick={() => onOpenReader(matchedBook.id, ch, 1)}
-                class="shrink-0 w-6 h-6 rounded-md border flex items-center justify-center font-medium transition-all hover:opacity-80"
-                style={{
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                  borderColor: 'var(--border-subtle)',
-                  color: 'var(--text-main)',
-                }}
-                title={t.openChapterAria({ book: matchedBook.name, ch })}
-              >
-                {ch}
-              </button>
-            ))}
+            <div class="flex items-center gap-1 overflow-x-auto text-[11px] no-scrollbar py-0.5">
+              {Array.from({ length: matchedBook.chapters }, (_, i) => i + 1).map((ch) => (
+                <button
+                  key={ch}
+                  type="button"
+                  onClick={() => onOpenReader(matchedBook.id, ch, 1)}
+                  class="shrink-0 w-6 h-6 rounded-md border flex items-center justify-center font-medium transition-all hover:opacity-80"
+                  style={{
+                    backgroundColor: 'var(--bg-surface-elevated)',
+                    borderColor: 'var(--border-subtle)',
+                    color: 'var(--text-main)',
+                  }}
+                  title={t.openChapterAria({ book: bookName, ch })}
+                >
+                  {ch}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Guidance Panel P (Shown on cold start or when search is focused/empty) */}
       {isPanelOpen && (
@@ -997,7 +1000,7 @@ export function SearchView({
         {!isSearching && passages.map((p, cardIdx) => {
           const chunkKey = getChunkKey(p.chunk);
           const isExpanded = expandedCardKey === chunkKey;
-          const refString = formatCitation(p.chunk.book, p.chunk.start, p.chunk.end);
+          const refString = formatCitation(p.chunk.book, p.chunk.start, p.chunk.end, currentLocale);
           const sections = getChunkSectionViews(p, splitPoints[chunkKey]);
 
           const isSaved =
@@ -1089,7 +1092,7 @@ export function SearchView({
                           return;
                         }
                         setExpandedCardKey(chunkKey);
-                        const segments = buildPassageSegments(passages);
+                        const segments = buildPassageSegments(passages, currentLocale);
                         narrator.play(segments, cardIdx);
                       }}
                       title={isCardPlaying ? t.pauseNarrationTitle : t.listenPassageTitle}
@@ -1118,7 +1121,7 @@ export function SearchView({
                     <button
                       type="button"
                       onClick={() => {
-                        const bookName = BIBLE_BOOKS_BY_ID[p.chunk.book]?.name ?? p.chunk.book;
+                        const bookName = getLocalizedBookName(p.chunk.book, currentLocale);
                         onSaveVerse({
                           book: p.chunk.book,
                           bookName,

@@ -98,6 +98,75 @@ export const FRENCH_BOOK_NAMES: Readonly<Record<string, string>> = Object.freeze
   JUD: 'Jude', REV: 'Apocalypse',
 });
 
+export const FRENCH_BOOK_ALIASES: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  GEN: ['gn', 'gen', 'genese'],
+  EXO: ['ex', 'exo', 'exode'],
+  LEV: ['lv', 'le', 'lev', 'levitique'],
+  NUM: ['nb', 'nom', 'nomb', 'nombres'],
+  DEU: ['dt', 'deut', 'deuteronome'],
+  JOS: ['jos', 'josue'],
+  JDG: ['jg', 'jug', 'juge', 'juges'],
+  RUT: ['rt', 'ru', 'rut', 'ruth'],
+  '1SA': ['1s', '1sam', '1samuel', '1 samuel', '1 sam'],
+  '2SA': ['2s', '2sam', '2samuel', '2 samuel', '2 sam'],
+  '1KI': ['1r', '1roi', '1rois', '1 roi', '1 rois'],
+  '2KI': ['2r', '2roi', '2rois', '2 roi', '2 rois'],
+  '1CH': ['1ch', '1chr', '1chron', '1chroniques', '1 chroniques', '1 chron'],
+  '2CH': ['2ch', '2chr', '2chron', '2chroniques', '2 chroniques', '2 chron'],
+  EZR: ['esd', 'esdr', 'esdras'],
+  NEH: ['ne', 'neh', 'nehemie'],
+  EST: ['est', 'esth', 'esther'],
+  JOB: ['job'],
+  PSA: ['ps', 'psa', 'psm', 'psaume', 'psaumes'],
+  PRO: ['pr', 'pro', 'prv', 'prov', 'proverbe', 'proverbes'],
+  ECC: ['ec', 'ecc', 'eccl', 'ecclesiaste'],
+  SNG: ['ct', 'cant', 'cantique', 'cantiques', 'cantique des cantiques'],
+  ISA: ['es', 'esa', 'esai', 'esaie'],
+  JER: ['jr', 'jer', 'jeremie'],
+  LAM: ['lm', 'lam', 'lamentation', 'lamentations'],
+  EZK: ['ez', 'eze', 'ezek', 'ezechiel'],
+  DAN: ['da', 'dan', 'daniel'],
+  HOS: ['os', 'ose', 'osee'],
+  JOL: ['jl', 'joe', 'joel'],
+  AMO: ['am', 'amo', 'amos'],
+  OBA: ['ab', 'abd', 'abdias'],
+  JON: ['jon', 'jonas'],
+  MIC: ['mi', 'mic', 'michee'],
+  NAM: ['na', 'nah', 'nahum'],
+  HAB: ['ha', 'hab', 'habacuc'],
+  ZEP: ['so', 'sop', 'sophonie'],
+  HAG: ['ag', 'agg', 'aggee'],
+  ZEC: ['za', 'zac', 'zacharie'],
+  MAL: ['ml', 'mal', 'malachie'],
+  MAT: ['mt', 'mat', 'matt', 'matthieu'],
+  MRK: ['mc', 'mrk', 'marc', 'mar'],
+  LUK: ['lc', 'luc', 'lu'],
+  JHN: ['jn', 'jean'],
+  ACT: ['ac', 'act', 'actes'],
+  ROM: ['rm', 'ro', 'rom', 'romain', 'romains'],
+  '1CO': ['1co', '1cor', '1corinthiens', '1 corinthiens', '1 cor'],
+  '2CO': ['2co', '2cor', '2corinthiens', '2 corinthiens', '2 cor'],
+  GAL: ['ga', 'gal', 'galate', 'galates'],
+  EPH: ['ep', 'eph', 'ephesien', 'ephesiens'],
+  PHP: ['ph', 'php', 'phil', 'philippien', 'philippiens'],
+  COL: ['col', 'colossien', 'colossiens'],
+  '1TH': ['1th', '1thess', '1thessaloniciens', '1 thessaloniciens', '1 thess'],
+  '2TH': ['2th', '2thess', '2thessaloniciens', '2 thessaloniciens', '2 thess'],
+  '1TI': ['1ti', '1tim', '1timothee', '1 timothee', '1 tim'],
+  '2TI': ['2ti', '2tim', '2timothee', '2 timothee', '2 tim'],
+  TIT: ['tt', 'tit', 'tite'],
+  PHM: ['phm', 'philemon'],
+  HEB: ['he', 'heb', 'hebreu', 'hebreux'],
+  JAS: ['jc', 'jac', 'jacq', 'jacques'],
+  '1PE': ['1p', '1pi', '1pierre', '1 pierre', '1 pet'],
+  '2PE': ['2p', '2pi', '2pierre', '2 pierre', '2 pet'],
+  '1JN': ['1jn', '1jean', '1 jean'],
+  '2JN': ['2jn', '2jean', '2 jean'],
+  '3JN': ['3jn', '3jean', '3 jean'],
+  JUD: ['jd', 'jud', 'jude'],
+  REV: ['ap', 'apo', 'apoc', 'apocalypse'],
+});
+
 /** Returns localized book title for a book id */
 export function getLocalizedBookName(bookId: string, locale: string = 'en'): string {
   const upper = bookId.toUpperCase();
@@ -107,7 +176,7 @@ export function getLocalizedBookName(bookId: string, locale: string = 'en'): str
   return BIBLE_BOOKS_BY_ID[upper]?.name ?? bookId;
 }
 
-const stripAccents = (str: string): string =>
+export const stripAccents = (str: string): string =>
   str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 /** Fast O(1) dictionary indexed by canonical book ID (e.g. 'PHP', 'GEN'). */
@@ -115,42 +184,55 @@ export const BIBLE_BOOKS_BY_ID: Readonly<Record<string, BibleBook>> = Object.fre
   Object.fromEntries(BIBLE_BOOKS.map((b) => [b.id, b])),
 );
 
-/** Fast O(1) hash map indexing all valid prefixes (len >= 2) and exact aliases. */
-const BOOK_BY_PREFIX = new Map<string, BibleBook>();
-for (const b of BIBLE_BOOKS) {
-  const frName = FRENCH_BOOK_NAMES[b.id];
-  const terms = [
-    b.name.toLowerCase(),
-    stripAccents(b.name.toLowerCase()),
-    ...(frName ? [frName.toLowerCase(), stripAccents(frName.toLowerCase())] : []),
-    ...b.aliases.map((a) => a.toLowerCase()),
-    ...b.aliases.map((a) => stripAccents(a.toLowerCase())),
-  ];
-  for (const term of terms) {
-    for (let len = 2; len <= term.length; len++) {
-      const prefix = term.slice(0, len);
-      if (!BOOK_BY_PREFIX.has(prefix)) {
-        BOOK_BY_PREFIX.set(prefix, b);
+function buildPrefixMap(primaryLocale: 'en' | 'fr'): Map<string, BibleBook> {
+  const map = new Map<string, BibleBook>();
+
+  const indexBook = (b: BibleBook, isPrimary: boolean) => {
+    const frName = FRENCH_BOOK_NAMES[b.id];
+    const frAliases = FRENCH_BOOK_ALIASES[b.id] ?? [];
+    const enTerms = [b.name.toLowerCase(), ...b.aliases.map((a) => a.toLowerCase())];
+    const frTerms = [
+      ...(frName ? [frName.toLowerCase(), stripAccents(frName.toLowerCase())] : []),
+      ...frAliases.map((a) => a.toLowerCase()),
+      ...frAliases.map((a) => stripAccents(a.toLowerCase())),
+    ];
+
+    const targetTerms = isPrimary
+      ? primaryLocale === 'fr' ? frTerms : enTerms
+      : primaryLocale === 'fr' ? enTerms : frTerms;
+
+    for (const term of targetTerms) {
+      if (!map.has(term)) map.set(term, b);
+      for (let len = 2; len <= term.length; len++) {
+        const prefix = term.slice(0, len);
+        if (!map.has(prefix)) {
+          map.set(prefix, b);
+        }
       }
     }
+  };
+
+  for (const b of BIBLE_BOOKS) {
+    map.set(b.id.toLowerCase(), b);
   }
-}
-for (const b of BIBLE_BOOKS) {
-  const frName = FRENCH_BOOK_NAMES[b.id];
-  BOOK_BY_PREFIX.set(b.id.toLowerCase(), b);
-  BOOK_BY_PREFIX.set(b.name.toLowerCase(), b);
-  if (frName) {
-    BOOK_BY_PREFIX.set(frName.toLowerCase(), b);
-    BOOK_BY_PREFIX.set(stripAccents(frName.toLowerCase()), b);
+  for (const b of BIBLE_BOOKS) {
+    indexBook(b, true);
   }
-  for (const alias of b.aliases) {
-    BOOK_BY_PREFIX.set(alias.toLowerCase(), b);
-    BOOK_BY_PREFIX.set(stripAccents(alias.toLowerCase()), b);
+  for (const b of BIBLE_BOOKS) {
+    indexBook(b, false);
   }
+
+  return map;
 }
 
+const BOOK_BY_PREFIX_EN = buildPrefixMap('en');
+const BOOK_BY_PREFIX_FR = buildPrefixMap('fr');
+
 /** Matches query string prefix to a Bible book in O(1). */
-export function findBookByPrefix(query: string): BibleBook | undefined {
+export function findBookByPrefix(query: string, locale: string = 'en'): BibleBook | undefined {
   const q = query.trim().toLowerCase();
-  return BOOK_BY_PREFIX.get(q) ?? BOOK_BY_PREFIX.get(stripAccents(q));
+  if (q.length < 2) return undefined;
+  const unaccented = stripAccents(q);
+  const map = locale === 'fr' ? BOOK_BY_PREFIX_FR : BOOK_BY_PREFIX_EN;
+  return map.get(q) ?? map.get(unaccented);
 }

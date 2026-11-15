@@ -23,6 +23,11 @@ describe('renderers', () => {
     it('falls back to bookId when book name is unrecognized', () => {
       expect(formatCitation('UNKNOWN_BOOK', [1, 1], [1, 2])).toBe('UNKNOWN_BOOK 1:1–2');
     });
+
+    it('formats citation localized by locale', () => {
+      expect(formatCitation('ROM', [8, 28], [8, 28], 'fr')).toBe('Romains 8:28');
+      expect(formatCitation('GEN', [1, 1], [1, 3], 'fr')).toBe('Genèse 1:1–3');
+    });
   });
 
   describe('renderChunk', () => {
