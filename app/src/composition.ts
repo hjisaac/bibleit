@@ -23,6 +23,7 @@ import { WebSpeechNarrator } from './adapters/web-speech-narrator';
 import { WorkerSlmAnswerProvider } from './adapters/worker-slm-answer-provider';
 import { HybridEngine } from './adapters/hybrid-engine';
 import { env } from './env';
+import { $locale } from './stores/i18n';
 
 export { LocalEngine };
 
@@ -68,5 +69,5 @@ export function createDefaultEngine(
 }
 
 export function createDefaultNarrator(): AudioNarrator {
-  return new WebSpeechNarrator();
+  return new WebSpeechNarrator(undefined, undefined, () => $locale.get());
 }

@@ -1,5 +1,5 @@
 
-export const POPULAR_TOPICS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+export const POPULAR_TOPICS = Object.freeze({
   en: Object.freeze([
     'Peace in anxiety',
     'Strength and courage',
@@ -22,7 +22,7 @@ export const POPULAR_TOPICS: Readonly<Record<string, readonly string[]>> = Objec
   ]),
 });
 
-export const SEARCH_SUGGESTIONS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+export const SEARCH_SUGGESTIONS = Object.freeze({
   en: Object.freeze([
     'Philippians 4:7',
     'peace that surpasses',
@@ -38,9 +38,11 @@ export const SEARCH_SUGGESTIONS: Readonly<Record<string, readonly string[]>> = O
 });
 
 export function getPopularTopics(locale: string = 'en'): readonly string[] {
-  return POPULAR_TOPICS[locale] ?? POPULAR_TOPICS.en;
+  const dict = POPULAR_TOPICS as Record<string, readonly string[]>;
+  return dict[locale] ?? POPULAR_TOPICS.en;
 }
 
 export function getSearchSuggestions(locale: string = 'en'): readonly string[] {
-  return SEARCH_SUGGESTIONS[locale] ?? SEARCH_SUGGESTIONS.en;
+  const dict = SEARCH_SUGGESTIONS as Record<string, readonly string[]>;
+  return dict[locale] ?? SEARCH_SUGGESTIONS.en;
 }
