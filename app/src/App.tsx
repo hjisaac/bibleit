@@ -17,7 +17,9 @@ import { BookSelectorModal } from './components/BookSelectorModal';
 import { HelpModal } from './components/HelpModal';
 import { FeedbackModal } from './components/FeedbackModal';
 import { AudioPlayerBar } from './components/AudioPlayerBar';
-import { DEFAULT_TOAST_DURATION_MS } from './constants';
+import { TOAST_DURATION_MS } from './constants';
+import { getLocalizedBookName } from './core/bible-books';
+import { $locale } from './stores/i18n';
 import { useHeadroom } from './core/headroom';
 import {
   PackageStatusEnum,
@@ -462,7 +464,7 @@ export function App(): JSX.Element {
 
   const toastTimerRef = useRef<number | null>(null);
 
-  const showToast = (message: string, durationMs = DEFAULT_TOAST_DURATION_MS) => {
+  const showToast = (message: string) => {
     if (toastTimerRef.current !== null) {
       clearTimeout(toastTimerRef.current);
     }
@@ -470,7 +472,7 @@ export function App(): JSX.Element {
     toastTimerRef.current = window.setTimeout(() => {
       setToastMessage(null);
       toastTimerRef.current = null;
-    }, durationMs);
+    }, TOAST_DURATION_MS);
   };
 
   const handleOpenReader = (book: string, chapter: number, verse: number) => {
@@ -491,11 +493,14 @@ export function App(): JSX.Element {
         (v) => v.book === verse.book && v.chapter === verse.chapter && v.verse === verse.verse,
       );
       let next;
+      const locale = $locale.get();
+      const localizedBook = getLocalizedBookName(verse.book, locale);
+      const citation = `${localizedBook} ${verse.chapter}:${verse.verse}`;
       if (exists) {
         next = prev.filter(
           (v) => !(v.book === verse.book && v.chapter === verse.chapter && v.verse === verse.verse),
         );
-        showToast(`Removed ${verse.citation} from bookmarks`);
+        showToast(locale === 'fr' ? `Retiré ${citation} des favoris` : `Removed ${citation} from bookmarks`);
       } else {
         next = [
           ...prev,
@@ -505,7 +510,7 @@ export function App(): JSX.Element {
             savedAt: Date.now(),
           },
         ];
-        showToast(`Saved ${verse.citation} to bookmarks`);
+        showToast(locale === 'fr' ? `Enregistré ${citation} dans les favoris` : `Saved ${citation} to bookmarks`);
       }
       return next;
     });

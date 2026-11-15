@@ -5,6 +5,10 @@ export const $theme = persistentAtom<ThemeEnum>('bibleit_theme', ThemeEnum.SEPIA
 
 export const $activeTab = persistentAtom<ViewTabEnum>('bibleit_active_tab', ViewTabEnum.SEARCH);
 
+export type TranslationId = 'web' | 'lsg';
+
+export const $activeTranslation = persistentAtom<TranslationId>('bibleit_active_translation', 'web');
+
 export const $isAiEnabled = persistentAtom<boolean>('bibleit_ai_enabled', true, {
   encode: String,
   decode: (v) => v === 'true',

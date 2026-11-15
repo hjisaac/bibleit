@@ -1,6 +1,28 @@
 import type { JSX } from 'preact';
+import { useStore } from '@nanostores/preact';
 import type { AudioNarrator } from '../core/ports';
 import type { NarrationState } from '../core/types';
+import { i18n } from '../stores/i18n';
+import { params } from '@nanostores/i18n';
+
+export const messages = i18n('main/audioPlayerBar', {
+  regionAriaLabel: 'Audio playback controls',
+  pauseNarration: 'Pause narration',
+  resumeNarration: 'Resume narration',
+  jumpToPassage: 'Jump to passage in Reader',
+  readingPassageAloud: 'Reading passage aloud',
+  paused: 'Paused',
+  passageProgress: params('Passage {current} of {total} · {state}'),
+  verseProgress: params('Verse {current} of {total} · {state}'),
+  readingAloudState: 'Reading aloud',
+  previousPassage: 'Previous passage',
+  previousVerse: 'Previous verse',
+  nextPassage: 'Next passage',
+  nextVerse: 'Next verse',
+  playbackSpeedAria: params('Playback speed {rate}x'),
+  playbackSpeedTitle: 'Change playback speed',
+  stopNarration: 'Stop narration',
+});
 
 const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5] as const;
 
@@ -21,6 +43,8 @@ export function AudioPlayerBar({
   onBarClick,
   title,
 }: AudioPlayerBarProps): JSX.Element | null {
+  const t = useStore(messages);
+
   if (state.status === 'idle' || !state.activeSegment) {
     return null;
   }
@@ -46,7 +70,7 @@ export function AudioPlayerBar({
   return (
     <div
       role="region"
-      aria-label="Audio playback controls"
+      aria-label={t.regionAriaLabel}
       onClick={onBarClick}
       class={`fixed left-3 right-3 max-w-2xl mx-auto z-30 px-3.5 py-2.5 rounded-2xl border shadow-lg flex items-center justify-between gap-2 transition-all duration-300 ease-in-out ${
         onBarClick ? 'cursor-pointer' : ''
@@ -67,7 +91,7 @@ export function AudioPlayerBar({
             e.stopPropagation();
             handleTogglePlay();
           }}
-          aria-label={isPlaying ? 'Pause narration' : 'Resume narration'}
+          aria-label={isPlaying ? t.pauseNarration : t.resumeNarration}
           class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white transition-transform active:scale-95"
           style={{ backgroundColor: 'var(--accent)' }}
         >
@@ -96,7 +120,7 @@ export function AudioPlayerBar({
               );
             }
           }}
-          title={title || 'Jump to passage in Reader'}
+          title={title || t.jumpToPassage}
           class="flex flex-col items-start min-w-0 text-left hover:opacity-80 transition-opacity"
         >
           <span class="text-xs font-semibold font-serif truncate max-w-full">
@@ -104,10 +128,20 @@ export function AudioPlayerBar({
           </span>
           <span class="text-[10px] font-sans truncate max-w-full" style={{ color: 'var(--text-muted)' }}>
             {hasMultiple
-              ? `${activeSegment.id.startsWith('chunk-') ? 'Passage' : 'Verse'} ${currentIndex + 1} of ${queue.length} · ${isPlaying ? 'Reading aloud' : 'Paused'}`
+              ? activeSegment.id.startsWith('chunk-')
+                ? t.passageProgress({
+                    current: currentIndex + 1,
+                    total: queue.length,
+                    state: isPlaying ? t.readingAloudState : t.paused,
+                  })
+                : t.verseProgress({
+                    current: currentIndex + 1,
+                    total: queue.length,
+                    state: isPlaying ? t.readingAloudState : t.paused,
+                  })
               : isPlaying
-              ? 'Reading passage aloud'
-              : 'Paused'}
+              ? t.readingPassageAloud
+              : t.paused}
           </span>
         </button>
       </div>
@@ -123,8 +157,8 @@ export function AudioPlayerBar({
                 narrator.prev();
               }}
               disabled={currentIndex <= 0}
-              aria-label={activeSegment.id.startsWith('chunk-') ? 'Previous passage' : 'Previous verse'}
-              title={activeSegment.id.startsWith('chunk-') ? 'Previous passage' : 'Previous verse'}
+              aria-label={activeSegment.id.startsWith('chunk-') ? t.previousPassage : t.previousVerse}
+              title={activeSegment.id.startsWith('chunk-') ? t.previousPassage : t.previousVerse}
               class="p-1.5 rounded-lg transition-opacity hover:opacity-80 disabled:opacity-30"
               style={{ color: 'var(--text-main)' }}
             >
@@ -140,8 +174,8 @@ export function AudioPlayerBar({
                 narrator.next();
               }}
               disabled={currentIndex >= queue.length - 1}
-              aria-label={activeSegment.id.startsWith('chunk-') ? 'Next passage' : 'Next verse'}
-              title={activeSegment.id.startsWith('chunk-') ? 'Next passage' : 'Next verse'}
+              aria-label={activeSegment.id.startsWith('chunk-') ? t.nextPassage : t.nextVerse}
+              title={activeSegment.id.startsWith('chunk-') ? t.nextPassage : t.nextVerse}
               class="p-1.5 rounded-lg transition-opacity hover:opacity-80 disabled:opacity-30"
               style={{ color: 'var(--text-main)' }}
             >
@@ -158,8 +192,8 @@ export function AudioPlayerBar({
             e.stopPropagation();
             handleCycleRate();
           }}
-          aria-label={`Playback speed ${rate}x`}
-          title="Change playback speed"
+          aria-label={t.playbackSpeedAria({ rate })}
+          title={t.playbackSpeedTitle}
           class="px-2 py-1 rounded-lg border text-[11px] font-mono font-semibold transition-opacity hover:opacity-80"
           style={{
             borderColor: 'var(--border-subtle)',
@@ -176,8 +210,8 @@ export function AudioPlayerBar({
             e.stopPropagation();
             narrator.stop();
           }}
-          aria-label="Stop narration"
-          title="Stop narration"
+          aria-label={t.stopNarration}
+          title={t.stopNarration}
           class="p-1.5 rounded-lg transition-opacity hover:opacity-80"
           style={{ color: 'var(--text-muted)' }}
         >

@@ -1,6 +1,67 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { useStore } from '@nanostores/preact';
 import { PackageStatusEnum, ThemeEnum, SearchModeEnum, type Manifest } from '../core/types';
+import { i18n, $locale, $localeSetting, $isMultilingualEnabled, type Locale } from '../stores/i18n';
+import { params } from '@nanostores/i18n';
+
+export const messages = i18n('settings/view', {
+  pageTitle: 'Settings',
+  pageSubtitle: 'Preferences, reading atmosphere, retrieval inspector, and offline storage.',
+  atmosphereTitle: 'Reading Atmosphere',
+  themeDay: 'Day',
+  themeDayDesc: 'Crisp linen',
+  themeWarm: 'Warm',
+  themeWarmDesc: 'Parchment',
+  themeDark: 'Dark',
+  themeDarkDesc: 'OLED black',
+  aiOverviewTitle: 'AI Scripture Overview',
+  aiOverviewBadge: 'AI',
+  aiOverviewDesc: 'Generate grounded scripture summaries when searching topics and questions.',
+  inspectorTitle: 'Retrieval Inspector Mode',
+  inspectorBadge: 'Scholar',
+  inspectorDesc: 'Show search signal badges, cosine scores, BM25 metrics, and latencies.',
+  headingsTitle: 'Pericope Headings',
+  headingsBadge: 'Context',
+  headingsDesc: 'Display topical section headings above retrieved passages.',
+  onDeviceTitle: 'On-Device Only',
+  onDeviceBadge: 'Offline',
+  onDeviceDescReady: 'Search scripture strictly on this device without contacting backend servers.',
+  onDeviceDescDownload: 'Download the scripture package below to unlock on-device search.',
+  storageTitle: 'Offline Packages & Storage',
+  storageDesc: 'Manage local data stored in Origin Private File System (OPFS).',
+  storageRestrictedTitle: 'Offline storage restricted',
+  storageRestrictedDesc: 'Your browser disables device storage (common in Private/Incognito windows). Switch to a standard window to download scripture for offline use.',
+  pkgTextTitle: 'Essential Scripture Text',
+  pkgTextDesc: 'All 66 Protestant books, 31,095 verses (WEB translation). Unlocks offline reading & keyword search.',
+  installedBadge: '✓ Installed',
+  readyToRead: 'Ready for offline reading',
+  downloadingVerses: 'Downloading verses...',
+  notStoredLocally: 'Not stored locally',
+  cancelButton: 'Cancel',
+  downloadButton: params('Download ({size})'),
+  pkgAiTitle: 'Precomputed Verse Vectors',
+  pkgAiDesc: 'Nomic v1.5 int8 quantized vectors for 2,655 passages. Enables offline vector similarity comparison.',
+  readyForVectors: 'Ready for vector search',
+  downloadingVectors: 'Downloading vectors...',
+  pkgModelTitle: 'Neural Query Embedder',
+  pkgModelDesc: 'Nomic v1.5 on-device neural model (Q8 ONNX). Converts search queries into 768-dim embeddings.',
+  readyForEmbed: 'Ready for on-device inference',
+  downloadingModel: 'Downloading model weights...',
+  pkgSlmTitle: 'On-Device AI Summarizer',
+  pkgSlmDesc: 'SmolLM2 360M Instruct on-device language model (Q4 ONNX). Generates grounded scripture summaries completely offline.',
+  readyForSlm: 'Ready for offline AI overviews',
+  compilingSlm: 'Compiling and initializing model...',
+  downloadingSlmProgress: params('Downloading model weights ({percent}%)...'),
+  deleteConfirmTitle: 'Delete all local offline data?',
+  deleteConfirmDesc: 'Removes downloaded scripture text and AI models from OPFS. You can re-download anytime.',
+  deleteConfirmYes: 'Yes, Delete All',
+  freeSpaceButton: 'Free Up Local Space (Clear Artifacts)',
+  languageTitle: 'Interface Language',
+  languageDesc: 'Setting your language also switches the Scripture translation (English uses WEB; French uses Louis Segond 1910).',
+  languageEnglish: 'English (World English Bible - WEB)',
+  languageFrench: 'Français (Louis Segond 1910 - LSG)',
+});
 
 interface SettingsViewProps {
   manifest?: Manifest | null;
@@ -69,6 +130,10 @@ export function SettingsView({
   onCancelDownloadSlm,
   onClearStorage,
 }: SettingsViewProps): JSX.Element {
+  const t = useStore(messages);
+  const currentLocale = useStore($locale);
+  const isMultilingual = useStore($isMultilingualEnabled);
+
   const storageSectionRef = useRef<HTMLDivElement>(null);
   const [isPulsing, setIsPulsing] = useState<boolean>(false);
   const [isConfirmingClear, setIsConfirmingClear] = useState<boolean>(false);
@@ -119,15 +184,16 @@ export function SettingsView({
       return () => clearTimeout(timer);
     }
     return undefined;
-  }, [highlightStorage]);
+  }, [highlightStorage, onClearHighlight]);
+
   return (
     <section class="flex-1 flex flex-col p-4 sm:p-8 pb-24 sm:pb-24 overflow-y-auto overscroll-y-contain space-y-6 max-w-2xl mx-auto w-full">
       <div>
         <h1 class="text-xl font-bold tracking-tight" style={{ color: 'var(--text-main)' }}>
-          Settings
+          {t.pageTitle}
         </h1>
         <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-          Preferences, reading atmosphere, retrieval inspector, and offline storage.
+          {t.pageSubtitle}
         </p>
       </div>
 
@@ -140,7 +206,7 @@ export function SettingsView({
         }}
       >
         <span class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
-          Reading Atmosphere
+          {t.atmosphereTitle}
         </span>
         <div class="grid grid-cols-3 gap-2.5">
           <button
@@ -155,8 +221,8 @@ export function SettingsView({
               color: '#1C1917',
             }}
           >
-            <div class="text-xs font-semibold">Day</div>
-            <div class="text-[10px] text-stone-500 mt-0.5">Crisp linen</div>
+            <div class="text-xs font-semibold">{t.themeDay}</div>
+            <div class="text-[10px] text-stone-500 mt-0.5">{t.themeDayDesc}</div>
           </button>
 
           <button
@@ -171,8 +237,8 @@ export function SettingsView({
               color: '#2D241E',
             }}
           >
-            <div class="text-xs font-semibold">Warm</div>
-            <div class="text-[10px] text-stone-600 mt-0.5">Parchment</div>
+            <div class="text-xs font-semibold">{t.themeWarm}</div>
+            <div class="text-[10px] text-stone-600 mt-0.5">{t.themeWarmDesc}</div>
           </button>
 
           <button
@@ -187,8 +253,8 @@ export function SettingsView({
               color: '#F5F5F4',
             }}
           >
-            <div class="text-xs font-semibold">Dark</div>
-            <div class="text-[10px] text-stone-400 mt-0.5">OLED black</div>
+            <div class="text-xs font-semibold">{t.themeDark}</div>
+            <div class="text-[10px] text-stone-400 mt-0.5">{t.themeDarkDesc}</div>
           </button>
         </div>
       </div>
@@ -204,13 +270,13 @@ export function SettingsView({
         <div class="flex items-center justify-between">
           <div class="pr-3">
             <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-              <span>AI Scripture Overview</span>
+              <span>{t.aiOverviewTitle}</span>
               <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-mono font-medium">
-                AI
+                {t.aiOverviewBadge}
               </span>
             </div>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              Generate grounded scripture summaries when searching topics and questions.
+              {t.aiOverviewDesc}
             </p>
           </div>
 
@@ -238,13 +304,13 @@ export function SettingsView({
         <div class="flex items-center justify-between">
           <div class="pr-3">
             <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-              <span>Retrieval Inspector Mode</span>
+              <span>{t.inspectorTitle}</span>
               <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 font-mono font-medium">
-                Scholar
+                {t.inspectorBadge}
               </span>
             </div>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              Show search signal badges, cosine scores, BM25 metrics, and latencies.
+              {t.inspectorDesc}
             </p>
           </div>
 
@@ -292,13 +358,13 @@ export function SettingsView({
         <div class="flex items-center justify-between">
           <div class="pr-3">
             <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-              <span>Pericope Headings</span>
+              <span>{t.headingsTitle}</span>
               <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 font-mono font-medium">
-                Context
+                {t.headingsBadge}
               </span>
             </div>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              Display topical section headings above retrieved passages.
+              {t.headingsDesc}
             </p>
           </div>
 
@@ -315,6 +381,42 @@ export function SettingsView({
         </div>
       </div>
 
+      {/* Interface Language (Available when multilingual feature is enabled) */}
+      {isMultilingual && (
+        <div
+          class="p-4 rounded-2xl border space-y-2.5"
+          style={{
+            backgroundColor: 'var(--bg-surface-elevated)',
+            borderColor: 'var(--border-subtle)',
+          }}
+        >
+          <div>
+            <div class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+              {t.languageTitle}
+            </div>
+            <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {t.languageDesc}
+            </p>
+          </div>
+          <select
+            value={currentLocale}
+            onChange={(e) => {
+              const next = (e.target as HTMLSelectElement).value as Locale;
+              $localeSetting.set(next);
+            }}
+            class="w-full p-2.5 rounded-xl border text-xs outline-none"
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              borderColor: 'var(--border-subtle)',
+              color: 'var(--text-main)',
+            }}
+          >
+            <option value="en">{t.languageEnglish}</option>
+            <option value="fr">{t.languageFrench}</option>
+          </select>
+        </div>
+      )}
+
       {/* On-Device Only Search Toggle */}
       <div
         class="p-4 rounded-2xl border space-y-3"
@@ -326,15 +428,15 @@ export function SettingsView({
         <div class="flex items-center justify-between">
           <div class="pr-3">
             <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-              <span>On-Device Only</span>
+              <span>{t.onDeviceTitle}</span>
               <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono font-medium">
-                Offline
+                {t.onDeviceBadge}
               </span>
             </div>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
               {textPackageStatus === PackageStatusEnum.DOWNLOADED
-                ? 'Search scripture strictly on this device without contacting backend servers.'
-                : 'Download the scripture package below to unlock on-device search.'}
+                ? t.onDeviceDescReady
+                : t.onDeviceDescDownload}
             </p>
           </div>
 
@@ -371,10 +473,10 @@ export function SettingsView({
         <div class="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border-subtle)' }}>
           <div>
             <span class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
-              Offline Packages & Storage
+              {t.storageTitle}
             </span>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              Manage local data stored in Origin Private File System (OPFS).
+              {t.storageDesc}
             </p>
           </div>
           <span class="text-xs font-mono font-medium text-emerald-600">
@@ -385,12 +487,6 @@ export function SettingsView({
               if (modelPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 137;
               if (slmPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 190;
               if (mb === 0) return '0 MB cached';
-              if (
-                modelPackageStatus === PackageStatusEnum.DOWNLOADED ||
-                slmPackageStatus === PackageStatusEnum.DOWNLOADED
-              ) {
-                return `${mb.toFixed(1)} MB cached`;
-              }
               return `${mb.toFixed(1)} MB in OPFS`;
             })()}
           </span>
@@ -409,351 +505,351 @@ export function SettingsView({
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
               <div class="text-xs">
-                <p class="font-semibold text-red-600 dark:text-red-400">Offline storage restricted</p>
+                <p class="font-semibold text-red-600 dark:text-red-400">{t.storageRestrictedTitle}</p>
                 <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  Your browser disables device storage (common in Private/Incognito windows). Switch to a standard window to download scripture for offline use.
+                  {t.storageRestrictedDesc}
                 </p>
               </div>
             </div>
           )}
 
           {/* Package 1: Essential Scripture Text */}
-        <div
-          class="p-3 rounded-xl border flex flex-col gap-2.5"
-          style={{
-            backgroundColor: 'var(--bg-surface)',
-            borderColor: 'var(--border-subtle)',
-          }}
-        >
-          <div class="flex items-start justify-between gap-2">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
-                  Essential Scripture Text
-                </span>
-                <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
-                  1.2 MB
-                </span>
+          <div
+            class="p-3 rounded-xl border flex flex-col gap-2.5"
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              borderColor: 'var(--border-subtle)',
+            }}
+          >
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
+                    {t.pkgTextTitle}
+                  </span>
+                  <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
+                    1.2 MB
+                  </span>
+                </div>
+                <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  {t.pkgTextDesc}
+                </p>
               </div>
-              <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                All 66 Protestant books, 31,095 verses (WEB translation). Unlocks offline reading & keyword search.
-              </p>
+
+              {textPackageStatus === PackageStatusEnum.DOWNLOADED ? (
+                <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
+                  {t.installedBadge}
+                </span>
+              ) : textPackageStatus === PackageStatusEnum.DOWNLOADING ? (
+                <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
+                  {textProgress}%
+                </span>
+              ) : null}
             </div>
 
-            {textPackageStatus === PackageStatusEnum.DOWNLOADED ? (
-              <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
-                ✓ Installed
-              </span>
-            ) : textPackageStatus === PackageStatusEnum.DOWNLOADING ? (
-              <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
-                {textProgress}%
-              </span>
-            ) : null}
-          </div>
-
-          {textPackageStatus === PackageStatusEnum.DOWNLOADING && (
-            <div class="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden">
-              <div
-                class="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
-                style={{ width: `${textProgress}%` }}
-              />
-            </div>
-          )}
-
-          <div class="flex items-center justify-between text-xs pt-1">
-            <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
-              {textPackageStatus === PackageStatusEnum.DOWNLOADED
-                ? 'Ready for offline reading'
-                : textPackageStatus === PackageStatusEnum.DOWNLOADING
-                ? 'Downloading verses...'
-                : 'Not stored locally'}
-            </span>
-            {textPackageStatus === PackageStatusEnum.DOWNLOADING ? (
-              <button
-                type="button"
-                onClick={onCancelDownloadText}
-                class="px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors hover:opacity-80"
-                style={{
-                  borderColor: 'var(--border-subtle)',
-                  color: 'var(--text-muted)',
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                }}
-              >
-                Cancel
-              </button>
-            ) : textPackageStatus !== PackageStatusEnum.DOWNLOADED ? (
-              <button
-                type="button"
-                onClick={onDownloadText}
-                disabled={!isStorageAvailable}
-                title={!isStorageAvailable ? 'Device storage disabled in Private Browsing' : undefined}
-                class={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                  isStorageAvailable ? 'hover:opacity-85' : 'opacity-50 cursor-not-allowed'
-                }`}
-                style={{
-                  backgroundColor: 'var(--accent)',
-                  color: '#FFFFFF',
-                }}
-              >
-                Download (1.2 MB)
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        {/* Package 2: Precomputed Verse Vectors */}
-        <div
-          class="p-3 rounded-xl border flex flex-col gap-2.5"
-          style={{
-            backgroundColor: 'var(--bg-surface)',
-            borderColor: 'var(--border-subtle)',
-          }}
-        >
-          <div class="flex items-start justify-between gap-2">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
-                  Precomputed Verse Vectors
-                </span>
-                <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
-                  2.1 MB
-                </span>
+            {textPackageStatus === PackageStatusEnum.DOWNLOADING && (
+              <div class="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden">
+                <div
+                  class="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
+                  style={{ width: `${textProgress}%` }}
+                />
               </div>
-              <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                Nomic v1.5 int8 quantized vectors for 2,655 passages. Enables offline vector similarity comparison.
-              </p>
-            </div>
+            )}
 
-            {aiPackageStatus === PackageStatusEnum.DOWNLOADED ? (
-              <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
-                ✓ Installed
+            <div class="flex items-center justify-between text-xs pt-1">
+              <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
+                {textPackageStatus === PackageStatusEnum.DOWNLOADED
+                  ? t.readyToRead
+                  : textPackageStatus === PackageStatusEnum.DOWNLOADING
+                  ? t.downloadingVerses
+                  : t.notStoredLocally}
               </span>
-            ) : aiPackageStatus === PackageStatusEnum.DOWNLOADING ? (
-              <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
-                {aiProgress}%
-              </span>
-            ) : null}
+              {textPackageStatus === PackageStatusEnum.DOWNLOADING ? (
+                <button
+                  type="button"
+                  onClick={onCancelDownloadText}
+                  class="px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors hover:opacity-80"
+                  style={{
+                    borderColor: 'var(--border-subtle)',
+                    color: 'var(--text-muted)',
+                    backgroundColor: 'var(--bg-surface-elevated)',
+                  }}
+                >
+                  {t.cancelButton}
+                </button>
+              ) : textPackageStatus !== PackageStatusEnum.DOWNLOADED ? (
+                <button
+                  type="button"
+                  onClick={onDownloadText}
+                  disabled={!isStorageAvailable}
+                  title={!isStorageAvailable ? 'Device storage disabled in Private Browsing' : undefined}
+                  class={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                    isStorageAvailable ? 'hover:opacity-85' : 'opacity-50 cursor-not-allowed'
+                  }`}
+                  style={{
+                    backgroundColor: 'var(--accent)',
+                    color: '#FFFFFF',
+                  }}
+                >
+                  {t.downloadButton({ size: '1.2 MB' })}
+                </button>
+              ) : null}
+            </div>
           </div>
 
-          {aiPackageStatus === PackageStatusEnum.DOWNLOADING && (
-            <div class="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden">
-              <div
-                class="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
-                style={{ width: `${aiProgress}%` }}
-              />
-            </div>
-          )}
-
-          <div class="flex items-center justify-between text-xs pt-1">
-            <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
-              {aiPackageStatus === PackageStatusEnum.DOWNLOADED
-                ? 'Ready for vector search'
-                : aiPackageStatus === PackageStatusEnum.DOWNLOADING
-                ? 'Downloading vectors...'
-                : 'Not stored locally'}
-            </span>
-            {aiPackageStatus === PackageStatusEnum.DOWNLOADING ? (
-              <button
-                type="button"
-                onClick={onCancelDownloadAi}
-                class="px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors hover:opacity-80"
-                style={{
-                  borderColor: 'var(--border-subtle)',
-                  color: 'var(--text-muted)',
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                }}
-              >
-                Cancel
-              </button>
-            ) : aiPackageStatus !== PackageStatusEnum.DOWNLOADED ? (
-              <button
-                type="button"
-                onClick={onDownloadAi}
-                disabled={!isStorageAvailable}
-                title={!isStorageAvailable ? 'Device storage disabled in Private Browsing' : undefined}
-                class={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                  isStorageAvailable ? 'hover:opacity-85' : 'opacity-50 cursor-not-allowed'
-                }`}
-                style={{
-                  backgroundColor: 'var(--accent)',
-                  color: '#FFFFFF',
-                }}
-              >
-                Download (2.1 MB)
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        {/* Package 3: Neural Query Embedder */}
-        <div
-          class="p-3 rounded-xl border flex flex-col gap-2.5"
-          style={{
-            backgroundColor: 'var(--bg-surface)',
-            borderColor: 'var(--border-subtle)',
-          }}
-        >
-          <div class="flex items-start justify-between gap-2">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
-                  Neural Query Embedder
-                </span>
-                <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
-                  137 MB
-                </span>
+          {/* Package 2: Precomputed Verse Vectors */}
+          <div
+            class="p-3 rounded-xl border flex flex-col gap-2.5"
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              borderColor: 'var(--border-subtle)',
+            }}
+          >
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
+                    {t.pkgAiTitle}
+                  </span>
+                  <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
+                    2.1 MB
+                  </span>
+                </div>
+                <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  {t.pkgAiDesc}
+                </p>
               </div>
-              <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                Nomic v1.5 on-device neural model (Q8 ONNX). Converts search queries into 768-dim embeddings.
-              </p>
+
+              {aiPackageStatus === PackageStatusEnum.DOWNLOADED ? (
+                <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
+                  {t.installedBadge}
+                </span>
+              ) : aiPackageStatus === PackageStatusEnum.DOWNLOADING ? (
+                <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
+                  {aiProgress}%
+                </span>
+              ) : null}
             </div>
 
-            {modelPackageStatus === PackageStatusEnum.DOWNLOADED ? (
-              <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
-                ✓ Installed
-              </span>
-            ) : modelPackageStatus === PackageStatusEnum.DOWNLOADING ? (
-              <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
-                {modelProgress}%
-              </span>
-            ) : null}
-          </div>
-
-          {modelPackageStatus === PackageStatusEnum.DOWNLOADING && (
-            <div class="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden">
-              <div
-                class="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
-                style={{ width: `${modelProgress}%` }}
-              />
-            </div>
-          )}
-
-          <div class="flex items-center justify-between text-xs pt-1">
-            <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
-              {modelPackageStatus === PackageStatusEnum.DOWNLOADED
-                ? 'Ready for on-device inference'
-                : modelPackageStatus === PackageStatusEnum.DOWNLOADING
-                ? 'Downloading model weights...'
-                : 'Not stored locally'}
-            </span>
-            {modelPackageStatus === PackageStatusEnum.DOWNLOADING ? (
-              <button
-                type="button"
-                onClick={onCancelDownloadModel}
-                class="px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors hover:opacity-80"
-                style={{
-                  borderColor: 'var(--border-subtle)',
-                  color: 'var(--text-muted)',
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                }}
-              >
-                Cancel
-              </button>
-            ) : modelPackageStatus !== PackageStatusEnum.DOWNLOADED ? (
-              <button
-                type="button"
-                onClick={onDownloadModel}
-                disabled={!isStorageAvailable}
-                title={!isStorageAvailable ? 'Device storage disabled in Private Browsing' : undefined}
-                class={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                  isStorageAvailable ? 'hover:opacity-85' : 'opacity-50 cursor-not-allowed'
-                }`}
-                style={{
-                  backgroundColor: 'var(--accent)',
-                  color: '#FFFFFF',
-                }}
-              >
-                Download (137 MB)
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        {/* Package 4: On-Device AI Summarizer */}
-        <div
-          class="p-3 rounded-xl border flex flex-col gap-2.5"
-          style={{
-            backgroundColor: 'var(--bg-surface)',
-            borderColor: 'var(--border-subtle)',
-          }}
-        >
-          <div class="flex items-start justify-between gap-2">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
-                  On-Device AI Summarizer
-                </span>
-                <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
-                  190 MB
-                </span>
+            {aiPackageStatus === PackageStatusEnum.DOWNLOADING && (
+              <div class="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden">
+                <div
+                  class="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
+                  style={{ width: `${aiProgress}%` }}
+                />
               </div>
-              <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                SmolLM2 360M Instruct on-device language model (Q4 ONNX). Generates grounded scripture summaries completely offline.
-              </p>
-            </div>
+            )}
 
-            {slmPackageStatus === PackageStatusEnum.DOWNLOADED ? (
-              <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
-                ✓ Installed
+            <div class="flex items-center justify-between text-xs pt-1">
+              <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
+                {aiPackageStatus === PackageStatusEnum.DOWNLOADED
+                  ? t.readyForVectors
+                  : aiPackageStatus === PackageStatusEnum.DOWNLOADING
+                  ? t.downloadingVectors
+                  : t.notStoredLocally}
               </span>
-            ) : slmPackageStatus === PackageStatusEnum.DOWNLOADING ? (
-              <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
-                {slmProgress}%
-              </span>
-            ) : null}
+              {aiPackageStatus === PackageStatusEnum.DOWNLOADING ? (
+                <button
+                  type="button"
+                  onClick={onCancelDownloadAi}
+                  class="px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors hover:opacity-80"
+                  style={{
+                    borderColor: 'var(--border-subtle)',
+                    color: 'var(--text-muted)',
+                    backgroundColor: 'var(--bg-surface-elevated)',
+                  }}
+                >
+                  {t.cancelButton}
+                </button>
+              ) : aiPackageStatus !== PackageStatusEnum.DOWNLOADED ? (
+                <button
+                  type="button"
+                  onClick={onDownloadAi}
+                  disabled={!isStorageAvailable}
+                  title={!isStorageAvailable ? 'Device storage disabled in Private Browsing' : undefined}
+                  class={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                    isStorageAvailable ? 'hover:opacity-85' : 'opacity-50 cursor-not-allowed'
+                  }`}
+                  style={{
+                    backgroundColor: 'var(--accent)',
+                    color: '#FFFFFF',
+                  }}
+                >
+                  {t.downloadButton({ size: '2.1 MB' })}
+                </button>
+              ) : null}
+            </div>
           </div>
 
-          {slmPackageStatus === PackageStatusEnum.DOWNLOADING && (
-            <div class="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden">
-              <div
-                class="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
-                style={{ width: `${slmProgress}%` }}
-              />
-            </div>
-          )}
+          {/* Package 3: Neural Query Embedder */}
+          <div
+            class="p-3 rounded-xl border flex flex-col gap-2.5"
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              borderColor: 'var(--border-subtle)',
+            }}
+          >
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
+                    {t.pkgModelTitle}
+                  </span>
+                  <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
+                    137 MB
+                  </span>
+                </div>
+                <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  {t.pkgModelDesc}
+                </p>
+              </div>
 
-          <div class="flex items-center justify-between text-xs pt-1">
-            <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
-              {slmPackageStatus === PackageStatusEnum.DOWNLOADED
-                ? 'Ready for offline AI overviews'
-                : slmPackageStatus === PackageStatusEnum.DOWNLOADING
-                ? slmProgress >= 98
-                  ? 'Compiling and initializing model...'
-                  : `Downloading model weights (${slmProgress}%)...`
-                : 'Not stored locally'}
-            </span>
-            {slmPackageStatus === PackageStatusEnum.DOWNLOADING ? (
-              <button
-                type="button"
-                onClick={onCancelDownloadSlm}
-                class="px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors hover:opacity-80"
-                style={{
-                  borderColor: 'var(--border-subtle)',
-                  color: 'var(--text-muted)',
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                }}
-              >
-                Cancel
-              </button>
-            ) : slmPackageStatus !== PackageStatusEnum.DOWNLOADED ? (
-              <button
-                type="button"
-                onClick={onDownloadSlm}
-                disabled={!isStorageAvailable}
-                title={!isStorageAvailable ? 'Device storage disabled in Private Browsing' : undefined}
-                class={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                  isStorageAvailable ? 'hover:opacity-85' : 'opacity-50 cursor-not-allowed'
-                }`}
-                style={{
-                  backgroundColor: 'var(--accent)',
-                  color: '#FFFFFF',
-                }}
-              >
-                Download (190 MB)
-              </button>
-            ) : null}
+              {modelPackageStatus === PackageStatusEnum.DOWNLOADED ? (
+                <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
+                  {t.installedBadge}
+                </span>
+              ) : modelPackageStatus === PackageStatusEnum.DOWNLOADING ? (
+                <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
+                  {modelProgress}%
+                </span>
+              ) : null}
+            </div>
+
+            {modelPackageStatus === PackageStatusEnum.DOWNLOADING && (
+              <div class="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden">
+                <div
+                  class="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
+                  style={{ width: `${modelProgress}%` }}
+                />
+              </div>
+            )}
+
+            <div class="flex items-center justify-between text-xs pt-1">
+              <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
+                {modelPackageStatus === PackageStatusEnum.DOWNLOADED
+                  ? t.readyForEmbed
+                  : modelPackageStatus === PackageStatusEnum.DOWNLOADING
+                  ? t.downloadingModel
+                  : t.notStoredLocally}
+              </span>
+              {modelPackageStatus === PackageStatusEnum.DOWNLOADING ? (
+                <button
+                  type="button"
+                  onClick={onCancelDownloadModel}
+                  class="px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors hover:opacity-80"
+                  style={{
+                    borderColor: 'var(--border-subtle)',
+                    color: 'var(--text-muted)',
+                    backgroundColor: 'var(--bg-surface-elevated)',
+                  }}
+                >
+                  {t.cancelButton}
+                </button>
+              ) : modelPackageStatus !== PackageStatusEnum.DOWNLOADED ? (
+                <button
+                  type="button"
+                  onClick={onDownloadModel}
+                  disabled={!isStorageAvailable}
+                  title={!isStorageAvailable ? 'Device storage disabled in Private Browsing' : undefined}
+                  class={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                    isStorageAvailable ? 'hover:opacity-85' : 'opacity-50 cursor-not-allowed'
+                  }`}
+                  style={{
+                    backgroundColor: 'var(--accent)',
+                    color: '#FFFFFF',
+                  }}
+                >
+                  {t.downloadButton({ size: '137 MB' })}
+                </button>
+              ) : null}
+            </div>
           </div>
-        </div>
+
+          {/* Package 4: On-Device AI Summarizer */}
+          <div
+            class="p-3 rounded-xl border flex flex-col gap-2.5"
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              borderColor: 'var(--border-subtle)',
+            }}
+          >
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
+                    {t.pkgSlmTitle}
+                  </span>
+                  <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
+                    190 MB
+                  </span>
+                </div>
+                <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  {t.pkgSlmDesc}
+                </p>
+              </div>
+
+              {slmPackageStatus === PackageStatusEnum.DOWNLOADED ? (
+                <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
+                  {t.installedBadge}
+                </span>
+              ) : slmPackageStatus === PackageStatusEnum.DOWNLOADING ? (
+                <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
+                  {slmProgress}%
+                </span>
+              ) : null}
+            </div>
+
+            {slmPackageStatus === PackageStatusEnum.DOWNLOADING && (
+              <div class="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden">
+                <div
+                  class="bg-amber-600 h-1.5 rounded-full transition-all duration-300"
+                  style={{ width: `${slmProgress}%` }}
+                />
+              </div>
+            )}
+
+            <div class="flex items-center justify-between text-xs pt-1">
+              <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
+                {slmPackageStatus === PackageStatusEnum.DOWNLOADED
+                  ? t.readyForSlm
+                  : slmPackageStatus === PackageStatusEnum.DOWNLOADING
+                  ? slmProgress >= 98
+                    ? t.compilingSlm
+                    : t.downloadingSlmProgress({ percent: slmProgress })
+                  : t.notStoredLocally}
+              </span>
+              {slmPackageStatus === PackageStatusEnum.DOWNLOADING ? (
+                <button
+                  type="button"
+                  onClick={onCancelDownloadSlm}
+                  class="px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors hover:opacity-80"
+                  style={{
+                    borderColor: 'var(--border-subtle)',
+                    color: 'var(--text-muted)',
+                    backgroundColor: 'var(--bg-surface-elevated)',
+                  }}
+                >
+                  {t.cancelButton}
+                </button>
+              ) : slmPackageStatus !== PackageStatusEnum.DOWNLOADED ? (
+                <button
+                  type="button"
+                  onClick={onDownloadSlm}
+                  disabled={!isStorageAvailable}
+                  title={!isStorageAvailable ? 'Device storage disabled in Private Browsing' : undefined}
+                  class={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                    isStorageAvailable ? 'hover:opacity-85' : 'opacity-50 cursor-not-allowed'
+                  }`}
+                  style={{
+                    backgroundColor: 'var(--accent)',
+                    color: '#FFFFFF',
+                  }}
+                >
+                  {t.downloadButton({ size: '190 MB' })}
+                </button>
+              ) : null}
+            </div>
+          </div>
         </div>
 
         {/* Clear Storage Action with Inline Confirmation & Visual Countdown */}
@@ -774,11 +870,11 @@ export function SettingsView({
                   d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                 />
               </svg>
-              <span>Delete all local offline data?</span>
+              <span>{t.deleteConfirmTitle}</span>
             </div>
 
             <p class="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              Removes downloaded scripture text and AI models from OPFS. You can re-download anytime.
+              {t.deleteConfirmDesc}
             </p>
 
             {/* Countdown progress bar */}
@@ -800,14 +896,14 @@ export function SettingsView({
                   color: 'var(--text-main)',
                 }}
               >
-                Cancel
+                {t.cancelButton}
               </button>
               <button
                 type="button"
                 onClick={handleConfirmClear}
                 class="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition-all shadow-sm"
               >
-                Yes, Delete All
+                {t.deleteConfirmYes}
               </button>
             </div>
           </div>
@@ -822,33 +918,9 @@ export function SettingsView({
               backgroundColor: 'var(--bg-surface)',
             }}
           >
-            Free Up Local Space (Clear Artifacts)
+            {t.freeSpaceButton}
           </button>
         )}
-      </div>
-
-      {/* Active Translation */}
-      <div
-        class="p-4 rounded-2xl border space-y-2"
-        style={{
-          backgroundColor: 'var(--bg-surface-elevated)',
-          borderColor: 'var(--border-subtle)',
-        }}
-      >
-        <span class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
-          Active Translation
-        </span>
-        <select
-          class="w-full p-2.5 rounded-xl border text-xs outline-none"
-          style={{
-            backgroundColor: 'var(--bg-surface)',
-            borderColor: 'var(--border-subtle)',
-            color: 'var(--text-main)',
-          }}
-        >
-          <option selected>World English Bible (WEB) - Public Domain</option>
-          {/* <option>Louis Segond 1910 (LSG) - Domaine Public (Français)</option> */}
-        </select>
       </div>
 
       {/* App Version & Commit Details */}

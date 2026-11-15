@@ -1,2 +1,1 @@
-export const DEFAULT_TOAST_DURATION_MS = 3800;
-export const FALLBACK_TOAST_DURATION_MS = 4500;
+export const TOAST_DURATION_MS = 4500;

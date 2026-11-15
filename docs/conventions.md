@@ -13,3 +13,5 @@
 5. **Offline seams mirror runtime seams.** Python ABCs in
    `ingest/rag_core/`; a new translation or model is a new adapter
    plus a CLI flag, never an edit to the pipeline core.
+6. **UI chrome localization is separated from Scripture translations.**
+   UI strings use `@nanostores/i18n` with component-scoped keys and lazy-loaded catalogs (`app/src/locales/`). Canonical Scripture texts, pericopes, and book names stay bound to version-gated artifacts. See [docs/i18n.md](file:///home/hjisaac/Devs/bibleit/docs/i18n.md).

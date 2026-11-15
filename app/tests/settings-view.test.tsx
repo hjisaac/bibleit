@@ -57,4 +57,24 @@ describe('SettingsView Component', () => {
     fireEvent.change(checkbox, { target: { checked: true } });
     expect(onToggleAi).toHaveBeenCalledWith(true);
   });
+
+  it('renders documented Interface Language selector and no separate translation dropdown', async () => {
+    const { $isMultilingualEnabled } = await import('../src/stores/i18n');
+    $isMultilingualEnabled.set(true);
+
+    render(<SettingsView {...defaultProps} />);
+
+    expect(screen.getByText('Interface Language')).toBeDefined();
+    expect(
+      screen.getByText(
+        'Setting your language also switches the Scripture translation (English uses WEB; French uses Louis Segond 1910).',
+      ),
+    ).toBeDefined();
+
+    expect(screen.getByText('English (World English Bible - WEB)')).toBeDefined();
+    expect(screen.getByText('Français (Louis Segond 1910 - LSG)')).toBeDefined();
+
+    // No redundant standalone translation selector
+    expect(screen.queryByText('Active Translation')).toBeNull();
+  });
 });

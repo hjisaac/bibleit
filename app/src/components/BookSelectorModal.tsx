@@ -1,7 +1,28 @@
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { BIBLE_BOOKS, BIBLE_BOOKS_BY_ID, type BibleBook } from '../core/bible-books';
+import { useStore } from '@nanostores/preact';
+import { BIBLE_BOOKS, BIBLE_BOOKS_BY_ID, type BibleBook, getLocalizedBookName } from '../core/bible-books';
 import { getVerseCount } from '../core/verse-counts';
+import { $locale, i18n } from '../stores/i18n';
+import { params } from '@nanostores/i18n';
+
+export const messages = i18n('modal/bookSelector', {
+  backToChapters: 'Back to chapters',
+  backToBooks: 'Back to books',
+  selectPassage: 'Select Passage',
+  stepBook: '1. Book',
+  stepChapter: params('2. Chapter {ch}'),
+  stepVerse: '3. Verse',
+  filterPlaceholder: 'Filter books (e.g. John, Rom, Ps)...',
+  filterAll: 'All (66)',
+  filterOt: 'OT (39)',
+  filterNt: 'NT (27)',
+  chaptersSingular: 'ch',
+  chaptersPlural: 'chs',
+  selectChapterSubtitle: params('Select chapter (1–{max})'),
+  chapterHeader: params('{book} Chapter {ch}'),
+  selectVerseSubtitle: params('Select verse (1–{max})'),
+});
 
 interface BookSelectorModalProps {
   isOpen: boolean;
@@ -21,6 +42,9 @@ export function BookSelectorModal({
   initialBookId,
   initialChapter,
 }: BookSelectorModalProps): JSX.Element | null {
+  const t = useStore(messages);
+  const currentLocale = useStore($locale);
+
   if (!isOpen) {
     return null;
   }
@@ -45,9 +69,11 @@ export function BookSelectorModal({
   const filteredBooks = BIBLE_BOOKS.filter((b) => {
     const matchesTestament =
       filterTestament === 'ALL' || b.testament === filterTestament;
+    const localized = getLocalizedBookName(b.id, currentLocale);
     const matchesSearch =
       searchFilter.trim().length === 0 ||
       b.name.toLowerCase().includes(searchFilter.trim().toLowerCase()) ||
+      localized.toLowerCase().includes(searchFilter.trim().toLowerCase()) ||
       b.aliases.some((a) => a.startsWith(searchFilter.trim().toLowerCase()));
     return matchesTestament && matchesSearch;
   });
@@ -125,11 +151,13 @@ export function BookSelectorModal({
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" />
               </svg>
               <span>
-                Back to {currentStep === 'verse' && selectedBook?.chapters !== 1 ? 'chapters' : 'books'}
+                {currentStep === 'verse' && selectedBook?.chapters !== 1
+                  ? t.backToChapters
+                  : t.backToBooks}
               </span>
             </button>
           ) : (
-            <span class="text-sm font-semibold tracking-tight">Select Passage</span>
+            <span class="text-sm font-semibold tracking-tight">{t.selectPassage}</span>
           )}
 
           <button
@@ -163,7 +191,7 @@ export function BookSelectorModal({
               color: currentStep === 'book' ? 'var(--text-main)' : 'var(--text-muted)',
             }}
           >
-            1. {selectedBook ? selectedBook.name : 'Book'}
+            {selectedBook ? `1. ${getLocalizedBookName(selectedBook.id, currentLocale)}` : t.stepBook}
           </button>
 
           <span class="text-xs opacity-40">›</span>
@@ -182,7 +210,7 @@ export function BookSelectorModal({
               color: currentStep === 'chapter' ? 'var(--text-main)' : 'var(--text-muted)',
             }}
           >
-            2. Chapter {selectedBook?.chapters === 1 ? '1' : selectedChapter}
+            {t.stepChapter({ ch: selectedBook?.chapters === 1 ? '1' : String(selectedChapter) })}
           </button>
 
           <span class="text-xs opacity-40">›</span>
@@ -201,7 +229,7 @@ export function BookSelectorModal({
               color: currentStep === 'verse' ? 'var(--text-main)' : 'var(--text-muted)',
             }}
           >
-            3. Verse
+            {t.stepVerse}
           </button>
         </div>
 
@@ -212,7 +240,7 @@ export function BookSelectorModal({
             <div class="space-y-3">
               <input
                 type="text"
-                placeholder="Filter books (e.g. John, Rom, Ps)..."
+                placeholder={t.filterPlaceholder}
                 value={searchFilter}
                 onInput={(e) => setSearchFilter((e.target as HTMLInputElement).value)}
                 class="w-full px-3.5 py-2 rounded-xl border text-xs outline-none focus:ring-2 focus:ring-amber-500/40"
@@ -240,7 +268,7 @@ export function BookSelectorModal({
                       filterTestament === 'ALL' ? 'var(--text-main)' : 'var(--text-muted)',
                   }}
                 >
-                  All (66)
+                  {t.filterAll}
                 </button>
                 <button
                   type="button"
@@ -255,7 +283,7 @@ export function BookSelectorModal({
                       filterTestament === 'OT' ? 'var(--text-main)' : 'var(--text-muted)',
                   }}
                 >
-                  OT (39)
+                  {t.filterOt}
                 </button>
                 <button
                   type="button"
@@ -270,7 +298,7 @@ export function BookSelectorModal({
                       filterTestament === 'NT' ? 'var(--text-main)' : 'var(--text-muted)',
                   }}
                 >
-                  NT (27)
+                  {t.filterNt}
                 </button>
               </div>
 
@@ -288,9 +316,9 @@ export function BookSelectorModal({
                       borderColor: 'var(--border-subtle)',
                     }}
                   >
-                    <span class="text-xs font-semibold">{b.name}</span>
+                    <span class="text-xs font-semibold">{getLocalizedBookName(b.id, currentLocale)}</span>
                     <span class="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                      {b.chapters} {b.chapters === 1 ? 'ch' : 'chs'}
+                      {b.chapters} {b.chapters === 1 ? t.chaptersSingular : t.chaptersPlural}
                     </span>
                   </button>
                 ))}
@@ -302,9 +330,9 @@ export function BookSelectorModal({
           {currentStep === 'chapter' && selectedBook && (
             <div class="space-y-3">
               <div class="text-center">
-                <h3 class="font-serif text-lg font-bold">{selectedBook.name}</h3>
+                <h3 class="font-serif text-lg font-bold">{getLocalizedBookName(selectedBook.id, currentLocale)}</h3>
                 <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Select chapter (1–{selectedBook.chapters})
+                  {t.selectChapterSubtitle({ max: selectedBook.chapters })}
                 </p>
               </div>
 
@@ -334,10 +362,10 @@ export function BookSelectorModal({
             <div class="space-y-3">
               <div class="text-center">
                 <h3 class="font-serif text-lg font-bold">
-                  {selectedBook.name} Chapter {selectedChapter}
+                  {t.chapterHeader({ book: getLocalizedBookName(selectedBook.id, currentLocale), ch: selectedChapter })}
                 </h3>
                 <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Select verse (1–{totalVerses})
+                  {t.selectVerseSubtitle({ max: totalVerses })}
                 </p>
               </div>
 

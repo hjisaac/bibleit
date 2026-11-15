@@ -37,10 +37,21 @@ export function computeCrc32(data: string | Uint8Array): string {
 }
 
 /** Verifies that downloaded book content matches its precomputed CRC32 checksum. */
-export function verifyBookIntegrity(bookId: string, content: string | Uint8Array): boolean {
-  const entry = WEB_BIBLE_MANIFEST.books[bookId];
+export function verifyBookIntegrity(
+  bookId: string,
+  content: string | Uint8Array,
+  manifest: BibleManifest = WEB_BIBLE_MANIFEST,
+): boolean {
+  const entry = manifest.books[bookId];
   if (!entry) return false;
   return computeCrc32(content) === entry.crc32;
+}
+
+import { LSG_BIBLE_MANIFEST } from './lsg-manifest';
+export { LSG_BIBLE_MANIFEST };
+
+export function getBibleManifest(translationId: string = 'web'): BibleManifest {
+  return translationId.toLowerCase() === 'lsg' ? LSG_BIBLE_MANIFEST : WEB_BIBLE_MANIFEST;
 }
 
 export const WEB_BIBLE_MANIFEST: BibleManifest = {

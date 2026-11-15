@@ -78,6 +78,38 @@ export const BIBLE_BOOKS: readonly BibleBook[] = [
   { id: 'REV', name: 'Revelation', testament: 'NT', chapters: 22, aliases: ['rev', 'revelation', 'apocalypse'] },
 ];
 
+export const FRENCH_BOOK_NAMES: Readonly<Record<string, string>> = Object.freeze({
+  GEN: 'Genèse', EXO: 'Exode', LEV: 'Lévitique', NUM: 'Nombres',
+  DEU: 'Deutéronome', JOS: 'Josué', JDG: 'Juges', RUT: 'Ruth',
+  '1SA': '1 Samuel', '2SA': '2 Samuel', '1KI': '1 Rois', '2KI': '2 Rois',
+  '1CH': '1 Chroniques', '2CH': '2 Chroniques', EZR: 'Esdras', NEH: 'Néhémie',
+  EST: 'Esther', JOB: 'Job', PSA: 'Psaumes', PRO: 'Proverbes',
+  ECC: 'Ecclésiaste', SNG: 'Cantique des Cantiques', ISA: 'Ésaïe', JER: 'Jérémie',
+  LAM: 'Lamentations', EZK: 'Ézéchiel', DAN: 'Daniel', HOS: 'Osée',
+  JOL: 'Joël', AMO: 'Amos', OBA: 'Abdias', JON: 'Jonas',
+  MIC: 'Michée', NAM: 'Nahum', HAB: 'Habacuc', ZEP: 'Sophonie',
+  HAG: 'Aggée', ZEC: 'Zacharie', MAL: 'Malachie', MAT: 'Matthieu',
+  MRK: 'Marc', LUK: 'Luc', JHN: 'Jean', ACT: 'Actes',
+  ROM: 'Romains', '1CO': '1 Corinthiens', '2CO': '2 Corinthiens', GAL: 'Galates',
+  EPH: 'Éphésiens', PHP: 'Philippiens', COL: 'Colossiens', '1TH': '1 Thessaloniciens',
+  '2TH': '2 Thessaloniciens', '1TI': '1 Timothée', '2TI': '2 Timothée', TIT: 'Tite',
+  PHM: 'Philémon', HEB: 'Hébreux', JAS: 'Jacques', '1PE': '1 Pierre',
+  '2PE': '2 Pierre', '1JN': '1 Jean', '2JN': '2 Jean', '3JN': '3 Jean',
+  JUD: 'Jude', REV: 'Apocalypse',
+});
+
+/** Returns localized book title for a book id */
+export function getLocalizedBookName(bookId: string, locale: string = 'en'): string {
+  const upper = bookId.toUpperCase();
+  if (locale === 'fr') {
+    return FRENCH_BOOK_NAMES[upper] ?? BIBLE_BOOKS_BY_ID[upper]?.name ?? bookId;
+  }
+  return BIBLE_BOOKS_BY_ID[upper]?.name ?? bookId;
+}
+
+const stripAccents = (str: string): string =>
+  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
 /** Fast O(1) dictionary indexed by canonical book ID (e.g. 'PHP', 'GEN'). */
 export const BIBLE_BOOKS_BY_ID: Readonly<Record<string, BibleBook>> = Object.freeze(
   Object.fromEntries(BIBLE_BOOKS.map((b) => [b.id, b])),
@@ -86,7 +118,15 @@ export const BIBLE_BOOKS_BY_ID: Readonly<Record<string, BibleBook>> = Object.fre
 /** Fast O(1) hash map indexing all valid prefixes (len >= 2) and exact aliases. */
 const BOOK_BY_PREFIX = new Map<string, BibleBook>();
 for (const b of BIBLE_BOOKS) {
-  for (const term of [b.name.toLowerCase(), ...b.aliases.map((a) => a.toLowerCase())]) {
+  const frName = FRENCH_BOOK_NAMES[b.id];
+  const terms = [
+    b.name.toLowerCase(),
+    stripAccents(b.name.toLowerCase()),
+    ...(frName ? [frName.toLowerCase(), stripAccents(frName.toLowerCase())] : []),
+    ...b.aliases.map((a) => a.toLowerCase()),
+    ...b.aliases.map((a) => stripAccents(a.toLowerCase())),
+  ];
+  for (const term of terms) {
     for (let len = 2; len <= term.length; len++) {
       const prefix = term.slice(0, len);
       if (!BOOK_BY_PREFIX.has(prefix)) {
@@ -96,14 +136,21 @@ for (const b of BIBLE_BOOKS) {
   }
 }
 for (const b of BIBLE_BOOKS) {
+  const frName = FRENCH_BOOK_NAMES[b.id];
   BOOK_BY_PREFIX.set(b.id.toLowerCase(), b);
   BOOK_BY_PREFIX.set(b.name.toLowerCase(), b);
+  if (frName) {
+    BOOK_BY_PREFIX.set(frName.toLowerCase(), b);
+    BOOK_BY_PREFIX.set(stripAccents(frName.toLowerCase()), b);
+  }
   for (const alias of b.aliases) {
     BOOK_BY_PREFIX.set(alias.toLowerCase(), b);
+    BOOK_BY_PREFIX.set(stripAccents(alias.toLowerCase()), b);
   }
 }
 
 /** Matches query string prefix to a Bible book in O(1). */
 export function findBookByPrefix(query: string): BibleBook | undefined {
-  return BOOK_BY_PREFIX.get(query.trim().toLowerCase());
+  const q = query.trim().toLowerCase();
+  return BOOK_BY_PREFIX.get(q) ?? BOOK_BY_PREFIX.get(stripAccents(q));
 }

@@ -124,7 +124,7 @@ describe('SearchView Cold Start and Search Persistence', () => {
 
     renderSearchView();
 
-    const targetTopic = POPULAR_TOPICS[1]!; // Strength and courage
+    const targetTopic = POPULAR_TOPICS.en[1]!; // Strength and courage
     const chip = screen.getByRole('button', { name: targetTopic });
     fireEvent.click(chip);
 
@@ -594,6 +594,22 @@ describe('SearchView Cold Start and Search Persistence', () => {
       expect(screen.queryByText('Synthesized test answer')).toBeNull();
       expect(screen.queryByText('Grounded Summary')).toBeNull();
     });
+  });
+
+  it('renders localized suggestions and popular topics when locale is set to French', async () => {
+    const { $isMultilingualEnabled, $localeSetting } = await import('../src/stores/i18n');
+    $isMultilingualEnabled.set(true);
+    $localeSetting.set('fr');
+
+    renderSearchView();
+
+    // Verify French suggestions and topics
+    expect(screen.getByText('Philippiens 4:7')).toBeTruthy();
+    expect(screen.getByText('paix qui surpasse')).toBeTruthy();
+    expect(screen.getByText("Paix dans l'anxiété")).toBeTruthy();
+    expect(screen.getByText('Force et courage')).toBeTruthy();
+
+    $localeSetting.set('en');
   });
 });
 

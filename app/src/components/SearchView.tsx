@@ -14,7 +14,7 @@ import {
 import { BIBLE_BOOKS_BY_ID, findBookByPrefix } from '../core/bible-books';
 import { formatCitation } from '@bibleit/engine';
 import { resolveVerseText } from '../adapters/book-store';
-import { POPULAR_TOPICS, SEARCH_SUGGESTIONS } from '../core/starter-topics';
+import { getPopularTopics, getSearchSuggestions } from '../core/starter-topics';
 import type { SavedVerse } from './SavedView';
 import {
   $searchHistory,
@@ -25,7 +25,54 @@ import {
   SEARCH_STORAGE_KEY,
 } from '../stores/search';
 import { ScriptureOverviewCard } from './ScriptureOverviewCard';
-import { FALLBACK_TOAST_DURATION_MS } from '../constants';
+import { $locale, i18n } from '../stores/i18n';
+import { params } from '@nanostores/i18n';
+
+export const messages = i18n('search/view', {
+  searchPlaceholder: 'Search verses, topics, or questions...',
+  searchButtonLabel: 'Search',
+  clearQueryTitle: 'Clear query',
+  readBookAria: params('Read {book} 1:1'),
+  openChapterAria: params('Open {book} {ch}'),
+  recentSearches: 'Recent Searches',
+  suggestions: 'Suggestions',
+  popularTopics: 'Popular Topics',
+  saveScriptureOfflineBanner: 'Save scripture for offline searches',
+  setUpButton: 'Set Up →',
+  dismissBannerTitle: 'Dismiss banner',
+  saveScriptureOfflineCompact: 'Save scripture for offline searches · Tap to set up →',
+  savingScripture: 'Saving scripture to this device…',
+  searchRefreshNotice: 'Search will automatically refresh once scripture is saved.',
+  offlineTitle: "You're currently offline",
+  serviceUnavailableTitle: 'Search service currently unavailable',
+  offlineDesc: "We couldn't connect to the search server. Save scripture to search offline or try again later.",
+  noMatchesTitle: 'No matching passages found',
+  noMatchesDesc: 'Try checking spelling, searching for a book name, or using broader keywords.',
+  serverRetrieval: 'Server retrieval',
+  deviceRetrieval: 'Device retrieval',
+  loadingPassagesAria: 'Loading retrieved passages',
+  badgeExactRef: 'Exact Reference',
+  badgeSemantic: 'Semantic Passage',
+  badgeKeyword: 'Keyword Match',
+  pauseNarrationTitle: 'Pause narration',
+  listenPassageTitle: 'Listen to passage',
+  pauseRefAria: params('Pause {ref}'),
+  listenRefAria: params('Listen to {ref}'),
+  removeFromBookmarksTitle: 'Remove from bookmarks',
+  saveToBookmarksTitle: 'Save to bookmarks',
+  copyPassageTitle: 'Copy passage citation and text',
+  loadingSurroundingVerses: 'Loading surrounding verses...',
+  expandPassage: '+ Expand passage',
+  collapsePassage: '– Collapse passage',
+  readChapter: 'Read chapter',
+  toastCopied: 'Copied to clipboard',
+  toastServerTimeout: 'Search server timed out: showing on-device results',
+  toastServerUnreachable: 'Search server unreachable: showing on-device results',
+  toastNotDownloaded: 'Scripture text not downloaded. Install in Settings to enable search.',
+  toastSearchFailed: params('Search failed: {message}'),
+  toastUnavailableOffline: 'AI overview unavailable offline: showing matching scripture',
+  toastUnavailableDevice: 'AI overview unavailable in device-only mode: showing matching scripture',
+});
 
 export { MAX_HISTORY_ITEMS, SEARCH_HISTORY_KEY, SEARCH_STORAGE_KEY };
 
@@ -52,7 +99,7 @@ interface SearchViewProps {
     citation: string;
     text: string;
   }) => void;
-  onToast: (message: string, durationMs?: number) => void;
+  onToast: (message: string) => void;
 }
 
 export function renderHighlightedText(
@@ -176,6 +223,10 @@ export function SearchView({
   onSaveVerse,
   onToast,
 }: SearchViewProps): JSX.Element {
+  const t = useStore(messages);
+  const currentLocale = useStore($locale);
+  const suggestions = getSearchSuggestions(currentLocale);
+  const popularTopics = getPopularTopics(currentLocale);
   const [initialSearch] = useState(() => $lastSearch.get());
   const [query, setQuery] = useState(initialSearch.query);
   const [passages, setPassages] = useState<ScoredPassage[]>(initialSearch.passages);
@@ -248,15 +299,15 @@ export function SearchView({
           setPassages(res.passages);
           setSearchOrigin(res.origin);
           if (res.fallbackReason === 'timeout') {
-            onToast('Search server timed out: showing on-device results', FALLBACK_TOAST_DURATION_MS);
+            onToast(t.toastServerTimeout);
           } else if (res.fallbackReason === 'error') {
-            onToast('Search server unreachable: showing on-device results', FALLBACK_TOAST_DURATION_MS);
+            onToast(t.toastServerUnreachable);
           }
         }
       })
       .catch((err) => {
         console.error('[Search Error]:', err);
-        onToast('Search failed: ' + (err instanceof Error ? err.message : String(err)));
+        onToast(t.toastSearchFailed({ message: err instanceof Error ? err.message : String(err) }));
       })
       .finally(() => {
         if (searchRunIdRef.current === runId) {
@@ -293,7 +344,7 @@ export function SearchView({
         setSynthesisTtftMs(null);
         setSynthesisTokensPerSec(null);
         setSynthesisError(null);
-        onToast('AI overview unavailable offline: showing matching scripture');
+        onToast(t.toastUnavailableOffline);
         runSearch(trimmed);
       } else if (!engine.answerProvider.available) {
         setAnswerText('');
@@ -301,7 +352,7 @@ export function SearchView({
         setSynthesisTtftMs(null);
         setSynthesisTokensPerSec(null);
         setSynthesisError(null);
-        onToast('AI overview unavailable in device-only mode: showing matching scripture');
+        onToast(t.toastUnavailableDevice);
         runSearch(trimmed);
       } else if (!isSynthesizing) {
         setSynthesisError(null);
@@ -415,7 +466,7 @@ export function SearchView({
 
   const copyToClipboard = (text: string) => {
     void navigator.clipboard.writeText(text);
-    onToast('Copied to clipboard');
+    onToast(t.toastCopied);
   };
 
   const handleSynthesize = async () => {
@@ -443,13 +494,13 @@ export function SearchView({
       setSearchOrigin(res.origin);
       setIsSearching(false);
       if (res.fallbackReason === 'timeout') {
-        onToast('Search server timed out: showing on-device results', FALLBACK_TOAST_DURATION_MS);
+        onToast(t.toastServerTimeout);
       } else if (res.fallbackReason === 'error') {
-        onToast('Search server unreachable: showing on-device results', FALLBACK_TOAST_DURATION_MS);
+        onToast(t.toastServerUnreachable);
       }
       if (res.passages.length === 0) {
         if (res.origin !== SearchOriginEnum.REMOTE && offlineTextStatus !== PackageStatusEnum.DOWNLOADED) {
-          onToast('Scripture text not downloaded. Install in Settings to enable search.');
+          onToast(t.toastNotDownloaded);
         }
         setIsSynthesizing(false);
         return;
@@ -516,7 +567,7 @@ export function SearchView({
                 />
               </svg>
               <span class="text-[11px] font-medium truncate" style={{ color: 'var(--text-main)' }}>
-                Save scripture for offline searches
+                {t.saveScriptureOfflineBanner}
               </span>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
@@ -526,7 +577,7 @@ export function SearchView({
                 class="px-2 py-0.5 rounded-lg text-[11px] font-medium text-white transition-opacity hover:opacity-90 shadow-sm"
                 style={{ backgroundColor: 'var(--accent)' }}
               >
-                Set Up →
+                {t.setUpButton}
               </button>
               {onDismissOnboarding && (
                 <button
@@ -534,7 +585,7 @@ export function SearchView({
                   onClick={onDismissOnboarding}
                   class="p-0.5 rounded-md text-[11px] hover:opacity-75"
                   style={{ color: 'var(--text-muted)' }}
-                  title="Dismiss banner"
+                  title={t.dismissBannerTitle}
                 >
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -569,7 +620,7 @@ export function SearchView({
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                 />
               </svg>
-              <span>Save scripture for offline searches · Tap to set up →</span>
+              <span>{t.saveScriptureOfflineCompact}</span>
             </button>
           </div>
         )
@@ -587,7 +638,7 @@ export function SearchView({
         >
           <button
             type="submit"
-            aria-label="Search"
+            aria-label={t.searchButtonLabel}
             class="w-5 h-5 shrink-0 flex items-center justify-center mr-2 hover:opacity-80 transition-opacity cursor-pointer"
             style={{ color: 'var(--text-muted)' }}
           >
@@ -615,7 +666,7 @@ export function SearchView({
             inputMode="search"
             enterKeyHint="search"
             value={query}
-            placeholder="Search verses, topics, or questions..."
+            placeholder={t.searchPlaceholder}
             class="w-full bg-transparent text-sm font-medium outline-none leading-normal pl-0 pr-2"
             style={{
               color: 'var(--text-main)',
@@ -649,7 +700,7 @@ export function SearchView({
               }}
               class="text-xs p-1 rounded-full hover:opacity-75 shrink-0 ml-1.5"
               style={{ color: 'var(--text-muted)' }}
-              title="Clear query"
+              title={t.clearQueryTitle}
             >
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -678,7 +729,7 @@ export function SearchView({
             onClick={() => onOpenReader(matchedBook.id, 1, 1)}
             class="shrink-0 text-xs font-semibold hover:opacity-80 transition-opacity text-left cursor-pointer hover:underline"
             style={{ color: 'var(--text-main)' }}
-            title={`Read ${matchedBook.name} 1:1`}
+            title={t.readBookAria({ book: matchedBook.name })}
           >
             {matchedBook.name}
           </button>
@@ -697,7 +748,7 @@ export function SearchView({
                   borderColor: 'var(--border-subtle)',
                   color: 'var(--text-main)',
                 }}
-                title={`Open ${matchedBook.name} ${ch}`}
+                title={t.openChapterAria({ book: matchedBook.name, ch })}
               >
                 {ch}
               </button>
@@ -714,7 +765,7 @@ export function SearchView({
             <div>
               <div class="mb-2">
                 <span class="text-[11px] font-semibold tracking-wider uppercase" style={{ color: 'var(--text-subtle)' }}>
-                  Recent Searches
+                  {t.recentSearches}
                 </span>
               </div>
               <div class="flex flex-wrap gap-1.5">
@@ -744,11 +795,11 @@ export function SearchView({
           <div>
             <div class="mb-2">
               <span class="text-[11px] font-semibold tracking-wider uppercase" style={{ color: 'var(--text-subtle)' }}>
-                Suggestions
+                {t.suggestions}
               </span>
             </div>
             <div class="flex flex-wrap gap-1.5">
-              {SEARCH_SUGGESTIONS.map((suggestion) => (
+              {suggestions.map((suggestion) => (
                 <button
                   key={suggestion}
                   type="button"
@@ -770,11 +821,11 @@ export function SearchView({
           <div>
             <div class="mb-2">
               <span class="text-[11px] font-semibold tracking-wider uppercase" style={{ color: 'var(--text-subtle)' }}>
-                Popular Topics
+                {t.popularTopics}
               </span>
             </div>
             <div class="flex flex-wrap gap-1.5">
-              {POPULAR_TOPICS.map((topic) => (
+              {popularTopics.map((topic) => (
                 <button
                   key={topic}
                   type="button"
@@ -806,7 +857,7 @@ export function SearchView({
           <div class="flex items-center justify-between text-xs">
             <span class="font-medium flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
               <div class="w-3.5 h-3.5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
-              Saving scripture to this device…
+              {t.savingScripture}
             </span>
             <span class="font-mono text-xs font-semibold" style={{ color: 'var(--accent)' }}>
               {textProgress !== undefined ? `${textProgress}%` : ''}
@@ -822,7 +873,7 @@ export function SearchView({
             />
           </div>
           <p class="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-            Search will automatically refresh once scripture is saved.
+            {t.searchRefreshNotice}
           </p>
         </div>
       )}
@@ -847,19 +898,19 @@ export function SearchView({
               )}
             </div>
             <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
-              {!isOnline ? "You're currently offline" : 'Search service currently unavailable'}
+              {!isOnline ? t.offlineTitle : t.serviceUnavailableTitle}
             </p>
             <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-              We couldn't connect to the search server. Save scripture to search offline or try again later.
+              {t.offlineDesc}
             </p>
           </div>
         ) : (
           <div class="py-16 flex flex-col items-center justify-center text-center animate-fadeIn">
             <p class="font-serif text-base font-semibold mb-1" style={{ color: 'var(--text-main)' }}>
-              No matching passages found
+              {t.noMatchesTitle}
             </p>
             <p class="text-xs max-w-sm" style={{ color: 'var(--text-muted)' }}>
-              Try checking spelling, searching for a book name, or using broader keywords.
+              {t.noMatchesDesc}
             </p>
           </div>
         )
@@ -881,7 +932,7 @@ export function SearchView({
           </span>
           {searchDurationMs !== null && (
             <span class="shrink-0">
-              {searchOrigin === SearchOriginEnum.REMOTE ? 'Server retrieval' : 'Device retrieval'}: {searchDurationMs}ms
+              {searchOrigin === SearchOriginEnum.REMOTE ? t.serverRetrieval : t.deviceRetrieval}: {searchDurationMs}ms
             </span>
           )}
         </div>
@@ -909,7 +960,7 @@ export function SearchView({
       {/* Results Stream */}
       <div class="flex flex-col space-y-3 pb-4">
         {isSearching && (
-          <div class="flex flex-col space-y-3 animate-fadeIn" aria-label="Loading retrieved passages">
+          <div class="flex flex-col space-y-3 animate-fadeIn" aria-label={t.loadingPassagesAria}>
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
@@ -1007,10 +1058,10 @@ export function SearchView({
                       }}
                     >
                       {p.source === 'reference'
-                        ? 'Exact Reference'
+                        ? t.badgeExactRef
                         : p.source === 'semantic'
-                        ? 'Semantic Passage'
-                        : 'Keyword Match'}
+                        ? t.badgeSemantic
+                        : t.badgeKeyword}
                     </span>
                   )}
                   {isInspectorMode && (
@@ -1041,8 +1092,8 @@ export function SearchView({
                         const segments = buildPassageSegments(passages);
                         narrator.play(segments, cardIdx);
                       }}
-                      title={isCardPlaying ? 'Pause narration' : 'Listen to passage'}
-                      aria-label={isCardPlaying ? `Pause ${refString}` : `Listen to ${refString}`}
+                      title={isCardPlaying ? t.pauseNarrationTitle : t.listenPassageTitle}
+                      aria-label={isCardPlaying ? t.pauseRefAria({ ref: refString }) : t.listenRefAria({ ref: refString })}
                       class="p-1 rounded hover:opacity-75 transition-opacity"
                       style={{ color: isCardActive ? 'var(--text-main)' : 'var(--text-muted)' }}
                     >
@@ -1077,7 +1128,7 @@ export function SearchView({
                           text: p.chunk.text,
                         });
                       }}
-                      title={isSaved ? 'Remove from bookmarks' : 'Save to bookmarks'}
+                      title={isSaved ? t.removeFromBookmarksTitle : t.saveToBookmarksTitle}
                       class="p-1 rounded hover:opacity-75 transition-opacity"
                       style={{ color: isSaved ? 'var(--text-main)' : 'var(--text-muted)' }}
                     >
@@ -1100,7 +1151,7 @@ export function SearchView({
                   <button
                     type="button"
                     onClick={() => copyToClipboard(`${refString} - ${p.chunk.text}`)}
-                    title="Copy passage citation and text"
+                    title={t.copyPassageTitle}
                     class="p-1 rounded hover:opacity-75 transition-opacity"
                     style={{ color: 'var(--text-muted)' }}
                   >
@@ -1193,7 +1244,7 @@ export function SearchView({
 
                 {isExpanded && !surrounding && (
                   <div class="text-xs font-sans italic mt-1" style={{ color: 'var(--text-muted)' }}>
-                    Loading surrounding verses...
+                    {t.loadingSurroundingVerses}
                   </div>
                 )}
               </div>
@@ -1206,7 +1257,7 @@ export function SearchView({
                   class="font-medium flex items-center gap-1 hover:underline"
                   style={{ color: 'var(--text-muted)' }}
                 >
-                  <span>{isExpanded ? '– Collapse passage' : '+ Expand passage'}</span>
+                  <span>{isExpanded ? t.collapsePassage : t.expandPassage}</span>
                 </button>
 
                 <button
@@ -1220,7 +1271,7 @@ export function SearchView({
                   }
                   class="font-medium flex items-center gap-1 text-amber-700 dark:text-amber-400 hover:underline"
                 >
-                  <span>Read chapter</span>
+                  <span>{t.readChapter}</span>
                   <span>→</span>
                 </button>
               </div>

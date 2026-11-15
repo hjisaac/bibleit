@@ -23,8 +23,11 @@ function resolveLocalNumThreads(): number {
 
 export const env = {
   feedbackEmail: requireEnv('VITE_FEEDBACK_EMAIL', import.meta.env.VITE_FEEDBACK_EMAIL),
-  r2Url: requireEnv('VITE_CLOUDFLARE_R2_URL', import.meta.env.VITE_CLOUDFLARE_R2_URL).replace(/\/+$/, ''),
+  r2Url: (import.meta.env.VITE_CLOUDFLARE_R2_URL || '').trim().replace(/\/+$/, ''),
   backendApiUrl: (import.meta.env.VITE_BACKEND_API_URL?.trim() || '').replace(/\/+$/, ''),
+  isMultilingualEnabled:
+    import.meta.env.VITE_MULTILINGUAL_ENABLED !== undefined
+      ? import.meta.env.VITE_MULTILINGUAL_ENABLED === 'true'
+      : Boolean(import.meta.env.DEV),
   numThreads: resolveLocalNumThreads(),
 } as const;
-

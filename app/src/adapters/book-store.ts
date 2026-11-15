@@ -1,4 +1,5 @@
-import { WEB_BIBLE_MANIFEST, verifyBookIntegrity } from '../core/bible-manifest';
+import { getBibleManifest, verifyBookIntegrity } from '../core/bible-manifest';
+import { $activeTranslation, type TranslationId } from '../stores/preferences';
 
 export interface ChapterVerse {
   num: number;
@@ -11,32 +12,63 @@ export interface BookData {
   chapters: Record<string, ChapterVerse[]>;
 }
 
+// Remaps the 7 Textus Receptus verses to their host verses where text is preserved
+export const VERSE_ALIASES: Readonly<Record<string, { chapter: number; verse: number }>> = {
+  'ACT:8:37': { chapter: 8, verse: 36 },
+  'LUK:17:36': { chapter: 17, verse: 35 },
+  'ACT:15:34': { chapter: 15, verse: 33 },
+  'ACT:24:7': { chapter: 24, verse: 6 },
+  'ROM:16:25': { chapter: 14, verse: 23 },
+  'ROM:16:26': { chapter: 14, verse: 23 },
+  'ROM:16:27': { chapter: 14, verse: 23 },
+};
+
 const CACHE_NAME = 'bibleit-books-v1';
 const memoryCache = new Map<string, BookData>();
 
-/** Canonical in-memory address index for instant O(1) verse lookups: "PHP:4:7" -> text */
+/** Canonical in-memory address index for instant O(1) verse lookups */
 const verseIndex = new Map<string, string>();
 
+function getActiveTrans(translation?: string): TranslationId {
+  return (translation ?? $activeTranslation.get() ?? 'web') as TranslationId;
+}
+
 /** Generates canonical string key for address indexing */
-export function verseKey(bookId: string, chapter: number, verse: number): string {
-  return `${bookId.toUpperCase()}:${chapter}:${verse}`;
+export function verseKey(
+  bookId: string,
+  chapter: number,
+  verse: number,
+  translation?: string,
+): string {
+  const trans = getActiveTrans(translation);
+  return `${trans}:${bookId.toUpperCase()}:${chapter}:${verse}`;
 }
 
 /** Synchronous O(1) lookup from the verse index. Returns undefined if not yet indexed. */
-export function getCachedVerse(bookId: string, chapter: number, verse: number): string | undefined {
-  return verseIndex.get(verseKey(bookId, chapter, verse));
+export function getCachedVerse(
+  bookId: string,
+  chapter: number,
+  verse: number,
+  translation?: string,
+): string | undefined {
+  const key = verseKey(bookId, chapter, verse, translation);
+  return verseIndex.get(key) ?? verseIndex.get(`${bookId.toUpperCase()}:${chapter}:${verse}`);
 }
 
 /** Non-blocking background worker to populate the verse index from a loaded book */
-export function scheduleBookIndexing(bookData: BookData): void {
+export function scheduleBookIndexing(bookData: BookData, translation?: string): void {
   if (!bookData?.chapters || typeof bookData.chapters !== 'object') return;
+  const trans = getActiveTrans(translation);
 
   const runner = () => {
     const bookId = bookData.id.toUpperCase();
     for (const [chStr, verses] of Object.entries(bookData.chapters)) {
       const ch = parseInt(chStr, 10);
       for (const v of verses) {
-        verseIndex.set(`${bookId}:${ch}:${v.num}`, v.text);
+        verseIndex.set(`${trans}:${bookId}:${ch}:${v.num}`, v.text);
+        if (trans === 'web') {
+          verseIndex.set(`${bookId}:${ch}:${v.num}`, v.text);
+        }
       }
     }
   };
@@ -52,52 +84,69 @@ export function scheduleBookIndexing(bookData: BookData): void {
   }
 }
 
-/** Resolves verse text: checks index first, or loads book asynchronously if missing */
+/** Resolves verse text: checks aliases, index, or loads book asynchronously if missing */
 export async function resolveVerseText(
   bookId: string,
   chapter: number,
   verse: number,
+  translation?: string,
 ): Promise<string | undefined> {
-  const cached = getCachedVerse(bookId, chapter, verse);
+  const aliasKey = `${bookId.toUpperCase()}:${chapter}:${verse}`;
+  const alias = VERSE_ALIASES[aliasKey];
+  const targetChapter = alias ? alias.chapter : chapter;
+  const targetVerse = alias ? alias.verse : verse;
+
+  const cached = getCachedVerse(bookId, targetChapter, targetVerse, translation);
   if (cached) return cached;
 
   try {
-    const bookData = await loadBook(bookId);
-    const chKey = String(chapter);
+    const bookData = await loadBook(bookId, translation);
+    const chKey = String(targetChapter);
     const chapterVerses = bookData?.chapters?.[chKey];
-    const found = chapterVerses?.find((v) => v.num === verse);
+    const found = chapterVerses?.find((v) => v.num === targetVerse);
     return found?.text;
   } catch {
     return undefined;
   }
 }
 
-function getBookUrl(bookId: string): string {
+function getBookUrl(bookId: string, translation?: string): string {
+  const trans = getActiveTrans(translation);
+  const baseUrl = import.meta.env.BASE_URL ?? '/';
+  const cleanBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  return `${cleanBase}data/books/${trans}/${bookId}.json`;
+}
+
+function getLegacyBookUrl(bookId: string): string {
   const baseUrl = import.meta.env.BASE_URL ?? '/';
   const cleanBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
   return `${cleanBase}data/books/${bookId}.json`;
 }
 
 /** Loads a book from memory, browser Cache API, or network with CRC32 integrity verification. */
-export async function loadBook(bookId: string): Promise<BookData> {
-  const cachedMem = memoryCache.get(bookId);
+export async function loadBook(bookId: string, translation?: string): Promise<BookData> {
+  const trans = getActiveTrans(translation);
+  const memKey = `${trans}:${bookId}`;
+
+  const cachedMem = memoryCache.get(memKey) ?? (trans === 'web' ? memoryCache.get(bookId) : undefined);
   if (cachedMem) {
     return cachedMem;
   }
 
-  const url = getBookUrl(bookId);
+  const url = getBookUrl(bookId, trans);
+  const manifest = getBibleManifest(trans);
 
   // Check persistent Cache API if available in browser
   if (typeof caches !== 'undefined') {
     try {
       const cache = await caches.open(CACHE_NAME);
-      const match = await cache.match(url);
+      const match = (await cache.match(url)) ?? (trans === 'web' ? await cache.match(getLegacyBookUrl(bookId)) : null);
       if (match) {
         try {
           const data: BookData = await match.json();
           if (data?.chapters) {
-            memoryCache.set(bookId, data);
-            scheduleBookIndexing(data);
+            memoryCache.set(memKey, data);
+            scheduleBookIndexing(data, trans);
             return data;
           }
           await cache.delete(url);
@@ -110,22 +159,25 @@ export async function loadBook(bookId: string): Promise<BookData> {
     }
   }
 
-  // Network fetch
-  const response = await fetch(url);
+  // Network fetch with legacy fallback for default translation
+  let response = await fetch(url);
+  if (!response.ok && trans === 'web') {
+    response = await fetch(getLegacyBookUrl(bookId));
+  }
   if (!response.ok) {
-    throw new Error(`Failed to load ${bookId}: HTTP ${response.status}`);
+    throw new Error(`Failed to load ${bookId} (${trans}): HTTP ${response.status}`);
   }
 
   const text = await response.text();
 
-  // Verify non-cryptographic CRC32 integrity
-  if (!verifyBookIntegrity(bookId, text)) {
-    throw new Error(`Integrity check failed for ${bookId}: corrupt or truncated payload.`);
+  // Verify non-cryptographic CRC32 integrity against translation manifest
+  if (!verifyBookIntegrity(bookId, text, manifest)) {
+    throw new Error(`Integrity check failed for ${bookId} (${trans}): corrupt payload.`);
   }
 
   const data: BookData = JSON.parse(text);
-  memoryCache.set(bookId, data);
-  scheduleBookIndexing(data);
+  memoryCache.set(memKey, data);
+  scheduleBookIndexing(data, trans);
 
   // Persist verified book into Cache API
   if (typeof caches !== 'undefined') {
@@ -149,18 +201,20 @@ export async function loadBook(bookId: string): Promise<BookData> {
 }
 
 /** Returns the number of books already cached locally in Cache API. */
-export async function getCachedBooksCount(): Promise<number> {
+export async function getCachedBooksCount(translation?: string): Promise<number> {
+  const trans = getActiveTrans(translation);
   if (typeof caches === 'undefined') {
     return memoryCache.size;
   }
 
   try {
     const cache = await caches.open(CACHE_NAME);
-    const bookIds = Object.keys(WEB_BIBLE_MANIFEST.books);
+    const manifest = getBibleManifest(trans);
+    const bookIds = Object.keys(manifest.books);
     let count = 0;
 
     for (const bookId of bookIds) {
-      const match = await cache.match(getBookUrl(bookId));
+      const match = await cache.match(getBookUrl(bookId, trans));
       if (match) {
         count++;
       }
@@ -174,13 +228,16 @@ export async function getCachedBooksCount(): Promise<number> {
 /** Downloads missing books with CRC32 verification and reports live progress. */
 export async function downloadAllBooks(
   onProgress?: (progressPercent: number, bookId: string) => void,
+  translation?: string,
 ): Promise<void> {
-  const bookIds = Object.keys(WEB_BIBLE_MANIFEST.books);
+  const trans = getActiveTrans(translation);
+  const manifest = getBibleManifest(trans);
+  const bookIds = Object.keys(manifest.books);
   const total = bookIds.length;
   let done = 0;
 
   for (const bookId of bookIds) {
-    await loadBook(bookId);
+    await loadBook(bookId, trans);
     done++;
     const percent = Math.min(100, Math.round((done / total) * 100));
     onProgress?.(percent, bookId);
@@ -190,6 +247,7 @@ export async function downloadAllBooks(
 /** Clears all locally cached Scripture books from both memory and browser Cache API. */
 export async function clearBookCache(): Promise<void> {
   memoryCache.clear();
+  verseIndex.clear();
   if (typeof caches !== 'undefined') {
     try {
       await caches.delete(CACHE_NAME);
