@@ -49,7 +49,7 @@ export const messages = i18n('settings/view', {
   readyForEmbed: 'Ready for on-device inference',
   downloadingModel: 'Downloading model weights...',
   pkgSlmTitle: 'On-Device AI Summarizer',
-  pkgSlmDesc: 'SmolLM2 360M Instruct on-device language model (Q4 ONNX). Generates grounded scripture summaries completely offline.',
+  pkgSlmDesc: 'SmolLM2 360M Instruct on-device language model (Q4 ONNX). Generates grounded scripture summaries completely offline (inference is currently a bit slower).',
   readyForSlm: 'Ready for offline AI overviews',
   compilingSlm: 'Compiling and initializing model...',
   downloadingSlmProgress: params('Downloading model weights ({percent}%)...'),
@@ -485,8 +485,8 @@ export function SettingsView({
               if (textPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 1.2;
               if (aiPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 2.1;
               if (modelPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 137;
-              if (slmPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 190;
-              if (mb === 0) return '0 MB cached';
+              if (slmPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 370;
+              if (mb === 0) return '0 MB in OPFS';
               return `${mb.toFixed(1)} MB in OPFS`;
             })()}
           </span>
@@ -780,7 +780,7 @@ export function SettingsView({
                     {t.pkgSlmTitle}
                   </span>
                   <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
-                    190 MB
+                    370 MB
                   </span>
                 </div>
                 <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
@@ -845,7 +845,7 @@ export function SettingsView({
                     color: '#FFFFFF',
                   }}
                 >
-                  {t.downloadButton({ size: '190 MB' })}
+                  {t.downloadButton({ size: '370 MB' })}
                 </button>
               ) : null}
             </div>

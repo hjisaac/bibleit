@@ -219,7 +219,7 @@
     "readyForEmbed": "Prêt pour l'inférence sur l'appareil",
     "downloadingModel": "Téléchargement des poids du modèle...",
     "pkgSlmTitle": "Synthétiseur IA sur l'appareil",
-    "pkgSlmDesc": "Modèle de langage sur l'appareil SmolLM2 360M Instruct (ONNX Q4). Génère des aperçus bibliques 100% hors-ligne.",
+    "pkgSlmDesc": "Modèle de langage sur l'appareil SmolLM2 360M Instruct (ONNX Q4). Génère des aperçus bibliques 100% hors-ligne (inférence actuellement un peu plus lente).",
     "readyForSlm": "Prêt pour les synthèses IA hors-ligne",
     "compilingSlm": "Compilation et initialisation du modèle...",
     "downloadingSlmProgress": "Téléchargement des poids du modèle ({percent}%)...",

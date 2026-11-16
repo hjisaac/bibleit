@@ -198,6 +198,23 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
 }
 
 export async function isSlmModelCached(): Promise<boolean> {
+  try {
+    const root = await navigator.storage?.getDirectory?.();
+    if (root) {
+      const dir = await root.getDirectoryHandle('models', { create: false }).catch(() => null);
+      if (dir && typeof (dir as any).entries === 'function') {
+        for await (const [name, handle] of (dir as any).entries()) {
+          if (name.includes('SmolLM2-360M-Instruct') && name.includes('model_q4.onnx')) {
+            const file = await (handle as FileSystemFileHandle).getFile();
+            if (file.size > 300_000_000) return true;
+          }
+        }
+      }
+    }
+  } catch {
+    // Fall back to Cache API
+  }
+
   if (typeof caches === 'undefined') return false;
   try {
     const cacheNames = await caches.keys();
@@ -222,6 +239,22 @@ export async function isSlmModelCached(): Promise<boolean> {
 }
 
 export async function clearSlmModelCache(): Promise<void> {
+  try {
+    const root = await navigator.storage?.getDirectory?.();
+    if (root) {
+      const dir = await root.getDirectoryHandle('models', { create: false }).catch(() => null);
+      if (dir && typeof (dir as any).entries === 'function') {
+        for await (const [name] of (dir as any).entries()) {
+          if (name.includes('SmolLM2-360M-Instruct')) {
+            await dir.removeEntry(name);
+          }
+        }
+      }
+    }
+  } catch {
+    // Ignore OPFS removal errors
+  }
+
   if (typeof caches === 'undefined') return;
   try {
     const cacheNames = await caches.keys();

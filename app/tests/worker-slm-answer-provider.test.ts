@@ -102,4 +102,51 @@ describe('WorkerSlmAnswerProvider', () => {
       }
     }).rejects.toThrow('WASM crash');
   });
+
+  it('detects model in OPFS if model_q4.onnx is present with valid size', async () => {
+    const mockFileHandle = {
+      getFile: vi.fn(async () => ({ size: 387_943_246 })),
+    };
+    const mockDirHandle = {
+      entries: async function* () {
+        yield ['HuggingFaceTB_SmolLM2-360M-Instruct_resolve_main_onnx_model_q4.onnx', mockFileHandle];
+      },
+    };
+    const mockRoot = {
+      getDirectoryHandle: vi.fn(async () => mockDirHandle),
+    };
+    vi.stubGlobal('navigator', {
+      storage: {
+        getDirectory: vi.fn(async () => mockRoot),
+      },
+    });
+
+    const { isSlmModelCached } = await import('../src/adapters/worker-slm-answer-provider');
+    const cached = await isSlmModelCached();
+    expect(cached).toBe(true);
+  });
+
+  it('clears model files from OPFS on clearSlmModelCache', async () => {
+    const removeEntrySpy = vi.fn();
+    const mockDirHandle = {
+      entries: async function* () {
+        yield ['HuggingFaceTB_SmolLM2-360M-Instruct_resolve_main_onnx_model_q4.onnx', {}];
+      },
+      removeEntry: removeEntrySpy,
+    };
+    const mockRoot = {
+      getDirectoryHandle: vi.fn(async () => mockDirHandle),
+    };
+    vi.stubGlobal('navigator', {
+      storage: {
+        getDirectory: vi.fn(async () => mockRoot),
+      },
+    });
+
+    const { clearSlmModelCache } = await import('../src/adapters/worker-slm-answer-provider');
+    await clearSlmModelCache();
+    expect(removeEntrySpy).toHaveBeenCalledWith(
+      'HuggingFaceTB_SmolLM2-360M-Instruct_resolve_main_onnx_model_q4.onnx',
+    );
+  });
 });

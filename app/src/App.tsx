@@ -361,7 +361,7 @@ export function App(): JSX.Element {
       await slmProvider.load?.((fraction) => setSlmProgress(Math.round(fraction * 100)));
       setSlmProgress(100);
       $slmPackageStatus.set(PackageStatusEnum.DOWNLOADED);
-      showToast('On-device AI model installed in browser cache (190 MB)');
+      showToast('On-device AI model installed in OPFS (370 MB)');
     } catch (err) {
       if (isSlmAbortedRef.current || (err instanceof DOMException && err.name === 'AbortError')) {
         $slmPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
