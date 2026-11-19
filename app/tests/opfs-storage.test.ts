@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   CorruptArtifactError,
-  OpfsArtifactStore,
   OpfsStorage,
   StorageUnavailableError,
   createArtifactStore,
@@ -293,7 +292,7 @@ describe('opfs-storage', () => {
         throw new Error('Offline');
       }));
 
-      const store = new OpfsArtifactStore();
+      const store = createArtifactStore();
       const m = await store.manifest();
       expect(m.translation.id).toBe('WEB');
     });

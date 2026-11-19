@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/preact';
 import { SearchView, MAX_HISTORY_ITEMS } from '../src/components/SearchView';
 import { PackageStatusEnum } from '../src/core/types';
-import { POPULAR_TOPICS } from '../src/core/starter-topics';
+import { getPopularTopics } from '../src/core/starter-topics';
 import type { SearchEngine } from '../src/core/ports';
 import type { ComponentProps } from 'preact';
 
@@ -124,7 +124,7 @@ describe('SearchView Cold Start and Search Persistence', () => {
 
     renderSearchView();
 
-    const targetTopic = POPULAR_TOPICS.en[1]!; // Strength and courage
+    const targetTopic = getPopularTopics('en')[1]!; // Strength and courage
     const chip = screen.getByRole('button', { name: targetTopic });
     fireEvent.click(chip);
 
