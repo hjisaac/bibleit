@@ -2,9 +2,9 @@ import { browser, createI18n, formatter, localeFrom } from '@nanostores/i18n';
 import { persistentAtom } from '@nanostores/persistent';
 import { atom, computed } from 'nanostores';
 import { env } from '../env';
+import { DEFAULT_LOCALE, LOCALES, type Locale } from '../core/types';
 
-export const LOCALES = ['en', 'fr'] as const;
-export type Locale = (typeof LOCALES)[number];
+export { DEFAULT_LOCALE, LOCALES, type Locale };
 
 // Multilingual feature gate: in-memory state driven by Vite configuration (enabled in dev, disabled in prod).
 export const $isMultilingualEnabled = atom<boolean>(env.isMultilingualEnabled);
@@ -13,13 +13,13 @@ export const $isMultilingualEnabled = atom<boolean>(env.isMultilingualEnabled);
 export const $localeSetting = persistentAtom<Locale | undefined>('bibleit_locale', undefined);
 
 // Device language detector
-export const $detectedLocale = localeFrom($localeSetting, browser({ available: LOCALES, fallback: 'en' }));
+export const $detectedLocale = localeFrom($localeSetting, browser({ available: LOCALES, fallback: DEFAULT_LOCALE }));
 
-// Effective locale: if multilingual is disabled, strictly enforce 'en'.
+// Effective locale: if multilingual is disabled, strictly enforce DEFAULT_LOCALE.
 // If multilingual is enabled, pick up user setting or device locale.
 export const $locale = computed(
   [$isMultilingualEnabled, $detectedLocale],
-  (enabled, detected) => (enabled ? detected : 'en'),
+  (enabled, detected) => (enabled ? detected : DEFAULT_LOCALE),
 );
 
 export const $format = formatter($locale);

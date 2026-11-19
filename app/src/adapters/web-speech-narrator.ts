@@ -1,5 +1,5 @@
 import type { AudioNarrator } from '../core/ports';
-import type { NarrationSegment, NarrationState } from '../core/types';
+import { DEFAULT_LOCALE, type NarrationSegment, type NarrationState } from '../core/types';
 
 function inferWordLength(text: string, charIndex: number, reportedLength?: number): number {
   if (reportedLength && reportedLength > 0) return reportedLength;
@@ -47,7 +47,7 @@ export class WebSpeechNarrator implements AudioNarrator {
       utteranceFactory ?? ((text: string) => new SpeechSynthesisUtterance(text));
     this.getLocale =
       getLocale ??
-      (() => (typeof document !== 'undefined' ? document.documentElement.lang || 'en' : 'en'));
+      (() => (typeof document !== 'undefined' ? document.documentElement.lang || DEFAULT_LOCALE : DEFAULT_LOCALE));
 
     // Halt any orphaned OS speech left running from a previous page reload.
     if (this.synth && (this.synth.speaking || this.synth.pending)) {
@@ -213,7 +213,7 @@ export class WebSpeechNarrator implements AudioNarrator {
       this.currentUtterance = utterance;
       utterance.rate = this.state.rate;
 
-      const locale = (this.getLocale() || 'en').toLowerCase();
+      const locale = (this.getLocale() || DEFAULT_LOCALE).toLowerCase();
       const langPrefix = locale.slice(0, 2);
       utterance.lang = locale.includes('-')
         ? locale
