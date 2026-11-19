@@ -6,9 +6,9 @@ import type {
   AnswerProvider,
   ArtifactStore,
   AudioNarrator,
+  FileStorage,
   QueryEmbedder,
   SearchEngine,
-  UniversalStorage,
 } from './core/ports';
 import {
   LocalEngine,
@@ -28,11 +28,7 @@ import { $locale } from './stores/i18n';
 
 export { LocalEngine };
 
-export function createDefaultStorage(): UniversalStorage {
-  return new OpfsStorage();
-}
-
-export function createDefaultArtifactStore(storage: UniversalStorage = createDefaultStorage()): ArtifactStore {
+export function createDefaultArtifactStore(storage: FileStorage = new OpfsStorage()): ArtifactStore {
   return createArtifactStore(storage);
 }
 

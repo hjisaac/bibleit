@@ -27,9 +27,11 @@ export const $format = formatter($locale);
 // Base translations (en) live in components. Other locales are loaded on demand.
 export const i18n = createI18n($locale, {
   async get(code) {
-    if (code === 'en') return {};
-    const module = await import(`../locales/${code}.json`);
-    return module.default;
+    if (code === 'fr') {
+      const module = await import('../locales/fr.json');
+      return module.default;
+    }
+    return {};
   },
 });
 

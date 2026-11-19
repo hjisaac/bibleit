@@ -46,7 +46,7 @@ export interface StorageWriteOptions {
   signal?: AbortSignal;
 }
 
-export interface UniversalStorage {
+export interface FileStorage {
   isAvailable(): Promise<boolean>;
   read(path: string): Promise<Uint8Array<ArrayBuffer> | null>;
   readFile(path: string): Promise<File | null>;

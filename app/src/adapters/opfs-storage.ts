@@ -1,8 +1,8 @@
 import type {
   ArtifactStore,
+  FileStorage,
   StorageStat,
   StorageWriteOptions,
-  UniversalStorage,
 } from '../core/ports';
 import type { Manifest, RawChunk, VerseCorpusData } from '../core/types';
 import { clearBookCache } from './book-store';
@@ -67,7 +67,7 @@ async function resolvePath(
   return { dir: current, filename };
 }
 
-export class OpfsStorage implements UniversalStorage {
+export class OpfsStorage implements FileStorage {
   async isAvailable(): Promise<boolean> {
     const root = await getOpfsRoot();
     return root !== null;
@@ -316,9 +316,9 @@ export interface StorageCacheProxy {
   delete?(request: string | Request): Promise<boolean>;
 }
 
-export function createCacheProxy(storage: UniversalStorage, subDir = 'models'): StorageCacheProxy {
+export function createCacheProxy(storage: FileStorage, subDir = 'models'): StorageCacheProxy {
   return new Proxy(storage as any, {
-    get(target: UniversalStorage, prop: string | symbol, receiver: unknown) {
+    get(target: FileStorage, prop: string | symbol, receiver: unknown) {
       if (prop === 'match') {
         return async (request: string | Request): Promise<Response | undefined> => {
           const key = typeof request === 'string' ? request : request.url;
@@ -475,7 +475,7 @@ async function fetchWithProgress(
   throw new Error(`Failed to fetch ${url} after retries`);
 }
 
-export function createArtifactStore(storage: UniversalStorage = new OpfsStorage()): ArtifactStore {
+export function createArtifactStore(storage: FileStorage = new OpfsStorage()): ArtifactStore {
   let manifestPromise: Promise<Manifest> | null = null;
 
   async function resolveManifest(): Promise<Manifest> {
@@ -674,7 +674,7 @@ export function createArtifactStore(storage: UniversalStorage = new OpfsStorage(
 export class OpfsArtifactStore implements ArtifactStore {
   private store: ArtifactStore;
 
-  constructor(storage: UniversalStorage = new OpfsStorage()) {
+  constructor(storage: FileStorage = new OpfsStorage()) {
     this.store = createArtifactStore(storage);
   }
 

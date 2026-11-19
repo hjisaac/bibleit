@@ -7,36 +7,9 @@ import {
 } from '../adapters/feedback-client';
 import { env } from '../env';
 import { i18n } from '../stores/i18n';
+import { feedbackMessages } from '../locales/feedback';
 
-export const messages = i18n('modal/feedback', {
-  dialogAriaLabel: 'Send Feedback',
-  modalTitle: 'Send Feedback & Report Bug',
-  modalSubtitle: 'Report an issue or suggest an improvement',
-  closeFormTitle: 'Close feedback form',
-  categoryLabel: 'Category',
-  detailsLabel: 'Details',
-  emptyMessageError: 'Please enter a message before sending.',
-  successToast: 'Thank you! Your feedback has been sent.',
-  nameLabel: 'Name',
-  nameOptional: '(optional)',
-  namePlaceholder: 'Your name',
-  emailLabel: 'Email',
-  emailOptional: '(optional, for follow-up)',
-  emailPlaceholder: 'you@example.com',
-  serverErrorTitle: 'Sorry, an issue occurred with the server.',
-  serverErrorPrefix: 'You can email us directly at ',
-  serverErrorOr: ' or create an issue on ',
-  sendingButton: 'Sending...',
-  sendButton: 'Send Feedback',
-  catBug: 'Bug Report',
-  catBugPlaceholder: 'What happened, and what did you expect instead? (e.g., Search or Reader issue)',
-  catFeature: 'Feature Idea',
-  catFeaturePlaceholder: 'What feature or improvement would make bibleit more helpful for you?',
-  catScripture: 'Scripture / Text',
-  catScripturePlaceholder: 'Which book, chapter, or verse has a formatting or reference issue?',
-  catGeneral: 'General',
-  catGeneralPlaceholder: 'Share your thoughts, questions, or experience using bibleit...',
-});
+export const messages = i18n('modal/feedback', feedbackMessages);
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -105,7 +78,7 @@ export function FeedbackModal({
       });
       setMessage('');
       onClose();
-      onToast(t.successToast);
+      onToast(t.thankYouSuccessToast);
     } catch {
       setIsServerError(true);
     } finally {

@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { messagesToJSON } from '@nanostores/i18n';
-import fr from '../src/locales/fr.json';
+import fr from '@/locales/fr.json';
 
 // Import message namespaces from all translated components
-import { messages as navbar } from '../src/components/Navbar';
-import { messages as header } from '../src/components/Header';
-import { messages as savedView } from '../src/components/SavedView';
-import { messages as audioPlayerBar } from '../src/components/AudioPlayerBar';
-import { messages as feedbackModal } from '../src/components/FeedbackModal';
-import { messages as bookSelectorModal } from '../src/components/BookSelectorModal';
-import { messages as helpModal } from '../src/components/HelpModal';
-import { messages as scriptureOverviewCard } from '../src/components/ScriptureOverviewCard';
-import { messages as readerView } from '../src/components/ReaderView';
-import { messages as settingsView } from '../src/components/SettingsView';
-import { messages as searchView } from '../src/components/SearchView';
+import { messages as navbar } from '@/components/Navbar';
+import { messages as header } from '@/components/Header';
+import { messages as savedView } from '@/components/SavedView';
+import { messages as audioPlayerBar } from '@/components/AudioPlayerBar';
+import { messages as feedbackModal } from '@/components/FeedbackModal';
+import { messages as bookSelectorModal } from '@/components/BookSelectorModal';
+import { messages as helpModal } from '@/components/HelpModal';
+import { messages as scriptureOverviewCard } from '@/components/ScriptureOverviewCard';
+import { messages as readerView } from '@/components/ReaderView';
+import { messages as settingsView } from '@/components/SettingsView';
+import { messages as searchView } from '@/components/SearchView';
 
 describe('i18n Parity & Dead Code Tracking', () => {
   it('has zero dead and zero missing translations in fr.json', () => {

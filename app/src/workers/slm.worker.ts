@@ -103,7 +103,9 @@ async function downloadModelFiles(onProgress: (fraction: number) => void): Promi
     const cached = await modelCache.match(url);
     if (cached) {
       const cl = cached.headers.get('content-length');
+      // Size fallbacks: ~370MB for Q4 ONNX weights, ~1KB for JSON configs when Content-Length header is missing.
       const size = cl ? parseInt(cl, 10) : (file.endsWith('.onnx') ? 370 * 1024 * 1024 : 1024);
+      // Loose threshold (>300MB) guards against 0-byte or incomplete ONNX downloads in cache.
       if (!file.endsWith('.onnx') || size > 300_000_000) {
         totalLoaded += size;
         onProgress(Math.min(totalLoaded / TOTAL_ESTIMATED_BYTES, 0.99));

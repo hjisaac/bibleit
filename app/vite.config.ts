@@ -35,6 +35,7 @@ export default defineConfig(async ({ command, mode }) => {
     base: process.env.BASE_URL || '/',
     resolve: {
       alias: {
+        '@': path.resolve(__dirname, './src'),
         '@bibleit/engine': path.resolve(__dirname, '../engine/src/index.ts'),
         '@bibleit/api': path.resolve(__dirname, '../api/src/index.ts'),
       },
