@@ -213,8 +213,11 @@ export class WebSpeechNarrator implements AudioNarrator {
       this.currentUtterance = utterance;
       utterance.rate = this.state.rate;
 
-      const langPrefix = (this.getLocale() || 'en').toLowerCase().slice(0, 2);
-      utterance.lang = langPrefix === 'fr' ? 'fr-FR' : 'en-US';
+      const locale = (this.getLocale() || 'en').toLowerCase();
+      const langPrefix = locale.slice(0, 2);
+      utterance.lang = locale.includes('-')
+        ? locale
+        : `${langPrefix}-${langPrefix === 'en' ? 'US' : langPrefix.toUpperCase()}`;
 
       const preferredVoice = this.pickOfflineVoice(langPrefix);
       if (preferredVoice) {
@@ -290,8 +293,7 @@ export class WebSpeechNarrator implements AudioNarrator {
     return (
       voices.find((v) => v.localService && v.lang.toLowerCase().startsWith(prefix)) ??
       voices.find((v) => v.lang.toLowerCase().startsWith(prefix)) ??
-      voices.find((v) => v.localService && v.lang.toLowerCase().startsWith('en')) ??
-      voices.find((v) => v.lang.toLowerCase().startsWith('en'))
+      voices.find((v) => v.default)
     );
   }
 

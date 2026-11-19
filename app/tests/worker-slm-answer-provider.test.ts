@@ -122,12 +122,12 @@ describe('WorkerSlmAnswerProvider', () => {
       },
     });
 
-    const { isSlmModelCached } = await import('../src/adapters/worker-slm-answer-provider');
-    const cached = await isSlmModelCached();
+    const { isGenModelCached } = await import('../src/adapters/worker-slm-answer-provider');
+    const cached = await isGenModelCached();
     expect(cached).toBe(true);
   });
 
-  it('clears model files from OPFS on clearSlmModelCache', async () => {
+  it('clears model files from OPFS on clearGenModelCache', async () => {
     const removeEntrySpy = vi.fn();
     const mockRoot = {
       removeEntry: removeEntrySpy,
@@ -138,8 +138,8 @@ describe('WorkerSlmAnswerProvider', () => {
       },
     });
 
-    const { clearSlmModelCache } = await import('../src/adapters/worker-slm-answer-provider');
-    await clearSlmModelCache();
+    const { clearGenModelCache } = await import('../src/adapters/worker-slm-answer-provider');
+    await clearGenModelCache();
     expect(removeEntrySpy).toHaveBeenCalledWith('models', { recursive: true });
   });
 

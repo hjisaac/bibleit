@@ -1,11 +1,11 @@
 import { pipeline, env, TextStreamer, DynamicCache, type Tensor } from '@huggingface/transformers';
 import { env as appEnv } from '../env';
-import { OpfsStorage } from '../adapters/opfs-storage';
+import { OpfsStorage, createCacheProxy } from '../adapters/opfs-storage';
 
 env.allowLocalModels = false;
 
 const storage = new OpfsStorage();
-const modelCache = storage.asTransformersCache('models');
+const modelCache = createCacheProxy(storage, 'models');
 env.useCustomCache = true;
 env.customCache = modelCache as any;
 

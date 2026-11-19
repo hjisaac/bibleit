@@ -2,7 +2,6 @@ import type {
   ArtifactStore,
   StorageStat,
   StorageWriteOptions,
-  TransformersCache,
   UniversalStorage,
 } from '../core/ports';
 import type { Manifest, RawChunk, VerseCorpusData } from '../core/types';
@@ -305,47 +304,70 @@ export class OpfsStorage implements UniversalStorage {
     return names;
   }
 
-  asTransformersCache(subDir = 'models'): TransformersCache {
-    return {
-      match: async (request: string | Request): Promise<Response | undefined> => {
-        const key = typeof request === 'string' ? request : request.url;
-        const filename = urlToOpfsFilename(key);
-        const path = `${subDir}/${filename}`;
-        const file = await this.readFile(path);
-        if (!file || file.size === 0) return undefined;
+}
 
-        const headers = new Headers();
-        headers.set('content-length', String(file.size));
-        headers.set('content-type', filename.endsWith('.json') ? 'application/json' : 'application/octet-stream');
-        return new Response(file, { headers });
-      },
-      put: async (
-        request: string | Request,
-        response: Response,
-        progressCallback?: (data: { loaded: number; total: number; progress: number }) => void,
-      ): Promise<void> => {
-        const key = typeof request === 'string' ? request : request.url;
-        const filename = urlToOpfsFilename(key);
-        const path = `${subDir}/${filename}`;
-        const contentLength = response.headers.get('content-length');
-        const total = contentLength ? parseInt(contentLength, 10) : 0;
+export interface StorageCacheProxy {
+  match(request: string | Request): Promise<Response | undefined>;
+  put(
+    request: string | Request,
+    response: Response,
+    progressCallback?: (data: { loaded: number; total: number; progress: number }) => void,
+  ): Promise<void>;
+  delete?(request: string | Request): Promise<boolean>;
+}
 
-        await this.write(path, response, {
-          onProgress: (pct) => {
-            if (progressCallback && total > 0) {
-              const loaded = Math.round((pct / 100) * total);
-              progressCallback({ loaded, total, progress: pct });
-            }
-          },
-        });
-      },
-      delete: async (request: string | Request): Promise<boolean> => {
-        const key = typeof request === 'string' ? request : request.url;
-        const filename = urlToOpfsFilename(key);
-        return await this.delete(`${subDir}/${filename}`);
-      },
-    };
-  }
+export function createCacheProxy(storage: UniversalStorage, subDir = 'models'): StorageCacheProxy {
+  return new Proxy(storage as any, {
+    get(target: UniversalStorage, prop: string | symbol, receiver: unknown) {
+      if (prop === 'match') {
+        return async (request: string | Request): Promise<Response | undefined> => {
+          const key = typeof request === 'string' ? request : request.url;
+          const filename = urlToOpfsFilename(key);
+          const path = `${subDir}/${filename}`;
+          const file = await target.readFile(path);
+          if (!file || file.size === 0) return undefined;
+
+          const headers = new Headers();
+          headers.set('content-length', String(file.size));
+          headers.set('content-type', filename.endsWith('.json') ? 'application/json' : 'application/octet-stream');
+          return new Response(file, { headers });
+        };
+      }
+
+      if (prop === 'put') {
+        return async (
+          request: string | Request,
+          response: Response,
+          progressCallback?: (data: { loaded: number; total: number; progress: number }) => void,
+        ): Promise<void> => {
+          const key = typeof request === 'string' ? request : request.url;
+          const filename = urlToOpfsFilename(key);
+          const path = `${subDir}/${filename}`;
+          const contentLength = response.headers.get('content-length');
+          const total = contentLength ? parseInt(contentLength, 10) : 0;
+
+          await target.write(path, response, {
+            onProgress: (pct) => {
+              if (progressCallback && total > 0) {
+                const loaded = Math.round((pct / 100) * total);
+                progressCallback({ loaded, total, progress: pct });
+              }
+            },
+          });
+        };
+      }
+
+      if (prop === 'delete') {
+        return async (request: string | Request): Promise<boolean> => {
+          const key = typeof request === 'string' ? request : request.url;
+          const filename = urlToOpfsFilename(key);
+          return await target.delete(`${subDir}/${filename}`);
+        };
+      }
+
+      return Reflect.get(target, prop, receiver);
+    },
+  });
 }
 
 function getDataUrl(file: string): string {

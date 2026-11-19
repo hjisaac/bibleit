@@ -46,16 +46,6 @@ export interface StorageWriteOptions {
   signal?: AbortSignal;
 }
 
-export interface TransformersCache {
-  match(request: string | Request): Promise<Response | undefined>;
-  put(
-    request: string | Request,
-    response: Response,
-    progressCallback?: (data: { loaded: number; total: number; progress: number }) => void,
-  ): Promise<void>;
-  delete?(request: string | Request): Promise<boolean>;
-}
-
 export interface UniversalStorage {
   isAvailable(): Promise<boolean>;
   read(path: string): Promise<Uint8Array<ArrayBuffer> | null>;
@@ -73,7 +63,6 @@ export interface UniversalStorage {
   deleteDir(path: string): Promise<boolean>;
   list(dirPath?: string): Promise<string[]>;
   verifySha256(path: string, expectedSha256: string): Promise<boolean>;
-  asTransformersCache?(subDir?: string): TransformersCache;
 }
 
 /**

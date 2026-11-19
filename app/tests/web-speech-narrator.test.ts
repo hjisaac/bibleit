@@ -210,18 +210,19 @@ describe('WebSpeechNarrator', () => {
     expect(spoken[0]?.voice?.name).toBe('Thomas Remote');
   });
 
-  it('falls back to English voice when no French voice is found on the device', () => {
+  it('falls back to default voice when no language-specific voice is found on the device', () => {
     const mockVoices = [
-      { name: 'Google US English', lang: 'en-US', localService: true } as SpeechSynthesisVoice,
+      { name: 'System Default Voice', lang: 'en-US', default: true } as SpeechSynthesisVoice,
+      { name: 'Random Voice', lang: 'it-IT', default: false } as SpeechSynthesisVoice,
     ];
     const { synth, factory, spoken } = createMockSpeech(mockVoices);
-    const narrator = new WebSpeechNarrator(synth, factory, () => 'fr');
+    const narrator = new WebSpeechNarrator(synth, factory, () => 'es');
 
     narrator.play(segments, 0);
 
     expect(spoken.length).toBe(1);
-    expect(spoken[0]?.lang).toBe('fr-FR');
-    expect(spoken[0]?.voice?.name).toBe('Google US English');
+    expect(spoken[0]?.lang).toBe('es-ES');
+    expect(spoken[0]?.voice?.name).toBe('System Default Voice');
   });
 });
 

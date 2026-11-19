@@ -5,6 +5,7 @@ import {
   OpfsStorage,
   StorageUnavailableError,
   createArtifactStore,
+  createCacheProxy,
   urlToOpfsFilename,
 } from '../src/adapters/opfs-storage';
 import type { Manifest } from '../src/core/types';
@@ -233,10 +234,10 @@ describe('opfs-storage', () => {
     });
   });
 
-  describe('asTransformersCache', () => {
+  describe('createCacheProxy', () => {
     it('matches stored files and returns Response with headers', async () => {
       const storage = new OpfsStorage();
-      const cache = storage.asTransformersCache('models');
+      const cache = createCacheProxy(storage, 'models');
 
       expect(await cache.match('https://huggingface.co/model.onnx')).toBeUndefined();
 
@@ -252,7 +253,7 @@ describe('opfs-storage', () => {
 
     it('puts streamed response into OPFS with progress', async () => {
       const storage = new OpfsStorage();
-      const cache = storage.asTransformersCache('models');
+      const cache = createCacheProxy(storage, 'models');
       const progressSpy = vi.fn();
 
       const response = new Response(new Uint8Array([1, 2, 3, 4]), {
@@ -266,7 +267,7 @@ describe('opfs-storage', () => {
 
     it('deletes model from cache', async () => {
       const storage = new OpfsStorage();
-      const cache = storage.asTransformersCache('models');
+      const cache = createCacheProxy(storage, 'models');
 
       await storage.write('models/' + urlToOpfsFilename('https://huggingface.co/model.onnx'), 'data');
       expect(await cache.delete!('https://huggingface.co/model.onnx')).toBe(true);
