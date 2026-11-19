@@ -1,12 +1,13 @@
 import { pipeline, env, TextStreamer, DynamicCache, type Tensor } from '@huggingface/transformers';
 import { env as appEnv } from '../env';
-import { OpfsModelCache } from '../adapters/opfs-cache';
+import { OpfsStorage } from '../adapters/opfs-storage';
 
 env.allowLocalModels = false;
 
-const opfsCache = new OpfsModelCache();
+const storage = new OpfsStorage();
+const modelCache = storage.asTransformersCache('models');
 env.useCustomCache = true;
-env.customCache = opfsCache as any;
+env.customCache = modelCache as any;
 
 const r2Base = appEnv.r2Url;
 if (env.backends?.onnx?.wasm) {
@@ -99,7 +100,7 @@ async function downloadModelFiles(onProgress: (fraction: number) => void): Promi
 
   for (const file of MODEL_FILES) {
     const url = `${base}/${file}`;
-    const cached = await opfsCache.match(url);
+    const cached = await modelCache.match(url);
     if (cached) {
       const cl = cached.headers.get('content-length');
       const size = cl ? parseInt(cl, 10) : (file.endsWith('.onnx') ? 370 * 1024 * 1024 : 1024);
@@ -114,7 +115,7 @@ async function downloadModelFiles(onProgress: (fraction: number) => void): Promi
     if (!res.ok) throw new Error(`Failed to download ${file}: HTTP ${res.status}`);
 
     let fileLoaded = 0;
-    await opfsCache.put(url, res, (item) => {
+    await modelCache.put(url, res, (item: { loaded: number }) => {
       const delta = item.loaded - fileLoaded;
       fileLoaded = item.loaded;
       totalLoaded += delta;

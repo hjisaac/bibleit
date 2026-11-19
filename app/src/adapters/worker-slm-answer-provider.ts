@@ -1,6 +1,7 @@
 import { renderChunk } from '@bibleit/engine';
 import type { AnswerMetadata, AnswerProvider } from '../core/ports';
 import type { RetrievalResult } from '../core/types';
+import { OpfsStorage } from './opfs-storage';
 
 /**
  * WorkerSlmAnswerProvider: Runs on-device SLM inference in an isolated Web Worker.
@@ -199,16 +200,12 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
 
 export async function isSlmModelCached(): Promise<boolean> {
   try {
-    const root = await navigator.storage?.getDirectory?.();
-    if (root) {
-      const dir = await root.getDirectoryHandle('models', { create: false }).catch(() => null);
-      if (dir && typeof (dir as any).entries === 'function') {
-        for await (const [name, handle] of (dir as any).entries()) {
-          if (name.includes('SmolLM2-360M-Instruct') && name.includes('model_q4.onnx')) {
-            const file = await (handle as FileSystemFileHandle).getFile();
-            if (file.size > 300_000_000) return true;
-          }
-        }
+    const storage = new OpfsStorage();
+    const files = await storage.list('models');
+    for (const name of files) {
+      if (name.includes('SmolLM2-360M-Instruct') && name.includes('model_q4.onnx')) {
+        const stat = await storage.stat(`models/${name}`);
+        if (stat && stat.size > 300_000_000) return true;
       }
     }
   } catch {
@@ -240,17 +237,8 @@ export async function isSlmModelCached(): Promise<boolean> {
 
 export async function clearSlmModelCache(): Promise<void> {
   try {
-    const root = await navigator.storage?.getDirectory?.();
-    if (root) {
-      const dir = await root.getDirectoryHandle('models', { create: false }).catch(() => null);
-      if (dir && typeof (dir as any).entries === 'function') {
-        for await (const [name] of (dir as any).entries()) {
-          if (name.includes('SmolLM2-360M-Instruct')) {
-            await dir.removeEntry(name);
-          }
-        }
-      }
-    }
+    const storage = new OpfsStorage();
+    await storage.deleteDir('models');
   } catch {
     // Ignore OPFS removal errors
   }

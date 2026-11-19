@@ -35,10 +35,49 @@ export interface SearchEngine {
   sync?(): Promise<void>;
 }
 
+export interface StorageStat {
+  size: number;
+  lastModified?: number;
+}
+
+export interface StorageWriteOptions {
+  expectedSha256?: string;
+  onProgress?: (progressPercent: number) => void;
+  signal?: AbortSignal;
+}
+
+export interface TransformersCache {
+  match(request: string | Request): Promise<Response | undefined>;
+  put(
+    request: string | Request,
+    response: Response,
+    progressCallback?: (data: { loaded: number; total: number; progress: number }) => void,
+  ): Promise<void>;
+  delete?(request: string | Request): Promise<boolean>;
+}
+
+export interface UniversalStorage {
+  isAvailable(): Promise<boolean>;
+  read(path: string): Promise<Uint8Array<ArrayBuffer> | null>;
+  readFile(path: string): Promise<File | null>;
+  readText(path: string): Promise<string | null>;
+  readJson<T = unknown>(path: string): Promise<T | null>;
+  write(
+    path: string,
+    data: Uint8Array<ArrayBuffer> | ArrayBuffer | Blob | Response | ReadableStream<Uint8Array> | string,
+    options?: StorageWriteOptions,
+  ): Promise<void>;
+  has(path: string, minBytes?: number): Promise<boolean>;
+  stat(path: string): Promise<StorageStat | null>;
+  delete(path: string): Promise<boolean>;
+  deleteDir(path: string): Promise<boolean>;
+  list(dirPath?: string): Promise<string[]>;
+  verifySha256(path: string, expectedSha256: string): Promise<boolean>;
+  asTransformersCache?(subDir?: string): TransformersCache;
+}
+
 /**
- * Fetches, caches, and serves the static artifacts (manifest, verses, chunks,
- * embeddings). Must survive cache eviction (iOS Safari) by re-downloading.
- * v1: OPFS + Cache API. Swap: IndexedDB fallback.
+ * Fetches, caches, and serves static artifacts (manifest, verses, chunks, embeddings).
  */
 export interface ArtifactStore {
   /** Resolve the manifest (network-or-cache); single source of truth for versions. */

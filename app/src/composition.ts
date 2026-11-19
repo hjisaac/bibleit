@@ -8,6 +8,7 @@ import type {
   AudioNarrator,
   QueryEmbedder,
   SearchEngine,
+  UniversalStorage,
 } from './core/ports';
 import {
   LocalEngine,
@@ -17,7 +18,7 @@ import {
   RrfRanker,
 } from '@bibleit/engine';
 
-import { OpfsArtifactStore } from './adapters/opfs-artifact-store';
+import { OpfsStorage, createArtifactStore } from './adapters/opfs-storage';
 import { WorkerQueryEmbedder } from './adapters/worker-query-embedder';
 import { WebSpeechNarrator } from './adapters/web-speech-narrator';
 import { WorkerSlmAnswerProvider } from './adapters/worker-slm-answer-provider';
@@ -27,8 +28,12 @@ import { $locale } from './stores/i18n';
 
 export { LocalEngine };
 
-export function createDefaultArtifactStore(): ArtifactStore {
-  return new OpfsArtifactStore();
+export function createDefaultStorage(): UniversalStorage {
+  return new OpfsStorage();
+}
+
+export function createDefaultArtifactStore(storage: UniversalStorage = createDefaultStorage()): ArtifactStore {
+  return createArtifactStore(storage);
 }
 
 let defaultEmbedder: QueryEmbedder | null = null;
