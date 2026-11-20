@@ -1,11 +1,11 @@
 import type { JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
-  createDefaultArtifactStore,
-  createDefaultEmbedder,
-  createDefaultEngine,
-  createDefaultNarrator,
-  createDefaultAnswerProvider,
+  createArtifactStore,
+  createEmbedder,
+  createEngine,
+  createNarrator,
+  createAnswerProvider,
 } from './composition';
 import { Header } from './components/Header';
 import { Navbar } from './components/Navbar';
@@ -48,15 +48,16 @@ import {
 import { $readerLocation, $savedVerses, type ReaderLocation } from './stores/reader';
 
 export function App(): JSX.Element {
-  const store = useMemo(() => createDefaultArtifactStore(), []);
-  const embedder = useMemo(() => createDefaultEmbedder(), []);
+  // Composition root wires production adapters for the app lifecycle.
+  const store = useMemo(() => createArtifactStore(), []);
+  const embedder = useMemo(() => createEmbedder(), []);
   const slmProvider = useMemo(
-    () => createDefaultAnswerProvider(() => $slmPackageStatus.get() === PackageStatusEnum.DOWNLOADED),
+    () => createAnswerProvider(() => $slmPackageStatus.get() === PackageStatusEnum.DOWNLOADED),
     [],
   );
   const engine = useMemo(
     () =>
-      createDefaultEngine(
+      createEngine(
         store,
         embedder,
         () => $searchMode.get() === SearchModeEnum.DEVICE,
@@ -64,7 +65,7 @@ export function App(): JSX.Element {
       ),
     [store, embedder, slmProvider],
   );
-  const narrator = useMemo(() => createDefaultNarrator(), []);
+  const narrator = useMemo(() => createNarrator(), []);
   const [narrationState, setNarrationState] = useState<NarrationState>(() => narrator.getState());
   const [manifest, setManifest] = useState<Manifest | null>(null);
 

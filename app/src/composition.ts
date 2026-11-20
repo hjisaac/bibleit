@@ -6,7 +6,6 @@ import type {
   AnswerProvider,
   ArtifactStore,
   AudioNarrator,
-  FileStorage,
   QueryEmbedder,
   SearchEngine,
 } from './core/ports';
@@ -18,7 +17,7 @@ import {
   RrfRanker,
 } from '@bibleit/engine';
 
-import { OpfsStorage, createArtifactStore } from './adapters/opfs-storage';
+import { createArtifactStore } from './adapters/opfs-storage';
 import { WorkerQueryEmbedder } from './adapters/worker-query-embedder';
 import { WebSpeechNarrator } from './adapters/web-speech-narrator';
 import { WorkerSlmAnswerProvider } from './adapters/worker-slm-answer-provider';
@@ -26,35 +25,31 @@ import { HybridEngine } from './adapters/hybrid-engine';
 import { env } from './env';
 import { $locale } from './stores/i18n';
 
-export { LocalEngine };
+export { LocalEngine, createArtifactStore };
 
-export function createDefaultArtifactStore(storage: FileStorage = new OpfsStorage()): ArtifactStore {
-  return createArtifactStore(storage);
-}
-
-let defaultEmbedder: QueryEmbedder | null = null;
-export function createDefaultEmbedder(): QueryEmbedder {
-  if (!defaultEmbedder) {
-    defaultEmbedder = new WorkerQueryEmbedder();
+let embedder: QueryEmbedder | null = null;
+export function createEmbedder(): QueryEmbedder {
+  if (!embedder) {
+    embedder = new WorkerQueryEmbedder();
   }
-  return defaultEmbedder;
+  return embedder;
 }
 
-let defaultAnswerProvider: AnswerProvider | null = null;
-export function createDefaultAnswerProvider(
+let answerProvider: AnswerProvider | null = null;
+export function createAnswerProvider(
   isInstalled?: () => boolean,
 ): AnswerProvider {
-  if (!defaultAnswerProvider) {
-    defaultAnswerProvider = new WorkerSlmAnswerProvider(isInstalled);
+  if (!answerProvider) {
+    answerProvider = new WorkerSlmAnswerProvider(isInstalled);
   }
-  return defaultAnswerProvider;
+  return answerProvider;
 }
 
-export function createDefaultEngine(
-  artifactStore: ArtifactStore = createDefaultArtifactStore(),
-  queryEmbedder: QueryEmbedder = createDefaultEmbedder(),
+export function createEngine(
+  artifactStore: ArtifactStore = createArtifactStore(),
+  queryEmbedder: QueryEmbedder = createEmbedder(),
   isDeviceOnly?: () => boolean,
-  answerProvider: AnswerProvider = createDefaultAnswerProvider(),
+  answerProvider: AnswerProvider = createAnswerProvider(),
 ): SearchEngine {
   const localEngine = new LocalEngine({
     artifactStore,
@@ -69,6 +64,6 @@ export function createDefaultEngine(
   return new HybridEngine(localEngine, env.backendApiUrl, isDeviceOnly);
 }
 
-export function createDefaultNarrator(): AudioNarrator {
+export function createNarrator(): AudioNarrator {
   return new WebSpeechNarrator(undefined, undefined, () => $locale.get());
 }
