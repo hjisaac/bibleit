@@ -204,8 +204,8 @@ export async function isGenModelCached(): Promise<boolean> {
     const files = await storage.list('models');
     for (const name of files) {
       if (name.includes('SmolLM2-360M-Instruct') && name.includes('model_q4.onnx')) {
-        const stat = await storage.stat(`models/${name}`);
-        if (stat && stat.size > 300_000_000) return true;
+        const blob = await storage.read(`models/${name}`);
+        if (blob && blob.size > 300_000_000) return true;
       }
     }
   } catch {
@@ -235,12 +235,10 @@ export async function isGenModelCached(): Promise<boolean> {
   }
 }
 
-export const isSlmModelCached = isGenModelCached;
-
 export async function clearGenModelCache(): Promise<void> {
   try {
     const storage = new OpfsStorage();
-    await storage.deleteDir('models');
+    await storage.delete('models');
   } catch {
     // Ignore OPFS removal errors
   }

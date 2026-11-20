@@ -164,66 +164,52 @@ describe('opfs-storage', () => {
     it('writes and reads binary data, strings, and JSON', async () => {
       const storage = new OpfsStorage();
       await storage.write('test.txt', 'hello opfs');
-      expect(await storage.readText('test.txt')).toBe('hello opfs');
+      const textBlob = await storage.read('test.txt');
+      expect(textBlob).not.toBeNull();
+      expect(await textBlob!.text()).toBe('hello opfs');
 
       const bytes = await storage.read('test.txt');
       expect(bytes).not.toBeNull();
-      expect(new TextDecoder().decode(bytes!)).toBe('hello opfs');
+      expect(new TextDecoder().decode(await bytes!.arrayBuffer())).toBe('hello opfs');
 
       await storage.write('data.json', JSON.stringify({ key: 'val' }));
-      const parsed = await storage.readJson<{ key: string }>('data.json');
+      const jsonBlob = await storage.read('data.json');
+      const parsed = JSON.parse(await jsonBlob!.text());
       expect(parsed?.key).toBe('val');
     });
 
     it('writes and reads nested directory files', async () => {
       const storage = new OpfsStorage();
       await storage.write('models/smollm.onnx', 'model-bytes');
-      expect(await storage.has('models/smollm.onnx')).toBe(true);
-      expect(await storage.readText('models/smollm.onnx')).toBe('model-bytes');
+      const blob = await storage.read('models/smollm.onnx');
+      expect(blob).not.toBeNull();
+      expect(await blob!.text()).toBe('model-bytes');
 
       const files = await storage.list('models');
       expect(files).toContain('smollm.onnx');
     });
 
-    it('checks existence and minBytes via has() and stat()', async () => {
+    it('checks existence and size via read()', async () => {
       const storage = new OpfsStorage();
-      expect(await storage.has('missing.bin')).toBe(false);
-      expect(await storage.stat('missing.bin')).toBeNull();
+      expect(await storage.read('missing.bin')).toBeNull();
 
       await storage.write('payload.bin', new Uint8Array([1, 2, 3, 4, 5]));
-      expect(await storage.has('payload.bin')).toBe(true);
-      expect(await storage.has('payload.bin', 5)).toBe(true);
-      expect(await storage.has('payload.bin', 10)).toBe(false);
-
-      const st = await storage.stat('payload.bin');
-      expect(st?.size).toBe(5);
+      const blob = await storage.read('payload.bin');
+      expect(blob).not.toBeNull();
+      expect(blob?.size).toBe(5);
     });
 
     it('deletes files and directories recursively', async () => {
       const storage = new OpfsStorage();
       await storage.write('nested/file1.txt', '1');
       await storage.write('nested/file2.txt', '2');
-      expect(await storage.has('nested/file1.txt')).toBe(true);
+      expect(await storage.read('nested/file1.txt')).not.toBeNull();
 
       expect(await storage.delete('nested/file1.txt')).toBe(true);
-      expect(await storage.has('nested/file1.txt')).toBe(false);
+      expect(await storage.read('nested/file1.txt')).toBeNull();
 
-      expect(await storage.deleteDir('nested')).toBe(true);
-      expect(await storage.has('nested/file2.txt')).toBe(false);
-    });
-
-    it('verifies SHA-256 and throws CorruptArtifactError on mismatch', async () => {
-      const storage = new OpfsStorage();
-      const content = 'clean text';
-      const hash = await sha256Hex(content);
-
-      await storage.write('valid.txt', content, { expectedSha256: hash });
-      expect(await storage.has('valid.txt')).toBe(true);
-
-      await expect(
-        storage.write('corrupt.txt', content, { expectedSha256: 'deadbeef' }),
-      ).rejects.toThrow(CorruptArtifactError);
-      expect(await storage.has('corrupt.txt')).toBe(false);
+      expect(await storage.delete('nested')).toBe(true);
+      expect(await storage.read('nested/file2.txt')).toBeNull();
     });
 
     it('throws StorageUnavailableError when writing without storage support', async () => {
@@ -260,7 +246,9 @@ describe('opfs-storage', () => {
       });
       await cache.put('https://huggingface.co/model.onnx', response, progressSpy);
 
-      expect(await storage.has('models/' + urlToOpfsFilename('https://huggingface.co/model.onnx'))).toBe(true);
+      const blob = await storage.read('models/' + urlToOpfsFilename('https://huggingface.co/model.onnx'));
+      expect(blob).not.toBeNull();
+      expect(blob?.size).toBe(4);
       expect(progressSpy).toHaveBeenCalled();
     });
 
@@ -353,12 +341,12 @@ describe('opfs-storage', () => {
       const store = createArtifactStore(storage);
       await store.clear();
 
-      expect(await storage.has('manifest.json')).toBe(false);
-      expect(await storage.has('verses-v3.json.gz')).toBe(false);
-      expect(await storage.has('chunks-123.json.gz')).toBe(false);
-      expect(await storage.has('embeddings-123.i8.bin')).toBe(false);
+      expect(await storage.read('manifest.json')).toBeNull();
+      expect(await storage.read('verses-v3.json.gz')).toBeNull();
+      expect(await storage.read('chunks-123.json.gz')).toBeNull();
+      expect(await storage.read('embeddings-123.i8.bin')).toBeNull();
       // Models are preserved during artifact clearing
-      expect(await storage.has('models/model.onnx')).toBe(true);
+      expect(await storage.read('models/model.onnx')).not.toBeNull();
     });
   });
 });

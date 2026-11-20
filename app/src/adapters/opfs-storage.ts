@@ -1,8 +1,6 @@
 import type {
   ArtifactStore,
   FileStorage,
-  StorageStat,
-  StorageWriteOptions,
 } from '../core/ports';
 import type { Manifest, RawChunk, VerseCorpusData } from '../core/types';
 import { clearBookCache } from './book-store';
@@ -73,26 +71,7 @@ export class OpfsStorage implements FileStorage {
     return root !== null;
   }
 
-  async stat(path: string): Promise<StorageStat | null> {
-    const root = await getOpfsRoot();
-    if (!root) return null;
-    const resolved = await resolvePath(root, path, false);
-    if (!resolved) return null;
-    try {
-      const handle = await resolved.dir.getFileHandle(resolved.filename);
-      const file = await handle.getFile();
-      return { size: file.size, lastModified: file.lastModified };
-    } catch {
-      return null;
-    }
-  }
-
-  async has(path: string, minBytes = 1): Promise<boolean> {
-    const fileStat = await this.stat(path);
-    return fileStat !== null && fileStat.size >= minBytes;
-  }
-
-  async readFile(path: string): Promise<File | null> {
+  async read(path: string): Promise<Blob | null> {
     const root = await getOpfsRoot();
     if (!root) return null;
     const resolved = await resolvePath(root, path, false);
@@ -105,32 +84,9 @@ export class OpfsStorage implements FileStorage {
     }
   }
 
-  async read(path: string): Promise<Uint8Array<ArrayBuffer> | null> {
-    const file = await this.readFile(path);
-    if (!file) return null;
-    return new Uint8Array(await file.arrayBuffer()) as Uint8Array<ArrayBuffer>;
-  }
-
-  async readText(path: string): Promise<string | null> {
-    const file = await this.readFile(path);
-    if (!file) return null;
-    return await file.text();
-  }
-
-  async readJson<T = unknown>(path: string): Promise<T | null> {
-    const text = await this.readText(path);
-    if (!text) return null;
-    try {
-      return JSON.parse(text) as T;
-    } catch {
-      return null;
-    }
-  }
-
   async write(
     path: string,
-    data: Uint8Array<ArrayBuffer> | ArrayBuffer | Blob | Response | ReadableStream<Uint8Array> | string,
-    options?: StorageWriteOptions,
+    data: Uint8Array | Blob | string | ReadableStream<Uint8Array>,
   ): Promise<void> {
     const root = await getOpfsRoot();
     if (!root) throw new StorageUnavailableError();
@@ -144,17 +100,14 @@ export class OpfsStorage implements FileStorage {
       try {
         if (typeof data === 'string') {
           await writable.write(new TextEncoder().encode(data));
-        } else if (data instanceof Response) {
-          if (data.body) {
-            await this.streamToWritable(data.body, writable, data.headers.get('content-length'), options);
-          } else {
-            await writable.write(await data.arrayBuffer());
-          }
         } else if (data instanceof ReadableStream) {
-          await this.streamToWritable(data, writable, null, options);
+          const reader = data.getReader();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value) await writable.write(toExactArrayBuffer(value));
+          }
         } else if (data instanceof Blob) {
-          await writable.write(data);
-        } else if (data instanceof ArrayBuffer) {
           await writable.write(data);
         } else {
           await writable.write(toExactArrayBuffer(data));
@@ -169,28 +122,15 @@ export class OpfsStorage implements FileStorage {
       try {
         if (typeof data === 'string') {
           accessHandle.write(new TextEncoder().encode(data));
-        } else if (data instanceof Response) {
-          if (data.body) {
-            const reader = data.body.getReader();
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              accessHandle.write(value);
-            }
-          } else {
-            accessHandle.write(new Uint8Array(await data.arrayBuffer()));
-          }
         } else if (data instanceof ReadableStream) {
           const reader = data.getReader();
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            accessHandle.write(value);
+            if (value) accessHandle.write(value);
           }
         } else if (data instanceof Blob) {
           accessHandle.write(new Uint8Array(await data.arrayBuffer()));
-        } else if (data instanceof ArrayBuffer) {
-          accessHandle.write(new Uint8Array(data));
         } else {
           accessHandle.write(data);
         }
@@ -199,72 +139,14 @@ export class OpfsStorage implements FileStorage {
         accessHandle.close();
       }
     }
-
-    if (options?.expectedSha256) {
-      const matches = await this.verifySha256(path, options.expectedSha256);
-      if (!matches) {
-        await this.delete(path);
-        throw new CorruptArtifactError(`Integrity check failed for ${path}`);
-      }
-    }
-  }
-
-  private async streamToWritable(
-    stream: ReadableStream<Uint8Array>,
-    writable: FileSystemWritableFileStream,
-    contentLength: string | null,
-    options?: StorageWriteOptions,
-  ): Promise<void> {
-    const total = contentLength ? parseInt(contentLength, 10) : 0;
-    const reader = stream.getReader();
-    let loaded = 0;
-    while (true) {
-      if (options?.signal?.aborted) {
-        await reader.cancel();
-        throw new DOMException('The user aborted a request.', 'AbortError');
-      }
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value) {
-        await writable.write(toExactArrayBuffer(value));
-        loaded += value.byteLength;
-        if (options?.onProgress && total > 0) {
-          options.onProgress(Math.min(99, Math.round((loaded / total) * 100)));
-        }
-      }
-    }
-    options?.onProgress?.(100);
-  }
-
-  async verifySha256(path: string, expectedSha256: string): Promise<boolean> {
-    if (!expectedSha256 || typeof crypto === 'undefined' || !crypto.subtle) return true;
-    const bytes = await this.read(path);
-    if (!bytes) return false;
-    const hashBuf = await crypto.subtle.digest('SHA-256', toExactArrayBuffer(bytes));
-    const hashArr = Array.from(new Uint8Array(hashBuf));
-    const actualHex = hashArr.map((b) => b.toString(16).padStart(2, '0')).join('');
-    return actualHex === expectedSha256.toLowerCase();
   }
 
   async delete(path: string): Promise<boolean> {
     const root = await getOpfsRoot();
     if (!root) return false;
-    const resolved = await resolvePath(root, path, false);
-    if (!resolved) return false;
-    try {
-      await resolved.dir.removeEntry(resolved.filename);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  async deleteDir(dirPath: string): Promise<boolean> {
-    const root = await getOpfsRoot();
-    if (!root) return false;
-    const parts = dirPath.split('/').filter(Boolean);
+    const parts = path.split('/').filter(Boolean);
     if (parts.length === 0) return false;
-    const dirName = parts.pop()!;
+    const entryName = parts.pop()!;
     let current = root;
     for (const segment of parts) {
       try {
@@ -274,7 +156,7 @@ export class OpfsStorage implements FileStorage {
       }
     }
     try {
-      await current.removeEntry(dirName, { recursive: true });
+      await current.removeEntry(entryName, { recursive: true });
       return true;
     } catch {
       return false;
@@ -303,7 +185,6 @@ export class OpfsStorage implements FileStorage {
     }
     return names;
   }
-
 }
 
 export interface StorageCacheProxy {
@@ -324,13 +205,13 @@ export function createCacheProxy(storage: FileStorage, subDir = 'models'): Stora
           const key = typeof request === 'string' ? request : request.url;
           const filename = urlToOpfsFilename(key);
           const path = `${subDir}/${filename}`;
-          const file = await target.readFile(path);
-          if (!file || file.size === 0) return undefined;
+          const blob = await target.read(path);
+          if (!blob || blob.size === 0) return undefined;
 
           const headers = new Headers();
-          headers.set('content-length', String(file.size));
+          headers.set('content-length', String(blob.size));
           headers.set('content-type', filename.endsWith('.json') ? 'application/json' : 'application/octet-stream');
-          return new Response(file, { headers });
+          return new Response(blob, { headers });
         };
       }
 
@@ -346,14 +227,34 @@ export function createCacheProxy(storage: FileStorage, subDir = 'models'): Stora
           const contentLength = response.headers.get('content-length');
           const total = contentLength ? parseInt(contentLength, 10) : 0;
 
-          await target.write(path, response, {
-            onProgress: (pct) => {
-              if (progressCallback && total > 0) {
-                const loaded = Math.round((pct / 100) * total);
-                progressCallback({ loaded, total, progress: pct });
-              }
-            },
-          });
+          if (!response.body) {
+            const buf = await response.arrayBuffer();
+            await target.write(path, new Uint8Array(buf));
+            progressCallback?.({ loaded: buf.byteLength, total: buf.byteLength, progress: 100 });
+            return;
+          }
+
+          // Count byte stream chunks via TransformStream without buffering full payload in memory.
+          let loaded = 0;
+          const stream = response.body.pipeThrough(
+            new TransformStream<Uint8Array, Uint8Array>({
+              transform(chunk, controller) {
+                loaded += chunk.byteLength;
+                if (progressCallback && total > 0) {
+                  const progress = Math.min(99, Math.round((loaded / total) * 100));
+                  progressCallback({ loaded, total, progress });
+                }
+                controller.enqueue(chunk);
+              },
+              flush() {
+                if (progressCallback) {
+                  progressCallback({ loaded, total: total || loaded, progress: 100 });
+                }
+              },
+            }),
+          );
+
+          await target.write(path, stream);
         };
       }
 
@@ -505,9 +406,16 @@ export function createArtifactStore(storage: FileStorage = new OpfsStorage()): A
 
     // Offline fallback from local storage
     if (isAvail) {
-      const cached = await storage.readJson<Manifest>('manifest.json');
-      if (cached && cached.schema_version === SUPPORTED_SCHEMA_VERSION) {
-        return cached;
+      const blob = await storage.read('manifest.json');
+      if (blob) {
+        try {
+          const cached = JSON.parse(await blob.text()) as Manifest;
+          if (cached && cached.schema_version === SUPPORTED_SCHEMA_VERSION) {
+            return cached;
+          }
+        } catch {
+          // Ignore corrupted cached manifest
+        }
       }
     }
 
@@ -524,9 +432,10 @@ export function createArtifactStore(storage: FileStorage = new OpfsStorage()): A
     signal?: AbortSignal,
   ): Promise<T> {
     const isGz = remoteFile.endsWith('.gz');
-    const cached = await storage.read(filename);
-    if (cached) {
+    const cachedBlob = await storage.read(filename);
+    if (cachedBlob) {
       try {
+        const cached = new Uint8Array(await cachedBlob.arrayBuffer()) as Uint8Array<ArrayBuffer>;
         const uncompressed = isGz ? await decompressGzipBytes(cached) : cached;
         await verifySha256Bytes(uncompressed, expectedSha256);
         return await parse(uncompressed);
@@ -639,7 +548,8 @@ export function createArtifactStore(storage: FileStorage = new OpfsStorage()): A
     },
 
     async hasVerses(): Promise<boolean> {
-      return await storage.has(`verses-v${SUPPORTED_SCHEMA_VERSION}.json.gz`);
+      const blob = await storage.read(`verses-v${SUPPORTED_SCHEMA_VERSION}.json.gz`);
+      return blob !== null && blob.size > 0;
     },
 
     async hasEmbeddings(): Promise<boolean> {

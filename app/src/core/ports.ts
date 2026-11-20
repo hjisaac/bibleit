@@ -35,34 +35,12 @@ export interface SearchEngine {
   sync?(): Promise<void>;
 }
 
-export interface StorageStat {
-  size: number;
-  lastModified?: number;
-}
-
-export interface StorageWriteOptions {
-  expectedSha256?: string;
-  onProgress?: (progressPercent: number) => void;
-  signal?: AbortSignal;
-}
-
 export interface FileStorage {
   isAvailable(): Promise<boolean>;
-  read(path: string): Promise<Uint8Array<ArrayBuffer> | null>;
-  readFile(path: string): Promise<File | null>;
-  readText(path: string): Promise<string | null>;
-  readJson<T = unknown>(path: string): Promise<T | null>;
-  write(
-    path: string,
-    data: Uint8Array<ArrayBuffer> | ArrayBuffer | Blob | Response | ReadableStream<Uint8Array> | string,
-    options?: StorageWriteOptions,
-  ): Promise<void>;
-  has(path: string, minBytes?: number): Promise<boolean>;
-  stat(path: string): Promise<StorageStat | null>;
+  read(path: string): Promise<Blob | null>;
+  write(path: string, data: Uint8Array | Blob | string | ReadableStream<Uint8Array>): Promise<void>;
   delete(path: string): Promise<boolean>;
-  deleteDir(path: string): Promise<boolean>;
   list(dirPath?: string): Promise<string[]>;
-  verifySha256(path: string, expectedSha256: string): Promise<boolean>;
 }
 
 /**
