@@ -19,7 +19,6 @@ def export_translation_slices(
     catalog_path: Path,
     trans_id: str,
     names_dict: dict[str, str],
-    is_default: bool = False,
 ) -> dict[str, Any]:
     catalog = json.loads(catalog_path.read_text())
     trans_dir = OUT_DIR / trans_id
@@ -50,12 +49,7 @@ def export_translation_slices(
         size = len(content_bytes)
         crc32 = f"{zlib.crc32(content_bytes) & 0xffffffff:08x}"
 
-        # Write translation-scoped slice: data/books/<trans_id>/<USFM>.json
         (trans_dir / f"{usfm_code}.json").write_bytes(content_bytes)
-
-        # If default, write legacy path: data/books/<USFM>.json
-        if is_default:
-            (OUT_DIR / f"{usfm_code}.json").write_bytes(content_bytes)
 
         manifest_books[usfm_code] = {"id": usfm_code, "size": size, "crc32": crc32}
         total_bytes += size
@@ -71,22 +65,25 @@ def export_translation_slices(
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    web_dir = OUT_DIR / "web"
-    web_dir.mkdir(parents=True, exist_ok=True)
 
-    print("Syncing canonical WEB book slices...")
-    for json_file in OUT_DIR.glob("*.json"):
-        (web_dir / json_file.name).write_bytes(json_file.read_bytes())
-    print("Synced WEB slices to data/books/web/")
+    translations = [
+        ("web", WEB_PATH, BOOK_NAMES),
+        ("lsg", LSG_PATH, FRENCH_BOOK_NAMES),
+    ]
 
-    print("Exporting LSG book slices...")
-    lsg_manifest = export_translation_slices(LSG_PATH, "lsg", FRENCH_BOOK_NAMES, is_default=False)
-    print(f"Exported LSG ({lsg_manifest['totalBytes']} bytes)")
-
-    ts_content = f"import type {{ BibleManifest }} from './bible-manifest';\n\nexport const LSG_BIBLE_MANIFEST: BibleManifest = {json.dumps(lsg_manifest, indent=2)};\n"
-    manifest_ts_path = REPO / "app/src/core/lsg-manifest.ts"
-    manifest_ts_path.write_text(ts_content)
-    print(f"Wrote {manifest_ts_path}")
+    for trans_id, catalog_path, names_dict in translations:
+        if not catalog_path.exists():
+            continue
+        manifest = export_translation_slices(catalog_path, trans_id, names_dict)
+        print(f"Exported {trans_id.upper()} ({manifest['totalBytes']} bytes) -> data/books/{trans_id}/")
+        if trans_id == "lsg":
+            ts_content = (
+                "import type { BibleManifest } from './bible-manifest';\n\n"
+                f"export const LSG_BIBLE_MANIFEST: BibleManifest = {json.dumps(manifest, indent=2)};\n"
+            )
+            manifest_ts_path = REPO / "app/src/core/lsg-manifest.ts"
+            manifest_ts_path.write_text(ts_content)
+            print(f"Wrote {manifest_ts_path}")
 
 
 if __name__ == "__main__":

@@ -21,7 +21,9 @@ import { createArtifactStore } from './adapters/opfs-storage';
 import { WorkerQueryEmbedder } from './adapters/worker-query-embedder';
 import { WebSpeechNarrator } from './adapters/web-speech-narrator';
 import { WorkerSlmAnswerProvider } from './adapters/worker-slm-answer-provider';
-import { HybridEngine } from './adapters/hybrid-engine';
+import { HttpAnswerProvider } from './adapters/http-answer-provider';
+import { RemoteEngine } from './adapters/remote-engine';
+import { EngineManager } from './adapters/engine-manager';
 import { env } from './env';
 import { $locale } from './stores/i18n';
 
@@ -53,7 +55,12 @@ export function createEngine(
     answerProvider,
   });
 
-  return new HybridEngine(localEngine, env.backendApiUrl, isDeviceOnly);
+  const remoteUrl = env.backendApiUrl?.trim().replace(/\/+$/, '');
+  const remoteEngine = remoteUrl
+    ? new RemoteEngine(remoteUrl, new HttpAnswerProvider(remoteUrl, isDeviceOnly))
+    : null;
+
+  return new EngineManager(remoteEngine, localEngine, isDeviceOnly);
 }
 
 export function createNarrator(): AudioNarrator {

@@ -1,47 +1,38 @@
 import type { AnswerProvider, SearchEngine } from '../core/ports';
-import { SearchOriginEnum, type RetrievalResult } from '../core/types';
-import { HttpAnswerProvider } from './http-answer-provider';
+import type { RetrievalResult } from '../core/types';
 import { HybridAnswerProvider } from './hybrid-answer-provider';
-import { BibleitApiClient } from './api-client';
 
-/**
- * HybridEngine: Tiered search engine delegating to remote API when online,
- * with seamless zero-latency fallback to LocalEngine when offline or on network failure.
- */
 const REMOTE_TIMEOUT_MS = 4000;
 const REMOTE_COOLDOWN_MS = 20_000;
 
-export class HybridEngine implements SearchEngine {
+/**
+ * Coordinates retrieval across a primary remote engine and local fallback engine
+ * with timeout, offline bypass, and cooldown circuit-breaking.
+ */
+export class EngineManager implements SearchEngine {
   readonly ready: Promise<void>;
   readonly answerProvider: AnswerProvider;
-  private localEngine: SearchEngine;
-  private remoteUrl: string | null;
-  private isDeviceOnly?: () => boolean;
-  private apiClient: BibleitApiClient | null = null;
+  private readonly remoteEngine: SearchEngine | null;
+  private readonly localEngine: SearchEngine;
+  private readonly isDeviceOnly?: () => boolean;
 
   // Timestamp until which remote requests are bypassed after a failure.
   private remoteDownUntil = 0;
 
   constructor(
+    remoteEngine: SearchEngine | null,
     localEngine: SearchEngine,
-    remoteUrl?: string | null,
     isDeviceOnly?: () => boolean,
   ) {
+    this.remoteEngine = remoteEngine;
     this.localEngine = localEngine;
-    this.remoteUrl = remoteUrl?.trim().replace(/\/+$/, '') || null;
     this.isDeviceOnly = isDeviceOnly;
     this.ready = localEngine.ready;
-    const remoteAnswer = this.remoteUrl
-      ? new HttpAnswerProvider(this.remoteUrl, isDeviceOnly)
-      : null;
     this.answerProvider = new HybridAnswerProvider(
-      remoteAnswer,
+      remoteEngine?.answerProvider ?? null,
       localEngine.answerProvider,
       isDeviceOnly,
     );
-    if (this.remoteUrl) {
-      this.apiClient = new BibleitApiClient(this.remoteUrl);
-    }
   }
 
   async sync(): Promise<void> {
@@ -49,9 +40,10 @@ export class HybridEngine implements SearchEngine {
   }
 
   async retrieve(query: string, k = 10): Promise<RetrievalResult> {
-    if (!this.remoteUrl || this.isDeviceOnly?.()) {
+    if (!this.remoteEngine || this.isDeviceOnly?.()) {
       return this.localEngine.retrieve(query, k);
     }
+
     const canAttemptRemote =
       Date.now() >= this.remoteDownUntil &&
       typeof navigator !== 'undefined' &&
@@ -59,27 +51,22 @@ export class HybridEngine implements SearchEngine {
 
     let fallbackReason: 'timeout' | 'error' | undefined;
 
-    if (canAttemptRemote && this.apiClient) {
+    if (canAttemptRemote) {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), REMOTE_TIMEOUT_MS);
-        const result = await this.apiClient.search(query, k, controller.signal);
+        const result = await this.remoteEngine.retrieve(query, k, controller.signal);
         clearTimeout(timeout);
 
-        if (result && Array.isArray(result.passages)) {
-          this.remoteDownUntil = 0;
-          return {
-            ...result,
-            origin: SearchOriginEnum.REMOTE,
-          };
-        }
+        this.remoteDownUntil = 0;
+        return result;
       } catch (err) {
         this.remoteDownUntil = Date.now() + REMOTE_COOLDOWN_MS;
         const isTimeout =
           (err instanceof DOMException && err.name === 'AbortError') ||
           (err instanceof Error && err.name === 'AbortError');
         fallbackReason = isTimeout ? 'timeout' : 'error';
-        console.warn('[HybridEngine] Remote search unavailable; falling back to local engine:', err);
+        console.warn('[EngineManager] Remote search unavailable; falling back to local engine:', err);
       }
     }
 

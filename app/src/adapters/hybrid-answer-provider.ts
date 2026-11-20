@@ -3,7 +3,7 @@ import type { RetrievalResult } from '../core/types';
 
 /**
  * HybridAnswerProvider: Composes remote cloud API with local on-device SLM fallback.
- * Follows the same fallback pattern as HybridEngine.
+ * Follows the same fallback pattern as EngineManager.
  */
 export class HybridAnswerProvider implements AnswerProvider {
   constructor(
