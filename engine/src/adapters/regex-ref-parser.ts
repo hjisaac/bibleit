@@ -2,40 +2,40 @@ import type { RefParser } from '../core/ports';
 import type { RefRange } from '../core/types';
 import {
   BIBLE_BOOKS,
-  FRENCH_BOOK_ALIASES,
-  FRENCH_BOOK_NAMES,
+  LOCALIZED_BOOK_TABLES,
   stripAccents,
   type BibleBook,
 } from '../core/bible-books';
 
 /**
  * Builds a lookup map from lowercase aliases to canonical BibleBook metadata.
- * Can be initialized with default English tables or custom language aliases (e.g., French, Fon).
+ * Indexes default names/aliases plus all registered localized book tables.
  */
 export function buildBookAliasMap(
   customBooks?: readonly BibleBook[],
 ): Map<string, BibleBook> {
   const books = customBooks ?? BIBLE_BOOKS;
   const aliasMap = new Map<string, BibleBook>();
+  const localizedTables = Object.values(LOCALIZED_BOOK_TABLES);
+
+  const register = (term: string, book: BibleBook) => {
+    const lower = term.toLowerCase();
+    aliasMap.set(lower, book);
+    aliasMap.set(stripAccents(lower), book);
+  };
 
   for (const b of books) {
     aliasMap.set(b.id.toLowerCase(), b);
-    aliasMap.set(b.name.toLowerCase(), b);
-    aliasMap.set(stripAccents(b.name.toLowerCase()), b);
+    register(b.name, b);
     for (const alias of b.aliases) {
-      aliasMap.set(alias.toLowerCase(), b);
-      aliasMap.set(stripAccents(alias.toLowerCase()), b);
+      register(alias, b);
     }
-    const frName = FRENCH_BOOK_NAMES[b.id];
-    if (frName) {
-      aliasMap.set(frName.toLowerCase(), b);
-      aliasMap.set(stripAccents(frName.toLowerCase()), b);
-    }
-    const frAliases = FRENCH_BOOK_ALIASES[b.id];
-    if (frAliases) {
-      for (const alias of frAliases) {
-        aliasMap.set(alias.toLowerCase(), b);
-        aliasMap.set(stripAccents(alias.toLowerCase()), b);
+    for (const table of localizedTables) {
+      if (!table) continue;
+      const localizedName = table.names[b.id];
+      if (localizedName) register(localizedName, b);
+      for (const alias of table.aliases[b.id] ?? []) {
+        register(alias, b);
       }
     }
   }

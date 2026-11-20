@@ -2,7 +2,7 @@ import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 
-import { getLocalizedBookName } from '../core/bible-books';
+import { getLocalizedBookName } from '@bibleit/engine';
 import type { AudioNarrator } from '../core/ports';
 import type { NarrationSegment, NarrationState, NarrationWordBoundary } from '../core/types';
 import { loadBook, type ChapterVerse } from '../adapters/book-store';

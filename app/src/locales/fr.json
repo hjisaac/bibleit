@@ -275,6 +275,32 @@
     "toastNotDownloaded": "Texte biblique non téléchargé. Installez-le dans Réglages pour activer la recherche.",
     "toastSearchFailed": "Échec de la recherche : {message}",
     "toastUnavailableOffline": "Aperçu IA indisponible hors-ligne : affichage des Écritures correspondantes",
-    "toastUnavailableDevice": "Aperçu IA indisponible en mode appareil : affichage des Écritures correspondantes"
+    "toastUnavailableDevice": "Aperçu IA indisponible en mode appareil : affichage des Écritures correspondantes",
+    "toastAiOverviewUnavailable": "Aperçu IA indisponible : affichage des Écritures correspondantes"
+  },
+  "app": {
+    "aiOverviewEnabled": "Aperçu IA des Écritures activé",
+    "aiOverviewDisabled": "Aperçu IA des Écritures désactivé",
+    "headingsEnabled": "Titres de péricopes activés",
+    "headingsHidden": "Titres de péricopes masqués",
+    "searchModeDevice": "Mode appareil uniquement activé : recherche locale",
+    "searchModeAuto": "Mode auto : recherche serveur avec repli hors-ligne",
+    "textInstalled": "Texte biblique vérifié et installé dans OPFS (1,2 Mo)",
+    "textCancelled": "Téléchargement du texte biblique annulé.",
+    "downloadInterrupted": "Téléchargement interrompu. Vérifiez votre connexion et réessayez.",
+    "vectorsInstalled": "Vecteurs de versets vérifiés et installés dans OPFS (2,1 Mo)",
+    "vectorsCancelled": "Téléchargement des vecteurs IA annulé.",
+    "vectorsInterrupted": "Téléchargement IA interrompu. Vérifiez votre connexion et réessayez.",
+    "modelInstalled": "Modèle de requête neuronal installé dans le cache navigateur (137 Mo)",
+    "modelCancelled": "Téléchargement du modèle annulé.",
+    "modelInterrupted": "Téléchargement du modèle interrompu. Vérifiez votre connexion et réessayez.",
+    "slmInstalled": "Modèle IA local installé dans OPFS (370 Mo)",
+    "slmCancelled": "Téléchargement du modèle IA annulé.",
+    "slmInterrupted": "Téléchargement du modèle IA interrompu. Vérifiez votre connexion et réessayez.",
+    "storageCleared": "Stockage hors-ligne et cache des modèles effacés.",
+    "backOnline": "Connecté : de retour en ligne",
+    "offlineActive": "Hors-ligne : recherche locale et lecteur actifs",
+    "bookmarkRemoved": "{citation} retiré des favoris",
+    "bookmarkSaved": "{citation} enregistré dans les favoris"
   }
 }

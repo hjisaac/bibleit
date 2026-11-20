@@ -221,7 +221,7 @@ describe('WebSpeechNarrator', () => {
     narrator.play(segments, 0);
 
     expect(spoken.length).toBe(1);
-    expect(spoken[0]?.lang).toBe('es-ES');
+    expect(spoken[0]?.lang).toBe('es');
     expect(spoken[0]?.voice?.name).toBe('System Default Voice');
   });
 });

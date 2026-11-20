@@ -47,11 +47,13 @@ export function verifyBookIntegrity(
   return computeCrc32(content) === entry.crc32;
 }
 
+import { DEFAULT_TRANSLATION, type TranslationId } from './types';
 import { LSG_BIBLE_MANIFEST } from './lsg-manifest';
 export { LSG_BIBLE_MANIFEST };
 
-export function getBibleManifest(translationId: string = 'web'): BibleManifest {
-  return translationId.toLowerCase() === 'lsg' ? LSG_BIBLE_MANIFEST : WEB_BIBLE_MANIFEST;
+export function getBibleManifest(translationId: string = DEFAULT_TRANSLATION): BibleManifest {
+  const key = translationId.toLowerCase() as TranslationId;
+  return BIBLE_MANIFESTS[key] ?? WEB_BIBLE_MANIFEST;
 }
 
 export const WEB_BIBLE_MANIFEST: BibleManifest = {
@@ -128,3 +130,8 @@ export const WEB_BIBLE_MANIFEST: BibleManifest = {
     ZEP: { id: 'ZEP', size: 9521, crc32: 'd96ccebe' },
   },
 };
+
+export const BIBLE_MANIFESTS: Readonly<Record<TranslationId, BibleManifest>> = Object.freeze({
+  web: WEB_BIBLE_MANIFEST,
+  lsg: LSG_BIBLE_MANIFEST,
+});

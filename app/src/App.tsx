@@ -18,8 +18,9 @@ import { HelpModal } from './components/HelpModal';
 import { FeedbackModal } from './components/FeedbackModal';
 import { AudioPlayerBar } from './components/AudioPlayerBar';
 import { TOAST_DURATION_MS } from './constants';
-import { getLocalizedBookName } from './core/bible-books';
-import { $locale } from './stores/i18n';
+import { getLocalizedBookName } from '@bibleit/engine';
+import { $locale, i18n } from './stores/i18n';
+import { params } from '@nanostores/i18n';
 import { useHeadroom } from './core/headroom';
 import {
   PackageStatusEnum,
@@ -46,6 +47,32 @@ import {
   $searchMode,
 } from './stores/preferences';
 import { $readerLocation, $savedVerses, type ReaderLocation } from './stores/reader';
+
+export const messages = i18n('app', {
+  aiOverviewEnabled: 'AI Scripture Overview enabled',
+  aiOverviewDisabled: 'AI Scripture Overview deactivated',
+  headingsEnabled: 'Pericope headings enabled',
+  headingsHidden: 'Pericope headings hidden',
+  searchModeDevice: 'Device-only search enabled: Searching locally',
+  searchModeAuto: 'Auto mode: Cloud search with offline fallback',
+  textInstalled: 'Scripture text verified & installed in OPFS (1.2 MB)',
+  textCancelled: 'Scripture download cancelled.',
+  downloadInterrupted: 'Download interrupted. Check network and try again.',
+  vectorsInstalled: 'Verse vectors verified & installed in OPFS (2.1 MB)',
+  vectorsCancelled: 'AI vectors download cancelled.',
+  vectorsInterrupted: 'AI download interrupted. Check network and try again.',
+  modelInstalled: 'Neural query model installed in browser cache (137 MB)',
+  modelCancelled: 'Model download cancelled.',
+  modelInterrupted: 'Model download interrupted. Check network and try again.',
+  slmInstalled: 'On-device AI model installed in OPFS (370 MB)',
+  slmCancelled: 'AI model download cancelled.',
+  slmInterrupted: 'AI model download interrupted. Check network and try again.',
+  storageCleared: 'Offline storage and model cache cleared.',
+  backOnline: 'Connected: Back online',
+  offlineActive: 'Offline: Local search & reader active',
+  bookmarkRemoved: params('Removed {citation} from bookmarks'),
+  bookmarkSaved: params('Saved {citation} to bookmarks'),
+});
 
 export function App(): JSX.Element {
   // Composition root wires production adapters for the app lifecycle.
@@ -152,23 +179,22 @@ export function App(): JSX.Element {
   const isAiEnabled = useStore($isAiEnabled);
   const handleToggleAi = (enabled: boolean) => {
     $isAiEnabled.set(enabled);
-    showToast(enabled ? 'AI Scripture Overview enabled' : 'AI Scripture Overview deactivated');
+    const t = messages.get();
+    showToast(enabled ? t.aiOverviewEnabled : t.aiOverviewDisabled);
   };
 
   const showHeadings = useStore($showHeadings);
   const handleToggleHeadings = (enabled: boolean) => {
     $showHeadings.set(enabled);
-    showToast(enabled ? 'Pericope headings enabled' : 'Pericope headings hidden');
+    const t = messages.get();
+    showToast(enabled ? t.headingsEnabled : t.headingsHidden);
   };
 
   const searchMode = useStore($searchMode);
   const handleToggleSearchMode = (mode: SearchModeEnum) => {
     $searchMode.set(mode);
-    showToast(
-      mode === SearchModeEnum.DEVICE
-        ? 'Device-only search enabled: Searching locally'
-        : 'Auto mode: Cloud search with offline fallback',
-    );
+    const t = messages.get();
+    showToast(mode === SearchModeEnum.DEVICE ? t.searchModeDevice : t.searchModeAuto);
   };
 
   // Reconcile in-memory state if page was reloaded mid-download
@@ -258,19 +284,19 @@ export function App(): JSX.Element {
       setTextProgress(100);
       await engine.sync?.();
       $textPackageStatus.set(PackageStatusEnum.DOWNLOADED);
-      showToast('Scripture text verified & installed in OPFS (1.2 MB)');
+      showToast(messages.get().textInstalled);
     } catch (err) {
       if (controller.signal.aborted) {
         $textPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
         setTextProgress(0);
-        showToast('Scripture download cancelled.');
+        showToast(messages.get().textCancelled);
         return;
       }
       console.error('Download failed:', err);
       showToast(
         err instanceof Error && (err.name === 'CorruptArtifactError' || err.name === 'StorageUnavailableError')
           ? err.message
-          : 'Download interrupted. Check network and try again.',
+          : messages.get().downloadInterrupted,
       );
       $textPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     } finally {
@@ -296,19 +322,19 @@ export function App(): JSX.Element {
       setAiProgress(100);
       await engine.sync?.();
       $aiPackageStatus.set(PackageStatusEnum.DOWNLOADED);
-      showToast('Verse vectors verified & installed in OPFS (2.1 MB)');
+      showToast(messages.get().vectorsInstalled);
     } catch (err) {
       if (controller.signal.aborted) {
         $aiPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
         setAiProgress(0);
-        showToast('AI vectors download cancelled.');
+        showToast(messages.get().vectorsCancelled);
         return;
       }
       console.error('Download failed:', err);
       showToast(
         err instanceof Error && (err.name === 'CorruptArtifactError' || err.name === 'StorageUnavailableError')
           ? err.message
-          : 'AI download interrupted. Check network and try again.',
+          : messages.get().vectorsInterrupted,
       );
       $aiPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     } finally {
@@ -333,16 +359,16 @@ export function App(): JSX.Element {
       setModelProgress(100);
       await engine.sync?.();
       $modelPackageStatus.set(PackageStatusEnum.DOWNLOADED);
-      showToast('Neural query model installed in browser cache (137 MB)');
+      showToast(messages.get().modelInstalled);
     } catch (err) {
       if (isModelAbortedRef.current || (err instanceof DOMException && err.name === 'AbortError')) {
         $modelPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
         setModelProgress(0);
-        showToast('Model download cancelled.');
+        showToast(messages.get().modelCancelled);
         return;
       }
       console.error('Model download failed:', err);
-      showToast('Model download interrupted. Check network and try again.');
+      showToast(messages.get().modelInterrupted);
       $modelPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     }
   };
@@ -362,16 +388,16 @@ export function App(): JSX.Element {
       await slmProvider.load?.((fraction) => setSlmProgress(Math.round(fraction * 100)));
       setSlmProgress(100);
       $slmPackageStatus.set(PackageStatusEnum.DOWNLOADED);
-      showToast('On-device AI model installed in OPFS (370 MB)');
+      showToast(messages.get().slmInstalled);
     } catch (err) {
       if (isSlmAbortedRef.current || (err instanceof DOMException && err.name === 'AbortError')) {
         $slmPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
         setSlmProgress(0);
-        showToast('AI model download cancelled.');
+        showToast(messages.get().slmCancelled);
         return;
       }
       console.error('SLM download failed:', err);
-      showToast('AI model download interrupted. Check network and try again.');
+      showToast(messages.get().slmInterrupted);
       $slmPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     }
   };
@@ -394,7 +420,7 @@ export function App(): JSX.Element {
     setAiProgress(0);
     setModelProgress(0);
     setSlmProgress(0);
-    showToast('Offline storage and model cache cleared.');
+    showToast(messages.get().storageCleared);
   };
 
   const handleOpenStorage = () => {
@@ -433,11 +459,11 @@ export function App(): JSX.Element {
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      showToast('Connected: Back online');
+      showToast(messages.get().backOnline);
     };
     const handleOffline = () => {
       setIsOnline(false);
-      showToast('Offline: Local search & reader active');
+      showToast(messages.get().offlineActive);
     };
 
     window.addEventListener(NetworkStatusEnum.ONLINE, handleOnline);
@@ -448,7 +474,8 @@ export function App(): JSX.Element {
         const current = navigator.onLine;
         setIsOnline((prev) => {
           if (prev !== current) {
-            showToast(current ? 'Connected: Back online' : 'Offline: Local search & reader active');
+            const t = messages.get();
+            showToast(current ? t.backOnline : t.offlineActive);
             return current;
           }
           return prev;
@@ -494,14 +521,14 @@ export function App(): JSX.Element {
         (v) => v.book === verse.book && v.chapter === verse.chapter && v.verse === verse.verse,
       );
       let next;
-      const locale = $locale.get();
-      const localizedBook = getLocalizedBookName(verse.book, locale);
+      const localizedBook = getLocalizedBookName(verse.book, $locale.get());
       const citation = `${localizedBook} ${verse.chapter}:${verse.verse}`;
+      const t = messages.get();
       if (exists) {
         next = prev.filter(
           (v) => !(v.book === verse.book && v.chapter === verse.chapter && v.verse === verse.verse),
         );
-        showToast(locale === 'fr' ? `Retiré ${citation} des favoris` : `Removed ${citation} from bookmarks`);
+        showToast(t.bookmarkRemoved({ citation }));
       } else {
         next = [
           ...prev,
@@ -511,7 +538,7 @@ export function App(): JSX.Element {
             savedAt: Date.now(),
           },
         ];
-        showToast(locale === 'fr' ? `Enregistré ${citation} dans les favoris` : `Saved ${citation} to bookmarks`);
+        showToast(t.bookmarkSaved({ citation }));
       }
       return next;
     });

@@ -11,8 +11,7 @@ import {
   SearchOriginEnum,
   type ScoredPassage,
 } from '../core/types';
-import { findBookByPrefix, getLocalizedBookName } from '../core/bible-books';
-import { formatCitation } from '@bibleit/engine';
+import { findBookByPrefix, formatCitation, getLocalizedBookName } from '@bibleit/engine';
 import { resolveVerseText } from '../adapters/book-store';
 import { getPopularTopics, getSearchSuggestions } from '../core/starter-topics';
 import type { SavedVerse } from './SavedView';
@@ -72,6 +71,7 @@ export const messages = i18n('search/view', {
   toastSearchFailed: params('Search failed: {message}'),
   toastUnavailableOffline: 'AI overview unavailable offline: showing matching scripture',
   toastUnavailableDevice: 'AI overview unavailable in device-only mode: showing matching scripture',
+  toastAiOverviewUnavailable: 'AI overview unavailable: showing matching scripture',
 });
 
 export { MAX_HISTORY_ITEMS, SEARCH_HISTORY_KEY, SEARCH_STORAGE_KEY };
@@ -534,10 +534,10 @@ export function SearchView({
         }
       }
       if (!receivedAny) {
-        onToast('AI overview unavailable: showing matching scripture');
+        onToast(t.toastAiOverviewUnavailable);
       }
     } catch {
-      onToast('AI overview unavailable: showing matching scripture');
+      onToast(t.toastAiOverviewUnavailable);
     } finally {
       setIsSearching(false);
       setIsSynthesizing(false);

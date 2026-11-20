@@ -3,7 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import { $locale, i18n } from '../stores/i18n';
 import { $activeTranslation } from '../stores/preferences';
-import { getLocalizedBookName } from '../core/bible-books';
+import { getLocalizedBookName } from '@bibleit/engine';
 import { resolveVerseText } from '../adapters/book-store';
 
 export const messages = i18n('saved/view', {

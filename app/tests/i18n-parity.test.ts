@@ -3,6 +3,7 @@ import { messagesToJSON } from '@nanostores/i18n';
 import fr from '@/locales/fr.json';
 
 // Import message namespaces from all translated components
+import { messages as app } from '@/App';
 import { messages as navbar } from '@/components/Navbar';
 import { messages as header } from '@/components/Header';
 import { messages as savedView } from '@/components/SavedView';
@@ -19,6 +20,7 @@ describe('i18n Parity & Dead Code Tracking', () => {
   it('has zero dead and zero missing translations in fr.json', () => {
     // Source of truth: extracted directly from live TypeScript component definitions (no en.json)
     const sourceOfTruthTree = messagesToJSON(
+      app,
       navbar,
       header,
       savedView,

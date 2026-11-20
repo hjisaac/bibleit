@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { findBookByPrefix, getLocalizedBookName } from '../src/core/bible-books';
+import { findBookByPrefix, getLocalizedBookName } from '@bibleit/engine';
 import { getBibleManifest } from '../src/core/bible-manifest';
 import {
   clearBookCache,

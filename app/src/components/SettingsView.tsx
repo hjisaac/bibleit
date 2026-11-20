@@ -2,7 +2,7 @@ import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import { PackageStatusEnum, ThemeEnum, SearchModeEnum, type Manifest } from '../core/types';
-import { i18n, $locale, $localeSetting, $isMultilingualEnabled, type Locale } from '../stores/i18n';
+import { i18n, $locale, $localeSetting, $isMultilingualEnabled, LOCALES, type Locale } from '../stores/i18n';
 import { params } from '@nanostores/i18n';
 
 export const messages = i18n('settings/view', {
@@ -411,8 +411,11 @@ export function SettingsView({
               color: 'var(--text-main)',
             }}
           >
-            <option value="en">{t.languageEnglish}</option>
-            <option value="fr">{t.languageFrench}</option>
+            {LOCALES.map((loc) => (
+              <option key={loc} value={loc}>
+                {({ en: t.languageEnglish, fr: t.languageFrench } satisfies Record<Locale, string>)[loc]}
+              </option>
+            ))}
           </select>
         </div>
       )}

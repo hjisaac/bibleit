@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { RegexRefParser, buildBookAliasMap } from '../src/adapters/regex-ref-parser';
-import type { BibleBook } from '../src/core/bible-books';
+import { RegexRefParser, buildBookAliasMap, type BibleBook } from '@bibleit/engine';
 
 describe('RegexRefParser', () => {
   const parser = new RegexRefParser();

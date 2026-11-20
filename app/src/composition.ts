@@ -27,22 +27,14 @@ import { $locale } from './stores/i18n';
 
 export { LocalEngine, createArtifactStore };
 
-let embedder: QueryEmbedder | null = null;
 export function createEmbedder(): QueryEmbedder {
-  if (!embedder) {
-    embedder = new WorkerQueryEmbedder();
-  }
-  return embedder;
+  return new WorkerQueryEmbedder();
 }
 
-let answerProvider: AnswerProvider | null = null;
 export function createAnswerProvider(
   isInstalled?: () => boolean,
 ): AnswerProvider {
-  if (!answerProvider) {
-    answerProvider = new WorkerSlmAnswerProvider(isInstalled);
-  }
-  return answerProvider;
+  return new WorkerSlmAnswerProvider(isInstalled);
 }
 
 export function createEngine(

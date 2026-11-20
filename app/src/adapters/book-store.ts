@@ -1,5 +1,6 @@
 import { getBibleManifest, verifyBookIntegrity } from '../core/bible-manifest';
-import { $activeTranslation, type TranslationId } from '../stores/preferences';
+import { DEFAULT_TRANSLATION, type TranslationId } from '../core/types';
+import { $activeTranslation } from '../stores/preferences';
 
 export interface ChapterVerse {
   num: number;
@@ -30,7 +31,7 @@ const memoryCache = new Map<string, BookData>();
 const verseIndex = new Map<string, string>();
 
 function getActiveTrans(translation?: string): TranslationId {
-  return (translation ?? $activeTranslation.get() ?? 'web') as TranslationId;
+  return (translation ?? $activeTranslation.get() ?? DEFAULT_TRANSLATION) as TranslationId;
 }
 
 /** Generates canonical string key for address indexing */
@@ -51,8 +52,7 @@ export function getCachedVerse(
   verse: number,
   translation?: string,
 ): string | undefined {
-  const key = verseKey(bookId, chapter, verse, translation);
-  return verseIndex.get(key) ?? verseIndex.get(`${bookId.toUpperCase()}:${chapter}:${verse}`);
+  return verseIndex.get(verseKey(bookId, chapter, verse, translation));
 }
 
 /** Non-blocking background worker to populate the verse index from a loaded book */
@@ -66,9 +66,6 @@ export function scheduleBookIndexing(bookData: BookData, translation?: string): 
       const ch = parseInt(chStr, 10);
       for (const v of verses) {
         verseIndex.set(`${trans}:${bookId}:${ch}:${v.num}`, v.text);
-        if (trans === 'web') {
-          verseIndex.set(`${bookId}:${ch}:${v.num}`, v.text);
-        }
       }
     }
   };
@@ -117,18 +114,12 @@ function getBookUrl(bookId: string, translation?: string): string {
   return `${cleanBase}data/books/${trans}/${bookId}.json`;
 }
 
-function getLegacyBookUrl(bookId: string): string {
-  const baseUrl = import.meta.env.BASE_URL ?? '/';
-  const cleanBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-  return `${cleanBase}data/books/${bookId}.json`;
-}
-
 /** Loads a book from memory, browser Cache API, or network with CRC32 integrity verification. */
 export async function loadBook(bookId: string, translation?: string): Promise<BookData> {
   const trans = getActiveTrans(translation);
   const memKey = `${trans}:${bookId}`;
 
-  const cachedMem = memoryCache.get(memKey) ?? (trans === 'web' ? memoryCache.get(bookId) : undefined);
+  const cachedMem = memoryCache.get(memKey);
   if (cachedMem) {
     return cachedMem;
   }
@@ -140,7 +131,7 @@ export async function loadBook(bookId: string, translation?: string): Promise<Bo
   if (typeof caches !== 'undefined') {
     try {
       const cache = await caches.open(CACHE_NAME);
-      const match = (await cache.match(url)) ?? (trans === 'web' ? await cache.match(getLegacyBookUrl(bookId)) : null);
+      const match = await cache.match(url);
       if (match) {
         try {
           const data: BookData = await match.json();
@@ -159,11 +150,7 @@ export async function loadBook(bookId: string, translation?: string): Promise<Bo
     }
   }
 
-  // Network fetch with legacy fallback for default translation
-  let response = await fetch(url);
-  if (!response.ok && trans === 'web') {
-    response = await fetch(getLegacyBookUrl(bookId));
-  }
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Failed to load ${bookId} (${trans}): HTTP ${response.status}`);
   }

@@ -1,7 +1,7 @@
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
-import { BIBLE_BOOKS, BIBLE_BOOKS_BY_ID, type BibleBook, getLocalizedBookName } from '../core/bible-books';
+import { BIBLE_BOOKS, BIBLE_BOOKS_BY_ID, type BibleBook, getLocalizedBookName } from '@bibleit/engine';
 import { getVerseCount } from '../core/verse-counts';
 import { $locale, i18n } from '../stores/i18n';
 import { params } from '@nanostores/i18n';

@@ -215,9 +215,8 @@ export class WebSpeechNarrator implements AudioNarrator {
 
       const locale = (this.getLocale() || DEFAULT_LOCALE).toLowerCase();
       const langPrefix = locale.slice(0, 2);
-      utterance.lang = locale.includes('-')
-        ? locale
-        : `${langPrefix}-${langPrefix === 'en' ? 'US' : langPrefix.toUpperCase()}`;
+      const DEFAULT_BCP47: Readonly<Record<string, string>> = { en: 'en-US', fr: 'fr-FR' };
+      utterance.lang = locale.includes('-') ? locale : (DEFAULT_BCP47[langPrefix] ?? langPrefix);
 
       const preferredVoice = this.pickOfflineVoice(langPrefix);
       if (preferredVoice) {
