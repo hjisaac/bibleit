@@ -52,10 +52,7 @@ Experiment runs and benchmark metrics:
 
 ### Deployment
 
-For now, the live web app runs on free-tier hosting:
-- **Cold starts**: The cloud API runs on a free Render instance that sleeps when idle. The first search may take 40 to 60 seconds while the server wakes up. Later searches run normally.
-- **Search submission**: Searches run on submit (Enter key or Search button), not as you type.
-- **Offline search**: If the server is unreachable or sleeping, the app searches locally using downloaded text and vectors. You can also turn on "Device-only (Offline)" in Settings to keep all search local.
+The cloud API runs on a free Render instance.
 
 </details>
 
