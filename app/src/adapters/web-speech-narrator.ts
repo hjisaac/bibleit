@@ -1,5 +1,5 @@
 import type { AudioNarrator } from '../core/ports';
-import type { NarrationSegment, NarrationState } from '../core/types';
+import { DEFAULT_LOCALE, type NarrationSegment, type NarrationState } from '../core/types';
 
 function inferWordLength(text: string, charIndex: number, reportedLength?: number): number {
   if (reportedLength && reportedLength > 0) return reportedLength;
@@ -11,6 +11,7 @@ function inferWordLength(text: string, charIndex: number, reportedLength?: numbe
 export class WebSpeechNarrator implements AudioNarrator {
   private readonly synth: SpeechSynthesis | undefined;
   private readonly createUtterance: (text: string) => SpeechSynthesisUtterance;
+  private readonly getLocale: () => string;
   private readonly isNativeSynth: boolean;
   private readonly listeners = new Set<(state: NarrationState) => void>();
 
@@ -34,6 +35,7 @@ export class WebSpeechNarrator implements AudioNarrator {
   constructor(
     synth?: SpeechSynthesis,
     utteranceFactory?: (text: string) => SpeechSynthesisUtterance,
+    getLocale?: () => string,
   ) {
     this.isNativeSynth = !synth;
     this.synth =
@@ -43,6 +45,9 @@ export class WebSpeechNarrator implements AudioNarrator {
         : undefined);
     this.createUtterance =
       utteranceFactory ?? ((text: string) => new SpeechSynthesisUtterance(text));
+    this.getLocale =
+      getLocale ??
+      (() => (typeof document !== 'undefined' ? document.documentElement.lang || DEFAULT_LOCALE : DEFAULT_LOCALE));
 
     // Halt any orphaned OS speech left running from a previous page reload.
     if (this.synth && (this.synth.speaking || this.synth.pending)) {
@@ -207,9 +212,13 @@ export class WebSpeechNarrator implements AudioNarrator {
       const utterance = this.createUtterance(textSlice);
       this.currentUtterance = utterance;
       utterance.rate = this.state.rate;
-      utterance.lang = 'en-US';
 
-      const preferredVoice = this.pickOfflineEnglishVoice();
+      const locale = (this.getLocale() || DEFAULT_LOCALE).toLowerCase();
+      const langPrefix = locale.slice(0, 2);
+      const DEFAULT_BCP47: Readonly<Record<string, string>> = { en: 'en-US', fr: 'fr-FR' };
+      utterance.lang = locale.includes('-') ? locale : (DEFAULT_BCP47[langPrefix] ?? langPrefix);
+
+      const preferredVoice = this.pickOfflineVoice(langPrefix);
       if (preferredVoice) {
         utterance.voice = preferredVoice;
       }
@@ -275,13 +284,15 @@ export class WebSpeechNarrator implements AudioNarrator {
     }
   }
 
-  private pickOfflineEnglishVoice(): SpeechSynthesisVoice | undefined {
+  private pickOfflineVoice(langPrefix: string): SpeechSynthesisVoice | undefined {
     if (!this.synth || typeof this.synth.getVoices !== 'function') return undefined;
     const voices = this.synth.getVoices();
     if (!voices || voices.length === 0) return undefined;
+    const prefix = langPrefix.toLowerCase();
     return (
-      voices.find((v) => v.localService && v.lang.toLowerCase().startsWith('en')) ??
-      voices.find((v) => v.lang.toLowerCase().startsWith('en'))
+      voices.find((v) => v.localService && v.lang.toLowerCase().startsWith(prefix)) ??
+      voices.find((v) => v.lang.toLowerCase().startsWith(prefix)) ??
+      voices.find((v) => v.default)
     );
   }
 

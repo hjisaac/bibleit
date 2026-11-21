@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/preact';
 import { SearchView, MAX_HISTORY_ITEMS } from '../src/components/SearchView';
 import { PackageStatusEnum } from '../src/core/types';
-import { POPULAR_TOPICS } from '../src/core/starter-topics';
+import { getPopularTopics } from '../src/core/starter-topics';
 import type { SearchEngine } from '../src/core/ports';
 import type { ComponentProps } from 'preact';
 
@@ -124,7 +124,7 @@ describe('SearchView Cold Start and Search Persistence', () => {
 
     renderSearchView();
 
-    const targetTopic = POPULAR_TOPICS[1]!; // Strength and courage
+    const targetTopic = getPopularTopics('en')[1]!; // Strength and courage
     const chip = screen.getByRole('button', { name: targetTopic });
     fireEvent.click(chip);
 
@@ -417,6 +417,35 @@ describe('SearchView Cold Start and Search Persistence', () => {
     // Panel P is now open, old results still unremoved
     expect(screen.getByText('Suggestions')).toBeTruthy();
     expect(screen.getByText('For God so loved the world...')).toBeTruthy();
+
+    // Blur closes Panel P while keeping previous results visible
+    fireEvent.blur(input);
+    expect(screen.queryByText('Suggestions')).toBeNull();
+    expect(screen.getByText('For God so loved the world...')).toBeTruthy();
+  });
+
+  it('auto-focuses on empty landing, hides Panel P on blur, and prevents premature blur when clicking chips', () => {
+    renderSearchView();
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    expect(document.activeElement).toBe(input);
+    expect(screen.getByText('Suggestions')).toBeTruthy();
+
+    // Pressing mouse down on a chip calls preventDefault so blur does not hide the panel before click
+    const chip = screen.getByRole('button', { name: getPopularTopics('en')[0]! });
+    const mouseDownEvent = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    chip.dispatchEvent(mouseDownEvent);
+    expect(mouseDownEvent.defaultPrevented).toBe(true);
+
+    // Losing focus hides Panel P immediately
+    fireEvent.blur(input);
+    expect(screen.queryByText('Suggestions')).toBeNull();
+    expect(screen.queryByText('Popular Topics')).toBeNull();
+
+    // Refocusing reopens Panel P
+    fireEvent.focus(input);
+    expect(screen.getByText('Suggestions')).toBeTruthy();
+    expect(screen.getByText('Popular Topics')).toBeTruthy();
   });
 
   it('keeps previous results and shows Panel P when clearing the query', () => {
@@ -594,6 +623,46 @@ describe('SearchView Cold Start and Search Persistence', () => {
       expect(screen.queryByText('Synthesized test answer')).toBeNull();
       expect(screen.queryByText('Grounded Summary')).toBeNull();
     });
+  });
+
+  it('renders localized suggestions and popular topics when locale is set to French', async () => {
+    const { $isMultilingualEnabled, $localeSetting } = await import('../src/stores/i18n');
+    $isMultilingualEnabled.set(true);
+    $localeSetting.set('fr');
+
+    renderSearchView();
+
+    // Verify French suggestions and topics
+    expect(screen.getByText('Philippiens 4:7')).toBeTruthy();
+    expect(screen.getByText('paix qui surpasse')).toBeTruthy();
+    expect(screen.getByText("Paix dans l'anxiété")).toBeTruthy();
+    expect(screen.getByText('Force et courage')).toBeTruthy();
+
+    $localeSetting.set('en');
+  });
+
+  it('renders localized book proposition and chapter buttons in French when typing book prefix', async () => {
+    const { $isMultilingualEnabled, $localeSetting } = await import('../src/stores/i18n');
+    $isMultilingualEnabled.set(true);
+    $localeSetting.set('fr');
+
+    const onOpenReader = vi.fn();
+    renderSearchView({ onOpenReader });
+
+    const input = screen.getByRole('textbox');
+    fireEvent.input(input, { target: { value: 'rom' } });
+
+    const bookBtn = await screen.findByRole('button', { name: 'Romains' });
+    expect(bookBtn).toBeTruthy();
+    expect(bookBtn.getAttribute('title')).toContain('Romains 1:1');
+
+    const ch1Btn = screen.getByRole('button', { name: '1' });
+    expect(ch1Btn.getAttribute('title')).toContain('Romains 1');
+
+    fireEvent.click(ch1Btn);
+    expect(onOpenReader).toHaveBeenCalledWith('ROM', 1, 1);
+
+    $localeSetting.set('en');
   });
 });
 

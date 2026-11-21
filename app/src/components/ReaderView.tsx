@@ -1,11 +1,23 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { useStore } from '@nanostores/preact';
 
-import { BIBLE_BOOKS_BY_ID } from '../core/bible-books';
+import { getLocalizedBookName } from '@bibleit/engine';
 import type { AudioNarrator } from '../core/ports';
 import type { NarrationSegment, NarrationState, NarrationWordBoundary } from '../core/types';
 import { loadBook, type ChapterVerse } from '../adapters/book-store';
 import type { SavedVerse } from './SavedView';
+import { i18n, $locale } from '../stores/i18n';
+import { $activeTranslation } from '../stores/preferences';
+import { params } from '@nanostores/i18n';
+import en from '../locales/en.json';
+
+export const messages = i18n('reader/view', {
+  ...en['reader/view'],
+  chapterHeading: params<{ book: string; ch: number }>(en['reader/view'].chapterHeading),
+  unableToLoadError: params<{ book: string; ch: number }>(en['reader/view'].unableToLoadError),
+  copiedToast: params<{ citation: string }>(en['reader/view'].copiedToast),
+});
 
 interface ReaderViewProps {
   book: string;
@@ -62,6 +74,7 @@ export function ReaderView({
   onSaveVerse,
   onToast,
 }: ReaderViewProps): JSX.Element {
+  const tt = useStore(messages);
   const [verses, setVerses] = useState<ChapterVerse[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -73,8 +86,10 @@ export function ReaderView({
   const isLongPressTriggeredRef = useRef<boolean>(false);
   const suppressClickUntilRef = useRef<number>(0);
 
-  const bookMeta = BIBLE_BOOKS_BY_ID[book];
-  const bookTitle = bookMeta ? bookMeta.name : book;
+  const currentLocale = useStore($locale);
+  const activeTranslation = useStore($activeTranslation);
+
+  const bookTitle = getLocalizedBookName(book, currentLocale);
 
   const isChapterActive =
     narrationState?.status !== 'idle' &&
@@ -90,7 +105,7 @@ export function ReaderView({
     setIsLoading(true);
     setLoadError(null);
 
-    loadBook(book)
+    loadBook(book, activeTranslation)
       .then((data) => {
         if (!isCancelled) {
           setVerses(data.chapters[chKey] || []);
@@ -100,8 +115,8 @@ export function ReaderView({
       })
       .catch((err) => {
         if (!isCancelled) {
-          console.error(`Error loading book ${book}:`, err);
-          setLoadError(`Unable to load ${bookTitle} Chapter ${chapter}. Check internet or download offline text in Settings.`);
+          console.error(`Error loading book ${book} (${activeTranslation}):`, err);
+          setLoadError(tt.unableToLoadError({ book: bookTitle, ch: chapter }));
           setIsLoading(false);
         }
       });
@@ -109,7 +124,7 @@ export function ReaderView({
     return () => {
       isCancelled = true;
     };
-  }, [book, chapter]);
+  }, [book, chapter, tt, activeTranslation, bookTitle]);
 
   useEffect(() => {
     if (targetVerse === undefined) {
@@ -141,7 +156,6 @@ export function ReaderView({
     }
   }, [activeSpokenVerse]);
 
-
   const triggerHaptic = (pattern: number | number[] = 20) => {
     try {
       if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
@@ -162,7 +176,6 @@ export function ReaderView({
       }
     }
 
-    // Fallback using textarea for insecure contexts / mobile restrictions
     try {
       const textArea = document.createElement('textarea');
       textArea.value = text;
@@ -191,9 +204,9 @@ export function ReaderView({
 
     void copyTextToClipboard(textToCopy).then((success) => {
       if (success) {
-        onToast(`Copied ${citation}`);
+        onToast(tt.copiedToast({ citation }));
       } else {
-        onToast(`Unable to copy automatically`);
+        onToast(tt.unableToCopyToast);
       }
     });
   };
@@ -228,7 +241,7 @@ export function ReaderView({
 
   const handleListenChapter = () => {
     if (!narrator || !narrator.supported) {
-      onToast('Speech synthesis is not supported on this device');
+      onToast(tt.speechNotSupportedToast);
       return;
     }
     if (isChapterActive) {
@@ -301,7 +314,6 @@ export function ReaderView({
       isLongPressTriggeredRef.current = false;
       return;
     }
-    // Toggle selection: tap to select; tap again to deselect
     if (selectedVerse?.num === v.num && !showActions) {
       setSelectedVerse(null);
     } else {
@@ -328,11 +340,11 @@ export function ReaderView({
           <button
             type="button"
             onClick={onOpenSelector}
-            title="Tap to select book or chapter"
+            title={tt.tapToSelectTitle}
             class="group inline-flex items-center justify-center gap-2.5 px-4 py-1.5 rounded-2xl transition-all hover:bg-stone-500/10 active:scale-[0.98]"
           >
             <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-center font-serif" style={{ color: 'var(--text-main)' }}>
-              {bookTitle} Chapter {chapter}
+              {tt.chapterHeading({ book: bookTitle, ch: chapter })}
             </h1>
             <svg
               class="w-5 h-5 transition-transform group-hover:translate-y-0.5 opacity-40 group-hover:opacity-80"
@@ -345,7 +357,7 @@ export function ReaderView({
             </svg>
           </button>
           <span class="text-[11px] font-sans mt-0.5 tracking-wide font-normal" style={{ color: 'var(--text-subtle)' }}>
-            Tap to change book & chapter
+            {tt.tapToChangeSubtitle}
           </span>
 
           {narrator?.supported && !isLoading && !loadError && verses.length > 0 && (
@@ -364,7 +376,7 @@ export function ReaderView({
                   <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z" />
                   </svg>
-                  <span>Pause</span>
+                  <span>{tt.pauseNarration}</span>
                 </>
               ) : (
                 <>
@@ -376,7 +388,7 @@ export function ReaderView({
                       d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
                     />
                   </svg>
-                  <span>{isChapterActive && narrationState?.status === 'paused' ? 'Resume' : 'Listen'}</span>
+                  <span>{isChapterActive && narrationState?.status === 'paused' ? tt.resumeNarration : tt.listenNarration}</span>
                 </>
               )}
             </button>
@@ -406,7 +418,7 @@ export function ReaderView({
 
         {!isLoading && !loadError && verses.length === 0 && (
           <div class="py-12 text-center text-sm font-sans" style={{ color: 'var(--text-muted)' }}>
-            No verses found for this chapter.
+            {tt.noVersesFound}
           </div>
         )}
 
@@ -418,7 +430,6 @@ export function ReaderView({
             (sv) => sv.book === book && sv.chapter === chapter && sv.verse === v.num,
           );
           const hasActions = isSelected && showActions;
-          // Spoken verse and any tapped/focused verse show yellow border in parallel
           const hasYellowBorder = isSpeaking || isSelected;
 
           return (
@@ -429,12 +440,12 @@ export function ReaderView({
                 tabIndex={0}
                 onClick={(e) => handleVerseClick(v, e)}
                 onTouchStart={(e) => {
-                  const t = e.touches[0];
-                  if (t) startLongPress(v, t.clientX, t.clientY);
+                  const touch = e.touches[0];
+                  if (touch) startLongPress(v, touch.clientX, touch.clientY);
                 }}
                 onTouchMove={(e) => {
-                  const t = e.touches[0];
-                  if (t) checkMoveCancel(t.clientX, t.clientY);
+                  const touch = e.touches[0];
+                  if (touch) checkMoveCancel(touch.clientX, touch.clientY);
                 }}
                 onTouchEnd={endLongPress}
                 onTouchCancel={endLongPress}
@@ -494,7 +505,7 @@ export function ReaderView({
                         onClick={(e) => handleListenFromVerse(e)}
                         class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-medium transition-all hover:opacity-80 active:opacity-60 cursor-pointer"
                         style={{ color: 'var(--text-main)', borderColor: 'var(--border-subtle)' }}
-                        title="Listen from this verse"
+                        title={tt.listenFromVerseTitle}
                       >
                         <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path
@@ -504,7 +515,7 @@ export function ReaderView({
                             d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z"
                           />
                         </svg>
-                        <span>Listen</span>
+                        <span>{tt.actionListen}</span>
                       </button>
                     )}
                     <button
@@ -512,7 +523,7 @@ export function ReaderView({
                       onClick={(e) => handleCopy(e)}
                       class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-medium transition-all hover:opacity-80 active:opacity-60 cursor-pointer"
                       style={{ color: 'var(--text-main)', borderColor: 'var(--border-subtle)' }}
-                      title="Copy verse text"
+                      title={tt.copyVerseTitle}
                     >
                       <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
@@ -522,7 +533,7 @@ export function ReaderView({
                           d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
                         />
                       </svg>
-                      <span>Copy</span>
+                      <span>{tt.actionCopy}</span>
                     </button>
                     <button
                       type="button"
@@ -532,7 +543,7 @@ export function ReaderView({
                         color: isSaved ? 'var(--accent)' : 'var(--text-main)',
                         borderColor: 'var(--border-subtle)',
                       }}
-                      title={isSaved ? 'Remove from bookmarks' : 'Save to bookmarks'}
+                      title={isSaved ? tt.removeVerseTitle : tt.saveVerseTitle}
                     >
                       <svg
                         class="w-3.5 h-3.5 shrink-0"
@@ -547,7 +558,7 @@ export function ReaderView({
                           d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
                         />
                       </svg>
-                      <span>{isSaved ? 'Unsave' : 'Save'}</span>
+                      <span>{isSaved ? tt.actionUnsave : tt.actionSave}</span>
                     </button>
                   </div>
                 </div>
@@ -559,4 +570,3 @@ export function ReaderView({
     </section>
   );
 }
-

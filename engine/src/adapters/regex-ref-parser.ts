@@ -1,22 +1,42 @@
 import type { RefParser } from '../core/ports';
 import type { RefRange } from '../core/types';
-import { BIBLE_BOOKS, type BibleBook } from '../core/bible-books';
+import {
+  BIBLE_BOOKS,
+  LOCALIZED_BOOK_TABLES,
+  stripAccents,
+  type BibleBook,
+} from '../core/bible-books';
 
 /**
  * Builds a lookup map from lowercase aliases to canonical BibleBook metadata.
- * Can be initialized with default English tables or custom language aliases (e.g., French, Fon).
+ * Indexes default names/aliases plus all registered localized book tables.
  */
 export function buildBookAliasMap(
   customBooks?: readonly BibleBook[],
 ): Map<string, BibleBook> {
   const books = customBooks ?? BIBLE_BOOKS;
   const aliasMap = new Map<string, BibleBook>();
+  const localizedTables = Object.values(LOCALIZED_BOOK_TABLES);
+
+  const register = (term: string, book: BibleBook) => {
+    const lower = term.toLowerCase();
+    aliasMap.set(lower, book);
+    aliasMap.set(stripAccents(lower), book);
+  };
 
   for (const b of books) {
     aliasMap.set(b.id.toLowerCase(), b);
-    aliasMap.set(b.name.toLowerCase(), b);
+    register(b.name, b);
     for (const alias of b.aliases) {
-      aliasMap.set(alias.toLowerCase(), b);
+      register(alias, b);
+    }
+    for (const table of localizedTables) {
+      if (!table) continue;
+      const localizedName = table.names[b.id];
+      if (localizedName) register(localizedName, b);
+      for (const alias of table.aliases[b.id] ?? []) {
+        register(alias, b);
+      }
     }
   }
 
@@ -32,14 +52,14 @@ export function buildBookAliasMap(
 export class RegexRefParser implements RefParser {
   private aliasMap: Map<string, BibleBook>;
 
-  // Regex pattern:
+  // Regex pattern (unicode-safe word boundaries for accented characters e.g. Ésaïe):
   // Group 1: Book name/alias (letters, numbers like 1/2/3, and spaces)
   // Group 2: Chapter number
   // Group 3: Optional verse portion (:start[-end])
   // Group 4: Start verse number
   // Group 5: Optional end verse number
   private static readonly REF_PATTERN =
-    /\b([1-3]?\s*[\p{L}\p{M}]+)\s+(\d+)(?::(\d+)(?:[-–—](\d+))?)?\b/gu;
+    /(?<![\p{L}\p{N}])([1-3]?\s*[\p{L}\p{M}]+)\s+(\d+)(?::(\d+)(?:[-–—](\d+))?)?(?![\p{L}\p{N}])/gu;
 
   constructor(aliasMap?: Map<string, BibleBook>) {
     this.aliasMap = aliasMap ?? buildBookAliasMap();
@@ -63,7 +83,7 @@ export class RegexRefParser implements RefParser {
 
       // Normalize internal whitespace (e.g., "1  cor" -> "1 cor")
       const normalizedBook = rawBook.replace(/\s+/g, ' ');
-      const book = this.aliasMap.get(normalizedBook);
+      const book = this.aliasMap.get(normalizedBook) ?? this.aliasMap.get(stripAccents(normalizedBook));
       if (!book) continue;
 
       const chapter = parseInt(chapterStr, 10);

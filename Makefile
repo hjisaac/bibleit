@@ -37,13 +37,16 @@ build-back:
 	pnpm --filter @bibleit/api build
 
 # Testing
-test: test-front test-back test-ingest
+test: test-front test-back test-proxy test-ingest
 
 test-front:
 	pnpm --prefix app test
 
 test-back:
 	pnpm --filter @bibleit/api build
+
+test-proxy:
+	pnpm --filter @bibleit/proxy test && pnpm --filter @bibleit/proxy typecheck
 
 test-ingest:
 	cd ingest && uv run pytest -q

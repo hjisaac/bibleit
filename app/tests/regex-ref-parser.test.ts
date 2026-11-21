@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { RegexRefParser, buildBookAliasMap } from '../src/adapters/regex-ref-parser';
-import type { BibleBook } from '../src/core/bible-books';
+import { RegexRefParser, buildBookAliasMap, type BibleBook } from '@bibleit/engine';
 
 describe('RegexRefParser', () => {
   const parser = new RegexRefParser();
@@ -34,12 +33,35 @@ describe('RegexRefParser', () => {
     ]);
   });
 
-  it('handles french alias in default table', () => {
-    const refs = parser.parse('Jean 3:16');
-    expect(refs).toEqual([
+  it('handles french book names and aliases in default table', () => {
+    expect(parser.parse('Jean 3:16')).toEqual([
       {
         start: { book: 'JHN', chapter: 3, verse: 16 },
         end: { book: 'JHN', chapter: 3, verse: 16 },
+      },
+    ]);
+    expect(parser.parse('Romains 8:28')).toEqual([
+      {
+        start: { book: 'ROM', chapter: 8, verse: 28 },
+        end: { book: 'ROM', chapter: 8, verse: 28 },
+      },
+    ]);
+    expect(parser.parse('Genèse 1:1')).toEqual([
+      {
+        start: { book: 'GEN', chapter: 1, verse: 1 },
+        end: { book: 'GEN', chapter: 1, verse: 1 },
+      },
+    ]);
+    expect(parser.parse('Ésaïe 53:5')).toEqual([
+      {
+        start: { book: 'ISA', chapter: 53, verse: 5 },
+        end: { book: 'ISA', chapter: 53, verse: 5 },
+      },
+    ]);
+    expect(parser.parse('1 Rois 18:21')).toEqual([
+      {
+        start: { book: '1KI', chapter: 18, verse: 21 },
+        end: { book: '1KI', chapter: 18, verse: 21 },
       },
     ]);
   });

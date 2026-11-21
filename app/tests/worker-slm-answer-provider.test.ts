@@ -102,4 +102,89 @@ describe('WorkerSlmAnswerProvider', () => {
       }
     }).rejects.toThrow('WASM crash');
   });
+
+  it('detects model in OPFS if model_q4.onnx is present with valid size', async () => {
+    const mockFileHandle = {
+      getFile: vi.fn(async () => ({ size: 387_943_246 })),
+    };
+    const mockDirHandle = {
+      keys: async function* () {
+        yield 'HuggingFaceTB_SmolLM2-360M-Instruct_resolve_main_onnx_model_q4.onnx';
+      },
+      getFileHandle: vi.fn(async () => mockFileHandle),
+    };
+    const mockRoot = {
+      getDirectoryHandle: vi.fn(async () => mockDirHandle),
+    };
+    vi.stubGlobal('navigator', {
+      storage: {
+        getDirectory: vi.fn(async () => mockRoot),
+      },
+    });
+
+    const { isSlmModelCached } = await import('../src/adapters/worker-slm-answer-provider');
+    const cached = await isSlmModelCached();
+    expect(cached).toBe(true);
+  });
+
+  it('clears model files from OPFS on clearSlmModelCache', async () => {
+    const removeEntrySpy = vi.fn();
+    const mockRoot = {
+      removeEntry: removeEntrySpy,
+    };
+    vi.stubGlobal('navigator', {
+      storage: {
+        getDirectory: vi.fn(async () => mockRoot),
+      },
+    });
+
+    const { clearSlmModelCache } = await import('../src/adapters/worker-slm-answer-provider');
+    await clearSlmModelCache();
+    expect(removeEntrySpy).toHaveBeenCalledWith('models', { recursive: true });
+  });
+
+  it('reports progress and resolves when worker posts loaded', async () => {
+    class LoadingWorker {
+      listeners: Record<string, ((e: MessageEvent) => void)[]> = {};
+      addEventListener(type: string, fn: any) {
+        (this.listeners[type] ||= []).push(fn);
+      }
+      removeEventListener(type: string, fn: any) {
+        this.listeners[type] = (this.listeners[type] || []).filter((f) => f !== fn);
+      }
+      postMessage(msg: any) {
+        if (msg.type === 'load') {
+          setTimeout(() => {
+            (this.listeners['message'] || []).forEach((fn) =>
+              fn({ data: { type: 'loaded' } } as MessageEvent),
+            );
+          }, 0);
+        }
+      }
+      terminate() {}
+    }
+
+    vi.stubGlobal('Worker', LoadingWorker);
+    const provider = new WorkerSlmAnswerProvider();
+    await expect(provider.load()).resolves.toBeUndefined();
+  });
+
+  it('rejects with AbortError when cancelLoad is called', async () => {
+    const terminateSpy = vi.fn();
+    class SlowWorker {
+      addEventListener() {}
+      removeEventListener() {}
+      postMessage() {}
+      terminate = terminateSpy;
+    }
+
+    vi.stubGlobal('Worker', SlowWorker);
+    const provider = new WorkerSlmAnswerProvider();
+    const loadPromise = provider.load();
+
+    provider.cancelLoad();
+
+    await expect(loadPromise).rejects.toThrow('The user aborted a request.');
+    expect(terminateSpy).toHaveBeenCalled();
+  });
 });

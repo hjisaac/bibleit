@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { HybridEngine } from '../src/adapters/hybrid-engine';
+import { createHybridEngine } from '../src/adapters/hybrid-engine';
+import { RemoteEngine } from '../src/adapters/remote-engine';
+import { HttpAnswerProvider } from '../src/adapters/http-answer-provider';
 import type { AnswerProvider, SearchEngine } from '../src/core/ports';
 import { SearchOriginEnum, type RetrievalResult } from '../src/core/types';
 import { API_ROUTES } from '@bibleit/engine';
 
-describe('HybridEngine', () => {
+describe('createHybridEngine & RemoteEngine', () => {
   const mockLocalResult: RetrievalResult = {
     passages: [
       {
@@ -39,13 +41,21 @@ describe('HybridEngine', () => {
     };
   });
 
-  it('delegates to remote API when online and healthy', async () => {
+  const createManager = (remoteUrl: string | null, isDeviceOnly?: () => boolean) => {
+    const cleanUrl = remoteUrl?.trim().replace(/\/+$/, '');
+    const remote = cleanUrl
+      ? new RemoteEngine(cleanUrl, new HttpAnswerProvider(cleanUrl, isDeviceOnly))
+      : null;
+    return createHybridEngine(remote, mockLocalEngine, isDeviceOnly);
+  };
+
+  it('delegates to RemoteEngine when online and healthy', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,
       json: async () => mockRemoteResult,
     } as Response);
 
-    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
+    const engine = createManager('https://api.bibleit.test');
     const result = await engine.retrieve('love');
 
     expect(result.passages[0]?.chunk.text).toContain('Remote API');
@@ -56,7 +66,7 @@ describe('HybridEngine', () => {
   it('falls back to localEngine when remote fetch rejects', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Network error'));
 
-    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
+    const engine = createManager('https://api.bibleit.test');
     const result = await engine.retrieve('love');
 
     expect(result.passages[0]?.chunk.text).toContain('For God so loved the world');
@@ -71,26 +81,27 @@ describe('HybridEngine', () => {
       status: 500,
     } as Response);
 
-    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
+    const engine = createManager('https://api.bibleit.test');
     const result = await engine.retrieve('love');
 
     expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
     expect(result.passages[0]?.chunk.text).toContain('For God so loved the world');
   });
 
-  it('calls localEngine directly without network call when remoteUrl is omitted', async () => {
+  it('returns localEngine directly without network call when remoteEngine is null', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    const engine = new HybridEngine(mockLocalEngine, null);
+    const engine = createManager(null);
+    expect(engine).toBe(mockLocalEngine);
     const result = await engine.retrieve('love');
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
+    expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love');
     expect(result).toEqual(mockLocalResult);
   });
 
   it('bypasses remote fetch when isDeviceOnly callback returns true', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test', () => true);
+    const engine = createManager('https://api.bibleit.test', () => true);
     const result = await engine.retrieve('love');
 
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -108,7 +119,7 @@ describe('HybridEngine', () => {
       });
     });
 
-    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
+    const engine = createManager('https://api.bibleit.test');
     const retrievePromise = engine.retrieve('love');
     await vi.advanceTimersByTimeAsync(4100);
     const result = await retrievePromise;
@@ -125,7 +136,7 @@ describe('HybridEngine', () => {
       json: async () => ({ error: 'Service Unavailable' }),
     } as Response);
 
-    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
+    const engine = createManager('https://api.bibleit.test');
     const result = await engine.retrieve('love');
 
     expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
@@ -136,7 +147,7 @@ describe('HybridEngine', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const onLineSpy = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
 
-    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
+    const engine = createManager('https://api.bibleit.test');
     const result = await engine.retrieve('love');
 
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -145,23 +156,24 @@ describe('HybridEngine', () => {
     onLineSpy.mockRestore();
   });
 
-  it('calls localEngine directly without network call when remoteUrl is empty string', async () => {
+  it('returns localEngine directly without network call when remoteUrl is whitespace', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    const engine = new HybridEngine(mockLocalEngine, '   ');
+    const engine = createManager('   ');
+    expect(engine).toBe(mockLocalEngine);
     const result = await engine.retrieve('love');
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
+    expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love');
     expect(result).toEqual(mockLocalResult);
   });
 
-  it('wires HttpAnswerProvider when remoteUrl is present', () => {
-    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
+  it('wires remote answerProvider when RemoteEngine is present', () => {
+    const engine = createManager('https://api.bibleit.test');
     expect(engine.answerProvider.available).toBe(true);
   });
 
-  it('delegates answers to localEngine when remoteUrl is not configured', () => {
-    const engine = new HybridEngine(mockLocalEngine, null);
+  it('delegates answers to localEngine when RemoteEngine is not configured', () => {
+    const engine = createManager(null);
     expect(engine.answerProvider.available).toBe(mockLocalEngine.answerProvider.available);
   });
 
@@ -174,7 +186,7 @@ describe('HybridEngine', () => {
       },
     };
     mockLocalEngine.answerProvider = localAnswerMock;
-    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
+    const engine = createManager('https://api.bibleit.test');
     const chunks: string[] = [];
     for await (const chunk of engine.answerProvider.answer('love', mockLocalResult)) {
       chunks.push(chunk);
@@ -201,7 +213,7 @@ describe('HybridEngine', () => {
       },
     } as unknown as Response);
 
-    const engine = new HybridEngine(mockLocalEngine, 'https://api.bibleit.test');
+    const engine = createManager('https://api.bibleit.test');
     const chunks: string[] = [];
     for await (const chunk of engine.answerProvider.answer('who is God?', mockLocalResult)) {
       chunks.push(chunk);

@@ -11,6 +11,5 @@ export * from './adapters/bruteforce-vector-index';
 export * from './adapters/rrf-ranker';
 export * from './adapters/array-verse-store';
 export * from './adapters/null-answer-provider';
-export * from './adapters/null-query-embedder';
 
 export * from './builder';

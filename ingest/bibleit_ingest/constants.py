@@ -7,6 +7,7 @@ REPO = Path(__file__).resolve().parent.parent.parent
 load_dotenv(REPO / "ingest/.env")
 
 WEB_PATH = REPO / "ingest/data/translations/web/en/web.json"
+LSG_PATH = REPO / "ingest/data/translations/lsg/fr/lsg.json"
 BSB_DIR = REPO / "ingest/data/translations/bsb/en"
 BSB_PERICOPES_PATH = REPO / "ingest/data/derived/bsb_pericopes.json"
 
@@ -71,4 +72,24 @@ BOOK_NAMES = {
     "PHM": "Philemon", "HEB": "Hebrews", "JAS": "James", "1PE": "1 Peter",
     "2PE": "2 Peter", "1JN": "1 John", "2JN": "2 John", "3JN": "3 John",
     "JUD": "Jude", "REV": "Revelation",
+}
+
+FRENCH_BOOK_NAMES = {
+    "GEN": "Genèse", "EXO": "Exode", "LEV": "Lévitique", "NUM": "Nombres",
+    "DEU": "Deutéronome", "JOS": "Josué", "JDG": "Juges", "RUT": "Ruth",
+    "1SA": "1 Samuel", "2SA": "2 Samuel", "1KI": "1 Rois", "2KI": "2 Rois",
+    "1CH": "1 Chroniques", "2CH": "2 Chroniques", "EZR": "Esdras", "NEH": "Néhémie",
+    "EST": "Esther", "JOB": "Job", "PSA": "Psaumes", "PRO": "Proverbes",
+    "ECC": "Ecclésiaste", "SNG": "Cantique des Cantiques", "ISA": "Ésaïe", "JER": "Jérémie",
+    "LAM": "Lamentations", "EZK": "Ézéchiel", "DAN": "Daniel", "HOS": "Osée",
+    "JOL": "Joël", "AMO": "Amos", "OBA": "Abdias", "JON": "Jonas",
+    "MIC": "Michée", "NAM": "Nahum", "HAB": "Habacuc", "ZEP": "Sophonie",
+    "HAG": "Aggée", "ZEC": "Zacharie", "MAL": "Malachie", "MAT": "Matthieu",
+    "MRK": "Marc", "LUK": "Luc", "JHN": "Jean", "ACT": "Actes",
+    "ROM": "Romains", "1CO": "1 Corinthiens", "2CO": "2 Corinthiens", "GAL": "Galates",
+    "EPH": "Éphésiens", "PHP": "Philippiens", "COL": "Colossiens", "1TH": "1 Thessaloniciens",
+    "2TH": "2 Thessaloniciens", "1TI": "1 Timothée", "2TI": "2 Timothée", "TIT": "Tite",
+    "PHM": "Philémon", "HEB": "Hébreux", "JAS": "Jacques", "1PE": "1 Pierre",
+    "2PE": "2 Pierre", "1JN": "1 Jean", "2JN": "2 Jean", "3JN": "3 Jean",
+    "JUD": "Jude", "REV": "Apocalypse",
 }

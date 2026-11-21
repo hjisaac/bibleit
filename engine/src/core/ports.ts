@@ -20,7 +20,7 @@ export { SubsystemStateEnum };
 export interface SearchEngine {
   /** Resolves when the engine is usable (artifacts loaded / backend reachable). */
   ready: Promise<void>;
-  retrieve(query: string, k?: number): Promise<RetrievalResult>;
+  retrieve(query: string, k?: number, signal?: AbortSignal): Promise<RetrievalResult>;
   answerProvider: AnswerProvider;
   sync?(): Promise<void>;
 }

@@ -35,7 +35,8 @@ flowchart TD
   end
 
   subgraph Client["Client Application (Browser PWA, app/)"]
-    Hybrid["HybridEngine"] -->|Online| API
+    Hybrid["createHybridEngine"] -->|Online| Remote["RemoteEngine"]
+    Remote --> API
     Hybrid -->|Offline / Fallback| ClientEngine["LocalEngine"]
     ClientEngine --> OpfsStore["OpfsArtifactStore"]
     ClientEngine --> WorkerEmbed["WorkerQueryEmbedder (WASM)"]
@@ -67,7 +68,7 @@ The UI and API communicate through a single entry port: `SearchEngine`.
 
 | Port | Browser Adapter (`app/`) | Server Adapter (`api/`) | Role |
 | :--- | :--- | :--- | :--- |
-| `SearchEngine` | `HybridEngine` (wraps `LocalEngine`) | `LocalEngine` | Top-level retrieval orchestrator. |
+| `SearchEngine` | `createHybridEngine` (`RemoteEngine` + `LocalEngine`) | `LocalEngine` | Top-level retrieval orchestrator. |
 | `ArtifactStore` | `OpfsArtifactStore` | `FsArtifactStore` / `HttpArtifactStore` | Loads manifest, text, chunks, and embeddings. |
 | `QueryEmbedder` | `WorkerQueryEmbedder` (WASM via Worker) | `NodeQueryEmbedder` (Native ONNX) | Encodes query into dense vector embedding. |
 | `RefParser` | `RegexRefParser` | `RegexRefParser` | Extracts exact references (e.g. *John 3:16*). |

@@ -91,4 +91,27 @@ test.describe('Search Results - Card Expansion & Inside-Scroll', () => {
     await expect(card1.getByText('Love Fulfills the Law')).toBeVisible();
     await expect(card1.getByText('8–14', { exact: true })).toBeVisible();
   });
+
+  test('shows guidance panel only while search input has focus and hides it on blur', async ({ page }) => {
+    const input = page.getByRole('textbox');
+
+    // Existing search results: panel starts hidden while input is unfocused
+    await expect(page.getByText('Popular Topics')).toBeHidden();
+
+    // Focusing input opens the panel
+    await input.click();
+    await expect(page.getByText('Popular Topics')).toBeVisible();
+
+    // Clicking a suggestion chip populates input without premature blur closing the panel
+    const chip = page.getByRole('button', { name: 'Strength and courage' });
+    await chip.click();
+    await expect(input).toHaveValue('Strength and courage');
+    await expect(input).toBeFocused();
+    await expect(page.getByText('Popular Topics')).toBeVisible();
+
+    // Clicking outside blurs the input and hides the panel immediately
+    await page.locator('header').click();
+    await expect(input).not.toBeFocused();
+    await expect(page.getByText('Popular Topics')).toBeHidden();
+  });
 });

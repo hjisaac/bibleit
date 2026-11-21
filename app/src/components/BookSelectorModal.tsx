@@ -1,7 +1,19 @@
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { BIBLE_BOOKS, BIBLE_BOOKS_BY_ID, type BibleBook } from '../core/bible-books';
+import { useStore } from '@nanostores/preact';
+import { BIBLE_BOOKS, BIBLE_BOOKS_BY_ID, type BibleBook, getLocalizedBookName } from '@bibleit/engine';
 import { getVerseCount } from '../core/verse-counts';
+import { $locale, i18n } from '../stores/i18n';
+import { params } from '@nanostores/i18n';
+import en from '../locales/en.json';
+
+export const messages = i18n('modal/bookSelector', {
+  ...en['modal/bookSelector'],
+  stepChapter: params<{ ch: string | number }>(en['modal/bookSelector'].stepChapter),
+  selectChapterSubtitle: params<{ max: number }>(en['modal/bookSelector'].selectChapterSubtitle),
+  chapterHeader: params<{ book: string; ch: number }>(en['modal/bookSelector'].chapterHeader),
+  selectVerseSubtitle: params<{ max: number }>(en['modal/bookSelector'].selectVerseSubtitle),
+});
 
 interface BookSelectorModalProps {
   isOpen: boolean;
@@ -12,7 +24,12 @@ interface BookSelectorModalProps {
 }
 
 type SelectorStep = 'book' | 'chapter' | 'verse';
-type TestamentFilter = 'ALL' | 'OT' | 'NT';
+
+export enum TestamentFilter {
+  All = 'ALL',
+  Old = 'OT',
+  New = 'NT',
+}
 
 export function BookSelectorModal({
   isOpen,
@@ -21,6 +38,9 @@ export function BookSelectorModal({
   initialBookId,
   initialChapter,
 }: BookSelectorModalProps): JSX.Element | null {
+  const tt = useStore(messages);
+  const currentLocale = useStore($locale);
+
   if (!isOpen) {
     return null;
   }
@@ -28,7 +48,7 @@ export function BookSelectorModal({
   const [currentStep, setCurrentStep] = useState<SelectorStep>('book');
   const [selectedBook, setSelectedBook] = useState<BibleBook | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<number>(1);
-  const [filterTestament, setFilterTestament] = useState<TestamentFilter>('ALL');
+  const [filterTestament, setFilterTestament] = useState<TestamentFilter>(TestamentFilter.All);
   const [searchFilter, setSearchFilter] = useState('');
 
   // Sync initial location when modal opens.
@@ -44,10 +64,12 @@ export function BookSelectorModal({
 
   const filteredBooks = BIBLE_BOOKS.filter((b) => {
     const matchesTestament =
-      filterTestament === 'ALL' || b.testament === filterTestament;
+      filterTestament === TestamentFilter.All || b.testament === filterTestament;
+    const localized = getLocalizedBookName(b.id, currentLocale);
     const matchesSearch =
       searchFilter.trim().length === 0 ||
       b.name.toLowerCase().includes(searchFilter.trim().toLowerCase()) ||
+      localized.toLowerCase().includes(searchFilter.trim().toLowerCase()) ||
       b.aliases.some((a) => a.startsWith(searchFilter.trim().toLowerCase()));
     return matchesTestament && matchesSearch;
   });
@@ -125,11 +147,13 @@ export function BookSelectorModal({
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" />
               </svg>
               <span>
-                Back to {currentStep === 'verse' && selectedBook?.chapters !== 1 ? 'chapters' : 'books'}
+                {currentStep === 'verse' && selectedBook?.chapters !== 1
+                  ? tt.backToChapters
+                  : tt.backToBooks}
               </span>
             </button>
           ) : (
-            <span class="text-sm font-semibold tracking-tight">Select Passage</span>
+            <span class="text-sm font-semibold tracking-tight">{tt.selectPassage}</span>
           )}
 
           <button
@@ -163,7 +187,7 @@ export function BookSelectorModal({
               color: currentStep === 'book' ? 'var(--text-main)' : 'var(--text-muted)',
             }}
           >
-            1. {selectedBook ? selectedBook.name : 'Book'}
+            {selectedBook ? `1. ${getLocalizedBookName(selectedBook.id, currentLocale)}` : tt.stepBook}
           </button>
 
           <span class="text-xs opacity-40">›</span>
@@ -182,7 +206,7 @@ export function BookSelectorModal({
               color: currentStep === 'chapter' ? 'var(--text-main)' : 'var(--text-muted)',
             }}
           >
-            2. Chapter {selectedBook?.chapters === 1 ? '1' : selectedChapter}
+            {tt.stepChapter({ ch: selectedBook?.chapters === 1 ? '1' : String(selectedChapter) })}
           </button>
 
           <span class="text-xs opacity-40">›</span>
@@ -201,7 +225,7 @@ export function BookSelectorModal({
               color: currentStep === 'verse' ? 'var(--text-main)' : 'var(--text-muted)',
             }}
           >
-            3. Verse
+            {tt.stepVerse}
           </button>
         </div>
 
@@ -212,7 +236,7 @@ export function BookSelectorModal({
             <div class="space-y-3">
               <input
                 type="text"
-                placeholder="Filter books (e.g. John, Rom, Ps)..."
+                placeholder={tt.filterPlaceholder}
                 value={searchFilter}
                 onInput={(e) => setSearchFilter((e.target as HTMLInputElement).value)}
                 class="w-full px-3.5 py-2 rounded-xl border text-xs outline-none focus:ring-2 focus:ring-amber-500/40"
@@ -229,48 +253,48 @@ export function BookSelectorModal({
               >
                 <button
                   type="button"
-                  onClick={() => setFilterTestament('ALL')}
+                  onClick={() => setFilterTestament(TestamentFilter.All)}
                   class={`flex-1 py-1 rounded-lg font-medium transition-all ${
-                    filterTestament === 'ALL' ? 'shadow-sm font-semibold' : ''
+                    filterTestament === TestamentFilter.All ? 'shadow-sm font-semibold' : ''
                   }`}
                   style={{
                     backgroundColor:
-                      filterTestament === 'ALL' ? 'var(--bg-surface)' : 'transparent',
+                      filterTestament === TestamentFilter.All ? 'var(--bg-surface)' : 'transparent',
                     color:
-                      filterTestament === 'ALL' ? 'var(--text-main)' : 'var(--text-muted)',
+                      filterTestament === TestamentFilter.All ? 'var(--text-main)' : 'var(--text-muted)',
                   }}
                 >
-                  All (66)
+                  {tt.filterAll}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFilterTestament('OT')}
+                  onClick={() => setFilterTestament(TestamentFilter.Old)}
                   class={`flex-1 py-1 rounded-lg font-medium transition-all ${
-                    filterTestament === 'OT' ? 'shadow-sm font-semibold' : ''
+                    filterTestament === TestamentFilter.Old ? 'shadow-sm font-semibold' : ''
                   }`}
                   style={{
                     backgroundColor:
-                      filterTestament === 'OT' ? 'var(--bg-surface)' : 'transparent',
+                      filterTestament === TestamentFilter.Old ? 'var(--bg-surface)' : 'transparent',
                     color:
-                      filterTestament === 'OT' ? 'var(--text-main)' : 'var(--text-muted)',
+                      filterTestament === TestamentFilter.Old ? 'var(--text-main)' : 'var(--text-muted)',
                   }}
                 >
-                  OT (39)
+                  {tt.filterOt}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFilterTestament('NT')}
+                  onClick={() => setFilterTestament(TestamentFilter.New)}
                   class={`flex-1 py-1 rounded-lg font-medium transition-all ${
-                    filterTestament === 'NT' ? 'shadow-sm font-semibold' : ''
+                    filterTestament === TestamentFilter.New ? 'shadow-sm font-semibold' : ''
                   }`}
                   style={{
                     backgroundColor:
-                      filterTestament === 'NT' ? 'var(--bg-surface)' : 'transparent',
+                      filterTestament === TestamentFilter.New ? 'var(--bg-surface)' : 'transparent',
                     color:
-                      filterTestament === 'NT' ? 'var(--text-main)' : 'var(--text-muted)',
+                      filterTestament === TestamentFilter.New ? 'var(--text-main)' : 'var(--text-muted)',
                   }}
                 >
-                  NT (27)
+                  {tt.filterNt}
                 </button>
               </div>
 
@@ -288,9 +312,9 @@ export function BookSelectorModal({
                       borderColor: 'var(--border-subtle)',
                     }}
                   >
-                    <span class="text-xs font-semibold">{b.name}</span>
+                    <span class="text-xs font-semibold">{getLocalizedBookName(b.id, currentLocale)}</span>
                     <span class="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                      {b.chapters} {b.chapters === 1 ? 'ch' : 'chs'}
+                      {b.chapters} {b.chapters === 1 ? tt.chaptersSingular : tt.chaptersPlural}
                     </span>
                   </button>
                 ))}
@@ -302,9 +326,9 @@ export function BookSelectorModal({
           {currentStep === 'chapter' && selectedBook && (
             <div class="space-y-3">
               <div class="text-center">
-                <h3 class="font-serif text-lg font-bold">{selectedBook.name}</h3>
+                <h3 class="font-serif text-lg font-bold">{getLocalizedBookName(selectedBook.id, currentLocale)}</h3>
                 <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Select chapter (1–{selectedBook.chapters})
+                  {tt.selectChapterSubtitle({ max: selectedBook.chapters })}
                 </p>
               </div>
 
@@ -334,10 +358,10 @@ export function BookSelectorModal({
             <div class="space-y-3">
               <div class="text-center">
                 <h3 class="font-serif text-lg font-bold">
-                  {selectedBook.name} Chapter {selectedChapter}
+                  {tt.chapterHeader({ book: getLocalizedBookName(selectedBook.id, currentLocale), ch: selectedChapter })}
                 </h3>
                 <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Select verse (1–{totalVerses})
+                  {tt.selectVerseSubtitle({ max: totalVerses })}
                 </p>
               </div>
 

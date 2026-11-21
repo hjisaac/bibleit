@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ArrayVerseStore } from '../src/adapters/array-verse-store';
+import { ArrayVerseStore } from '@bibleit/engine';
 
 describe('ArrayVerseStore', () => {
   const mockData = {

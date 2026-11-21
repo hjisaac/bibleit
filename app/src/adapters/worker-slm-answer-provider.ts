@@ -1,6 +1,7 @@
 import { renderChunk } from '@bibleit/engine';
 import type { AnswerMetadata, AnswerProvider } from '../core/ports';
 import type { RetrievalResult } from '../core/types';
+import { OpfsStorage } from './opfs-storage';
 
 /**
  * WorkerSlmAnswerProvider: Runs on-device SLM inference in an isolated Web Worker.
@@ -198,6 +199,19 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
 }
 
 export async function isSlmModelCached(): Promise<boolean> {
+  try {
+    const storage = new OpfsStorage();
+    const files = await storage.list('models');
+    for (const name of files) {
+      if (name.includes('SmolLM2-360M-Instruct') && name.includes('model_q4.onnx')) {
+        const blob = await storage.read(`models/${name}`);
+        if (blob && blob.size > 300_000_000) return true;
+      }
+    }
+  } catch {
+    // Fall back to Cache API
+  }
+
   if (typeof caches === 'undefined') return false;
   try {
     const cacheNames = await caches.keys();
@@ -222,6 +236,13 @@ export async function isSlmModelCached(): Promise<boolean> {
 }
 
 export async function clearSlmModelCache(): Promise<void> {
+  try {
+    const storage = new OpfsStorage();
+    await storage.delete('models');
+  } catch {
+    // Ignore OPFS removal errors
+  }
+
   if (typeof caches === 'undefined') return;
   try {
     const cacheNames = await caches.keys();

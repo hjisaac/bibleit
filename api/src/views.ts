@@ -118,7 +118,7 @@ export function renderHomeHtml(): string {
   );
 }
 
-export function renderHealthHtml(
+export function renderStatusHtml(
   isReady: boolean,
   providers: Array<{ name: string; tier: 1 | 2; model?: string; status: string; cooldownRemainingSec?: number }> = [],
   health: EngineHealth | null = null,
@@ -196,5 +196,3 @@ export function renderHealthHtml(
     </div>`,
   );
 }
-
-export const renderStatusHtml = renderHealthHtml;

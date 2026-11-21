@@ -17,42 +17,33 @@ import {
   RrfRanker,
 } from '@bibleit/engine';
 
-import { OpfsArtifactStore } from './adapters/opfs-artifact-store';
+import { createArtifactStore } from './adapters/opfs-storage';
 import { WorkerQueryEmbedder } from './adapters/worker-query-embedder';
 import { WebSpeechNarrator } from './adapters/web-speech-narrator';
 import { WorkerSlmAnswerProvider } from './adapters/worker-slm-answer-provider';
-import { HybridEngine } from './adapters/hybrid-engine';
+import { HttpAnswerProvider } from './adapters/http-answer-provider';
+import { RemoteEngine } from './adapters/remote-engine';
+import { createHybridEngine } from './adapters/hybrid-engine';
 import { env } from './env';
+import { $locale } from './stores/i18n';
 
-export { LocalEngine };
+export { LocalEngine, createArtifactStore };
 
-export function createDefaultArtifactStore(): ArtifactStore {
-  return new OpfsArtifactStore();
+export function createEmbedder(): QueryEmbedder {
+  return new WorkerQueryEmbedder();
 }
 
-let defaultEmbedder: QueryEmbedder | null = null;
-export function createDefaultEmbedder(): QueryEmbedder {
-  if (!defaultEmbedder) {
-    defaultEmbedder = new WorkerQueryEmbedder();
-  }
-  return defaultEmbedder;
-}
-
-let defaultAnswerProvider: AnswerProvider | null = null;
-export function createDefaultAnswerProvider(
+export function createAnswerProvider(
   isInstalled?: () => boolean,
 ): AnswerProvider {
-  if (!defaultAnswerProvider) {
-    defaultAnswerProvider = new WorkerSlmAnswerProvider(isInstalled);
-  }
-  return defaultAnswerProvider;
+  return new WorkerSlmAnswerProvider(isInstalled);
 }
 
-export function createDefaultEngine(
-  artifactStore: ArtifactStore = createDefaultArtifactStore(),
-  queryEmbedder: QueryEmbedder = createDefaultEmbedder(),
+export function createEngine(
+  artifactStore: ArtifactStore = createArtifactStore(),
+  queryEmbedder: QueryEmbedder = createEmbedder(),
   isDeviceOnly?: () => boolean,
-  answerProvider: AnswerProvider = createDefaultAnswerProvider(),
+  answerProvider: AnswerProvider = createAnswerProvider(),
 ): SearchEngine {
   const localEngine = new LocalEngine({
     artifactStore,
@@ -64,9 +55,14 @@ export function createDefaultEngine(
     answerProvider,
   });
 
-  return new HybridEngine(localEngine, env.backendApiUrl, isDeviceOnly);
+  const remoteUrl = env.backendApiUrl?.trim().replace(/\/+$/, '');
+  const remoteEngine = remoteUrl
+    ? new RemoteEngine(remoteUrl, new HttpAnswerProvider(remoteUrl, isDeviceOnly))
+    : null;
+
+  return createHybridEngine(remoteEngine, localEngine, isDeviceOnly);
 }
 
-export function createDefaultNarrator(): AudioNarrator {
-  return new WebSpeechNarrator();
+export function createNarrator(): AudioNarrator {
+  return new WebSpeechNarrator(undefined, undefined, () => $locale.get());
 }

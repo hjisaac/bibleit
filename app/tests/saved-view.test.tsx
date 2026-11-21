@@ -62,4 +62,17 @@ describe('SavedView Component', () => {
       screen.getByText(/Tap the bookmark icon in search results or long-press a verse in the reader/i),
     ).toBeTruthy();
   });
+
+  it('renders localized citation when switching language to French', async () => {
+    const { $isMultilingualEnabled, $localeSetting } = await import('../src/stores/i18n');
+    $isMultilingualEnabled.set(true);
+    $localeSetting.set('fr');
+
+    render(<SavedView savedVerses={mockVerses} onOpenVerse={vi.fn()} />);
+
+    // Citation dynamically resolves to Jean 3:16 instead of static John 3:16
+    expect(screen.getByText('Jean 3:16')).toBeTruthy();
+
+    $localeSetting.set('en');
+  });
 });

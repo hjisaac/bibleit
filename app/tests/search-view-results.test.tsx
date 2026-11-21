@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/preact';
 import { SearchView } from '../src/components/SearchView';
-import { HybridEngine } from '../src/adapters/hybrid-engine';
+import { createHybridEngine } from '../src/adapters/hybrid-engine';
+import { RemoteEngine } from '../src/adapters/remote-engine';
 import type { SearchEngine, AudioNarrator } from '../src/core/ports';
 import type { ComponentProps } from 'preact';
 import { getChunkKey, PackageStatusEnum, type ScoredPassage } from '../src/core/types';
-import { FALLBACK_TOAST_DURATION_MS } from '../src/constants';
 
 type SearchViewProps = ComponentProps<typeof SearchView>;
 
@@ -370,9 +370,9 @@ describe('SearchView Result Cards & User Actions', () => {
     );
   });
 
-  it('retrieves and displays results seamlessly when backed by HybridEngine with failing remote backend', async () => {
+  it('retrieves and displays results seamlessly when backed by createHybridEngine with failing remote backend', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Backend Connection Refused'));
-    const hybridEngine = new HybridEngine(mockEngine, 'https://api.bibleit.test');
+    const hybridEngine = createHybridEngine(new RemoteEngine('https://api.bibleit.test'), mockEngine);
 
     renderSearchView({ engine: hybridEngine });
 
@@ -416,7 +416,7 @@ describe('SearchView Result Cards & User Actions', () => {
       retrieve: vi.fn().mockResolvedValue({ passages: [], parsedRefs: [], origin: 'local' }),
       answerProvider: { available: false, answer: async function* () {} },
     };
-    const hybridEngine = new HybridEngine(emptyLocalEngine, 'https://api.bibleit.test');
+    const hybridEngine = createHybridEngine(new RemoteEngine('https://api.bibleit.test'), emptyLocalEngine);
 
     renderSearchView({
       engine: hybridEngine,
@@ -574,7 +574,7 @@ describe('SearchView Result Cards & User Actions', () => {
     expect(badge.style.color).toBe('var(--badge-ai-text)');
   });
 
-  it('triggers onToast with extended duration when search result falls back due to server timeout', async () => {
+  it('triggers onToast when search result falls back due to server timeout', async () => {
     retrieveSpy.mockResolvedValueOnce({
       query: 'grace',
       passages: samplePassages,
@@ -594,7 +594,6 @@ describe('SearchView Result Cards & User Actions', () => {
     await waitFor(() => {
       expect(onToastSpy).toHaveBeenCalledWith(
         'Search server timed out: showing on-device results',
-        FALLBACK_TOAST_DURATION_MS,
       );
     });
   });

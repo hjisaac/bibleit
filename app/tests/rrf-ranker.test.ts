@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { RrfRanker } from '../src/adapters/rrf-ranker';
-import { getChunkKey, type Chunk, type ScoredPassage } from '../src/core/types';
+import { RrfRanker, getChunkKey, type Chunk, type ScoredPassage } from '@bibleit/engine';
 
 describe('RrfRanker', () => {
   const ranker = new RrfRanker({ kConst: 60 });

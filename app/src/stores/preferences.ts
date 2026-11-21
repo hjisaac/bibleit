@@ -1,9 +1,22 @@
 import { persistentAtom } from '@nanostores/persistent';
-import { ThemeEnum, ViewTabEnum, SearchModeEnum } from '../core/types';
+import {
+  ThemeEnum,
+  ViewTabEnum,
+  SearchModeEnum,
+  DEFAULT_TRANSLATION,
+  type TranslationId,
+} from '../core/types';
+
+export type { TranslationId };
 
 export const $theme = persistentAtom<ThemeEnum>('bibleit_theme', ThemeEnum.SEPIA);
 
 export const $activeTab = persistentAtom<ViewTabEnum>('bibleit_active_tab', ViewTabEnum.SEARCH);
+
+export const $activeTranslation = persistentAtom<TranslationId>(
+  'bibleit_active_translation',
+  DEFAULT_TRANSLATION,
+);
 
 export const $isAiEnabled = persistentAtom<boolean>('bibleit_ai_enabled', true, {
   encode: String,

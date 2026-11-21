@@ -30,15 +30,21 @@ import type {
 export interface SearchEngine {
   /** Resolves when the engine is usable (artifacts loaded / backend reachable). */
   ready: Promise<void>;
-  retrieve(query: string, k?: number): Promise<RetrievalResult>;
+  retrieve(query: string, k?: number, signal?: AbortSignal): Promise<RetrievalResult>;
   answerProvider: AnswerProvider;
   sync?(): Promise<void>;
 }
 
+export interface FileStorage {
+  isAvailable(): Promise<boolean>;
+  read(path: string): Promise<Blob | null>;
+  write(path: string, data: Uint8Array | Blob | string | ReadableStream<Uint8Array>): Promise<void>;
+  delete(path: string): Promise<boolean>;
+  list(dirPath?: string): Promise<string[]>;
+}
+
 /**
- * Fetches, caches, and serves the static artifacts (manifest, verses, chunks,
- * embeddings). Must survive cache eviction (iOS Safari) by re-downloading.
- * v1: OPFS + Cache API. Swap: IndexedDB fallback.
+ * Fetches, caches, and serves static artifacts (manifest, verses, chunks, embeddings).
  */
 export interface ArtifactStore {
   /** Resolve the manifest (network-or-cache); single source of truth for versions. */

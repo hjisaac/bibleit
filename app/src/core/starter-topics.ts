@@ -1,18 +1,21 @@
+import en from '../locales/en.json';
+import fr from '../locales/fr.json';
+import { DEFAULT_LOCALE, type Locale } from './types';
 
-export const POPULAR_TOPICS: string[] = [
-  'Peace in anxiety',
-  'Strength and courage',
-  'Wisdom and guidance',
-  'Forgiveness and grace',
-  'Comfort in grief',
-  'Faith and trust',
-  'Love your neighbor',
-  'Hope for the future',
-];
+interface LocaleTopics {
+  readonly popularTopics: readonly string[];
+  readonly searchSuggestions: readonly string[];
+}
 
-export const SEARCH_SUGGESTIONS: string[] = [
-  'Philippians 4:7',
-  'peace that surpasses',
-  'What did Jesus teach about worry?',
-  'Romans 8:28',
-];
+const topicsByLocale: Readonly<Record<Locale, LocaleTopics>> = {
+  en: en.starterTopics,
+  fr: fr.starterTopics,
+};
+
+export function getPopularTopics(locale: string = DEFAULT_LOCALE): readonly string[] {
+  return (topicsByLocale[locale as Locale] ?? topicsByLocale[DEFAULT_LOCALE]).popularTopics;
+}
+
+export function getSearchSuggestions(locale: string = DEFAULT_LOCALE): readonly string[] {
+  return (topicsByLocale[locale as Locale] ?? topicsByLocale[DEFAULT_LOCALE]).searchSuggestions;
+}

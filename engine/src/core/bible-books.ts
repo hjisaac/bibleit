@@ -1,9 +1,16 @@
+import { DEFAULT_LOCALE, LOCALES, type Locale } from './types';
+
 export interface BibleBook {
   readonly id: string;
   readonly name: string;
   readonly testament: 'OT' | 'NT';
   readonly chapters: number;
   readonly aliases: readonly string[];
+}
+
+export interface LocalizedBookTable {
+  readonly names: Readonly<Record<string, string>>;
+  readonly aliases: Readonly<Record<string, readonly string[]>>;
 }
 
 export const BIBLE_BOOKS: readonly BibleBook[] = [
@@ -78,32 +85,142 @@ export const BIBLE_BOOKS: readonly BibleBook[] = [
   { id: 'REV', name: 'Revelation', testament: 'NT', chapters: 22, aliases: ['rev', 'revelation', 'apocalypse'] },
 ];
 
+export const LOCALIZED_BOOK_TABLES: Readonly<Partial<Record<Locale, LocalizedBookTable>>> = Object.freeze({
+  fr: Object.freeze({
+    names: Object.freeze({
+      GEN: 'Genèse', EXO: 'Exode', LEV: 'Lévitique', NUM: 'Nombres',
+      DEU: 'Deutéronome', JOS: 'Josué', JDG: 'Juges', RUT: 'Ruth',
+      '1SA': '1 Samuel', '2SA': '2 Samuel', '1KI': '1 Rois', '2KI': '2 Rois',
+      '1CH': '1 Chroniques', '2CH': '2 Chroniques', EZR: 'Esdras', NEH: 'Néhémie',
+      EST: 'Esther', JOB: 'Job', PSA: 'Psaumes', PRO: 'Proverbes',
+      ECC: 'Ecclésiaste', SNG: 'Cantique des Cantiques', ISA: 'Ésaïe', JER: 'Jérémie',
+      LAM: 'Lamentations', EZK: 'Ézéchiel', DAN: 'Daniel', HOS: 'Osée',
+      JOL: 'Joël', AMO: 'Amos', OBA: 'Abdias', JON: 'Jonas',
+      MIC: 'Michée', NAM: 'Nahum', HAB: 'Habacuc', ZEP: 'Sophonie',
+      HAG: 'Aggée', ZEC: 'Zacharie', MAL: 'Malachie', MAT: 'Matthieu',
+      MRK: 'Marc', LUK: 'Luc', JHN: 'Jean', ACT: 'Actes',
+      ROM: 'Romains', '1CO': '1 Corinthiens', '2CO': '2 Corinthiens', GAL: 'Galates',
+      EPH: 'Éphésiens', PHP: 'Philippiens', COL: 'Colossiens', '1TH': '1 Thessaloniciens',
+      '2TH': '2 Thessaloniciens', '1TI': '1 Timothée', '2TI': '2 Timothée', TIT: 'Tite',
+      PHM: 'Philémon', HEB: 'Hébreux', JAS: 'Jacques', '1PE': '1 Pierre',
+      '2PE': '2 Pierre', '1JN': '1 Jean', '2JN': '2 Jean', '3JN': '3 Jean',
+      JUD: 'Jude', REV: 'Apocalypse',
+    }),
+    aliases: Object.freeze({
+  GEN: ['gn', 'gen', 'genese'],
+  EXO: ['ex', 'exo', 'exode'],
+  LEV: ['lv', 'le', 'lev', 'levitique'],
+  NUM: ['nb', 'nom', 'nomb', 'nombres'],
+  DEU: ['dt', 'deut', 'deuteronome'],
+  JOS: ['jos', 'josue'],
+  JDG: ['jg', 'jug', 'juge', 'juges'],
+  RUT: ['rt', 'ru', 'rut', 'ruth'],
+  '1SA': ['1s', '1sam', '1samuel', '1 samuel', '1 sam'],
+  '2SA': ['2s', '2sam', '2samuel', '2 samuel', '2 sam'],
+  '1KI': ['1r', '1roi', '1rois', '1 roi', '1 rois'],
+  '2KI': ['2r', '2roi', '2rois', '2 roi', '2 rois'],
+  '1CH': ['1ch', '1chr', '1chron', '1chroniques', '1 chroniques', '1 chron'],
+  '2CH': ['2ch', '2chr', '2chron', '2chroniques', '2 chroniques', '2 chron'],
+  EZR: ['esd', 'esdr', 'esdras'],
+  NEH: ['ne', 'neh', 'nehemie'],
+  EST: ['est', 'esth', 'esther'],
+  JOB: ['job'],
+  PSA: ['ps', 'psa', 'psm', 'psaume', 'psaumes'],
+  PRO: ['pr', 'pro', 'prv', 'prov', 'proverbe', 'proverbes'],
+  ECC: ['ec', 'ecc', 'eccl', 'ecclesiaste'],
+  SNG: ['ct', 'cant', 'cantique', 'cantiques', 'cantique des cantiques'],
+  ISA: ['es', 'esa', 'esai', 'esaie'],
+  JER: ['jr', 'jer', 'jeremie'],
+  LAM: ['lm', 'lam', 'lamentation', 'lamentations'],
+  EZK: ['ez', 'eze', 'ezek', 'ezechiel'],
+  DAN: ['da', 'dan', 'daniel'],
+  HOS: ['os', 'ose', 'osee'],
+  JOL: ['jl', 'joe', 'joel'],
+  AMO: ['am', 'amo', 'amos'],
+  OBA: ['ab', 'abd', 'abdias'],
+  JON: ['jon', 'jonas'],
+  MIC: ['mi', 'mic', 'michee'],
+  NAM: ['na', 'nah', 'nahum'],
+  HAB: ['ha', 'hab', 'habacuc'],
+  ZEP: ['so', 'sop', 'sophonie'],
+  HAG: ['ag', 'agg', 'aggee'],
+  ZEC: ['za', 'zac', 'zacharie'],
+  MAL: ['ml', 'mal', 'malachie'],
+  MAT: ['mt', 'mat', 'matt', 'matthieu'],
+  MRK: ['mc', 'mrk', 'marc', 'mar'],
+  LUK: ['lc', 'luc', 'lu'],
+  JHN: ['jn', 'jean'],
+  ACT: ['ac', 'act', 'actes'],
+  ROM: ['rm', 'ro', 'rom', 'romain', 'romains'],
+  '1CO': ['1co', '1cor', '1corinthiens', '1 corinthiens', '1 cor'],
+  '2CO': ['2co', '2cor', '2corinthiens', '2 corinthiens', '2 cor'],
+  GAL: ['ga', 'gal', 'galate', 'galates'],
+  EPH: ['ep', 'eph', 'ephesien', 'ephesiens'],
+  PHP: ['ph', 'php', 'phil', 'philippien', 'philippiens'],
+  COL: ['col', 'colossien', 'colossiens'],
+  '1TH': ['1th', '1thess', '1thessaloniciens', '1 thessaloniciens', '1 thess'],
+  '2TH': ['2th', '2thess', '2thessaloniciens', '2 thessaloniciens', '2 thess'],
+  '1TI': ['1ti', '1tim', '1timothee', '1 timothee', '1 tim'],
+  '2TI': ['2ti', '2tim', '2timothee', '2 timothee', '2 tim'],
+  TIT: ['tt', 'tit', 'tite'],
+  PHM: ['phm', 'philemon'],
+  HEB: ['he', 'heb', 'hebreu', 'hebreux'],
+  JAS: ['jc', 'jac', 'jacq', 'jacques'],
+  '1PE': ['1p', '1pi', '1pierre', '1 pierre', '1 pet'],
+  '2PE': ['2p', '2pi', '2pierre', '2 pierre', '2 pet'],
+  '1JN': ['1jn', '1jean', '1 jean'],
+  '2JN': ['2jn', '2jean', '2 jean'],
+  '3JN': ['3jn', '3jean', '3 jean'],
+  JUD: ['jd', 'jud', 'jude'],
+  REV: ['ap', 'apo', 'apoc', 'apocalypse'],
+    }),
+  }),
+});
+
+export const stripAccents = (str: string): string =>
+  str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
 /** Fast O(1) dictionary indexed by canonical book ID (e.g. 'PHP', 'GEN'). */
 export const BIBLE_BOOKS_BY_ID: Readonly<Record<string, BibleBook>> = Object.freeze(
   Object.fromEntries(BIBLE_BOOKS.map((b) => [b.id, b])),
 );
 
-/** Fast O(1) hash map indexing all valid prefixes (len >= 2) and exact aliases. */
-const BOOK_BY_PREFIX = new Map<string, BibleBook>();
-for (const b of BIBLE_BOOKS) {
-  for (const term of [b.name.toLowerCase(), ...b.aliases.map((a) => a.toLowerCase())]) {
-    for (let len = 2; len <= term.length; len++) {
-      const prefix = term.slice(0, len);
-      if (!BOOK_BY_PREFIX.has(prefix)) {
-        BOOK_BY_PREFIX.set(prefix, b);
-      }
-    }
-  }
-}
-for (const b of BIBLE_BOOKS) {
-  BOOK_BY_PREFIX.set(b.id.toLowerCase(), b);
-  BOOK_BY_PREFIX.set(b.name.toLowerCase(), b);
-  for (const alias of b.aliases) {
-    BOOK_BY_PREFIX.set(alias.toLowerCase(), b);
-  }
+/** Returns localized book title for a book id. */
+export function getLocalizedBookName(bookId: string, locale: string = DEFAULT_LOCALE): string {
+  const upper = bookId.toUpperCase();
+  const table = LOCALIZED_BOOK_TABLES[locale as Locale];
+  return table?.names[upper] ?? BIBLE_BOOKS_BY_ID[upper]?.name ?? bookId;
 }
 
-/** Matches query string prefix to a Bible book in O(1). */
-export function findBookByPrefix(query: string): BibleBook | undefined {
-  return BOOK_BY_PREFIX.get(query.trim().toLowerCase());
+function getBookTerms(book: BibleBook, locale: Locale): string[] {
+  const table = LOCALIZED_BOOK_TABLES[locale];
+  const raw = table
+    ? [...(table.names[book.id] ? [table.names[book.id]!] : []), ...(table.aliases[book.id] ?? [])]
+    : [book.name, ...book.aliases];
+  return raw.map((t) => stripAccents(t.toLowerCase()));
+}
+
+/** Matches a book name, alias, or prefix prioritizing the active locale. */
+export function findBookByPrefix(query: string, locale: string = DEFAULT_LOCALE): BibleBook | undefined {
+  const q = stripAccents(query.trim().toLowerCase());
+  if (q.length < 2) return undefined;
+
+  const byId = BIBLE_BOOKS_BY_ID[q.toUpperCase()];
+  if (byId) return byId;
+
+  const active = (LOCALES as readonly string[]).includes(locale) ? (locale as Locale) : DEFAULT_LOCALE;
+  const orderedLocales: Locale[] = [active, ...LOCALES.filter((l) => l !== active)];
+
+  // Check exact aliases before prefixes so short localized aliases (e.g. "mc", "ap") aren't shadowed.
+  for (const loc of orderedLocales) {
+    for (const book of BIBLE_BOOKS) {
+      if (getBookTerms(book, loc).includes(q)) return book;
+    }
+  }
+  for (const loc of orderedLocales) {
+    for (const book of BIBLE_BOOKS) {
+      if (getBookTerms(book, loc).some((term) => term.startsWith(q))) return book;
+    }
+  }
+  return undefined;
 }

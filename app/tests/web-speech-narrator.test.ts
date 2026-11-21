@@ -2,11 +2,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { WebSpeechNarrator } from '../src/adapters/web-speech-narrator';
 import type { NarrationSegment } from '../src/core/types';
 
-function createMockSpeech() {
+function createMockSpeech(voices: SpeechSynthesisVoice[] = []) {
   const spoken: Array<{
     text: string;
     rate: number;
     lang: string;
+    voice?: SpeechSynthesisVoice | null;
     onboundary: ((e: Partial<SpeechSynthesisEvent>) => void) | null;
     onend: (() => void) | null;
     onerror: ((e: Partial<SpeechSynthesisErrorEvent>) => void) | null;
@@ -19,7 +20,7 @@ function createMockSpeech() {
     cancel: vi.fn(),
     pause: vi.fn(),
     resume: vi.fn(),
-    getVoices: vi.fn(() => []),
+    getVoices: vi.fn(() => voices),
   } as unknown as SpeechSynthesis;
 
   const factory = (text: string) =>
@@ -27,6 +28,7 @@ function createMockSpeech() {
       text,
       rate: 1,
       lang: 'en-US',
+      voice: null,
       onboundary: null,
       onend: null,
       onerror: null,
@@ -175,6 +177,52 @@ describe('WebSpeechNarrator', () => {
     } finally {
       globalThis.window = origWindow;
     }
+  });
+
+  it('configures utterance language and picks French voice when locale is French', () => {
+    const mockVoices = [
+      { name: 'Google US English', lang: 'en-US', localService: true } as SpeechSynthesisVoice,
+      { name: 'Thomas Remote', lang: 'fr-FR', localService: false } as SpeechSynthesisVoice,
+      { name: 'Amelie Local', lang: 'fr-FR', localService: true } as SpeechSynthesisVoice,
+    ];
+    const { synth, factory, spoken } = createMockSpeech(mockVoices);
+    const narrator = new WebSpeechNarrator(synth, factory, () => 'fr');
+
+    narrator.play(segments, 0);
+
+    expect(spoken.length).toBe(1);
+    expect(spoken[0]?.lang).toBe('fr-FR');
+    expect(spoken[0]?.voice?.name).toBe('Amelie Local');
+  });
+
+  it('falls back to remote French voice when no local French voice is installed', () => {
+    const mockVoices = [
+      { name: 'Google US English', lang: 'en-US', localService: true } as SpeechSynthesisVoice,
+      { name: 'Thomas Remote', lang: 'fr-FR', localService: false } as SpeechSynthesisVoice,
+    ];
+    const { synth, factory, spoken } = createMockSpeech(mockVoices);
+    const narrator = new WebSpeechNarrator(synth, factory, () => 'fr');
+
+    narrator.play(segments, 0);
+
+    expect(spoken.length).toBe(1);
+    expect(spoken[0]?.lang).toBe('fr-FR');
+    expect(spoken[0]?.voice?.name).toBe('Thomas Remote');
+  });
+
+  it('falls back to default voice when no language-specific voice is found on the device', () => {
+    const mockVoices = [
+      { name: 'System Default Voice', lang: 'en-US', default: true } as SpeechSynthesisVoice,
+      { name: 'Random Voice', lang: 'it-IT', default: false } as SpeechSynthesisVoice,
+    ];
+    const { synth, factory, spoken } = createMockSpeech(mockVoices);
+    const narrator = new WebSpeechNarrator(synth, factory, () => 'es');
+
+    narrator.play(segments, 0);
+
+    expect(spoken.length).toBe(1);
+    expect(spoken[0]?.lang).toBe('es');
+    expect(spoken[0]?.voice?.name).toBe('System Default Voice');
   });
 });
 

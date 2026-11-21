@@ -1,11 +1,11 @@
 import type { JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
-  createDefaultArtifactStore,
-  createDefaultEmbedder,
-  createDefaultEngine,
-  createDefaultNarrator,
-  createDefaultAnswerProvider,
+  createArtifactStore,
+  createEmbedder,
+  createEngine,
+  createNarrator,
+  createAnswerProvider,
 } from './composition';
 import { Header } from './components/Header';
 import { Navbar } from './components/Navbar';
@@ -17,7 +17,10 @@ import { BookSelectorModal } from './components/BookSelectorModal';
 import { HelpModal } from './components/HelpModal';
 import { FeedbackModal } from './components/FeedbackModal';
 import { AudioPlayerBar } from './components/AudioPlayerBar';
-import { DEFAULT_TOAST_DURATION_MS } from './constants';
+import { TOAST_DURATION_MS } from './constants';
+import { getLocalizedBookName } from '@bibleit/engine';
+import { $locale, i18n } from './stores/i18n';
+import { params } from '@nanostores/i18n';
 import { useHeadroom } from './core/headroom';
 import {
   PackageStatusEnum,
@@ -45,16 +48,29 @@ import {
 } from './stores/preferences';
 import { $readerLocation, $savedVerses, type ReaderLocation } from './stores/reader';
 
+import en from './locales/en.json';
+
+export const messages = i18n('app', {
+  ...en.app,
+  bookmarkRemoved: params<{ citation: string }>(en.app.bookmarkRemoved),
+  bookmarkSaved: params<{ citation: string }>(en.app.bookmarkSaved),
+});
+
 export function App(): JSX.Element {
-  const store = useMemo(() => createDefaultArtifactStore(), []);
-  const embedder = useMemo(() => createDefaultEmbedder(), []);
+  const tt = useStore(messages);
+  const ttRef = useRef(tt);
+  ttRef.current = tt;
+
+  // Composition root wires production adapters for the app lifecycle.
+  const store = useMemo(() => createArtifactStore(), []);
+  const embedder = useMemo(() => createEmbedder(), []);
   const slmProvider = useMemo(
-    () => createDefaultAnswerProvider(() => $slmPackageStatus.get() === PackageStatusEnum.DOWNLOADED),
+    () => createAnswerProvider(() => $slmPackageStatus.get() === PackageStatusEnum.DOWNLOADED),
     [],
   );
   const engine = useMemo(
     () =>
-      createDefaultEngine(
+      createEngine(
         store,
         embedder,
         () => $searchMode.get() === SearchModeEnum.DEVICE,
@@ -62,7 +78,7 @@ export function App(): JSX.Element {
       ),
     [store, embedder, slmProvider],
   );
-  const narrator = useMemo(() => createDefaultNarrator(), []);
+  const narrator = useMemo(() => createNarrator(), []);
   const [narrationState, setNarrationState] = useState<NarrationState>(() => narrator.getState());
   const [manifest, setManifest] = useState<Manifest | null>(null);
 
@@ -149,23 +165,19 @@ export function App(): JSX.Element {
   const isAiEnabled = useStore($isAiEnabled);
   const handleToggleAi = (enabled: boolean) => {
     $isAiEnabled.set(enabled);
-    showToast(enabled ? 'AI Scripture Overview enabled' : 'AI Scripture Overview deactivated');
+    showToast(enabled ? tt.aiOverviewEnabled : tt.aiOverviewDisabled);
   };
 
   const showHeadings = useStore($showHeadings);
   const handleToggleHeadings = (enabled: boolean) => {
     $showHeadings.set(enabled);
-    showToast(enabled ? 'Pericope headings enabled' : 'Pericope headings hidden');
+    showToast(enabled ? tt.headingsEnabled : tt.headingsHidden);
   };
 
   const searchMode = useStore($searchMode);
   const handleToggleSearchMode = (mode: SearchModeEnum) => {
     $searchMode.set(mode);
-    showToast(
-      mode === SearchModeEnum.DEVICE
-        ? 'Device-only search enabled: Searching locally'
-        : 'Auto mode: Cloud search with offline fallback',
-    );
+    showToast(mode === SearchModeEnum.DEVICE ? tt.searchModeDevice : tt.searchModeAuto);
   };
 
   // Reconcile in-memory state if page was reloaded mid-download
@@ -255,19 +267,19 @@ export function App(): JSX.Element {
       setTextProgress(100);
       await engine.sync?.();
       $textPackageStatus.set(PackageStatusEnum.DOWNLOADED);
-      showToast('Scripture text verified & installed in OPFS (1.2 MB)');
+      showToast(tt.textInstalled);
     } catch (err) {
       if (controller.signal.aborted) {
         $textPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
         setTextProgress(0);
-        showToast('Scripture download cancelled.');
+        showToast(tt.textCancelled);
         return;
       }
       console.error('Download failed:', err);
       showToast(
         err instanceof Error && (err.name === 'CorruptArtifactError' || err.name === 'StorageUnavailableError')
           ? err.message
-          : 'Download interrupted. Check network and try again.',
+          : tt.downloadInterrupted,
       );
       $textPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     } finally {
@@ -293,19 +305,19 @@ export function App(): JSX.Element {
       setAiProgress(100);
       await engine.sync?.();
       $aiPackageStatus.set(PackageStatusEnum.DOWNLOADED);
-      showToast('Verse vectors verified & installed in OPFS (2.1 MB)');
+      showToast(tt.vectorsInstalled);
     } catch (err) {
       if (controller.signal.aborted) {
         $aiPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
         setAiProgress(0);
-        showToast('AI vectors download cancelled.');
+        showToast(tt.vectorsCancelled);
         return;
       }
       console.error('Download failed:', err);
       showToast(
         err instanceof Error && (err.name === 'CorruptArtifactError' || err.name === 'StorageUnavailableError')
           ? err.message
-          : 'AI download interrupted. Check network and try again.',
+          : tt.vectorsInterrupted,
       );
       $aiPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     } finally {
@@ -330,16 +342,16 @@ export function App(): JSX.Element {
       setModelProgress(100);
       await engine.sync?.();
       $modelPackageStatus.set(PackageStatusEnum.DOWNLOADED);
-      showToast('Neural query model installed in browser cache (137 MB)');
+      showToast(tt.modelInstalled);
     } catch (err) {
       if (isModelAbortedRef.current || (err instanceof DOMException && err.name === 'AbortError')) {
         $modelPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
         setModelProgress(0);
-        showToast('Model download cancelled.');
+        showToast(tt.modelCancelled);
         return;
       }
       console.error('Model download failed:', err);
-      showToast('Model download interrupted. Check network and try again.');
+      showToast(tt.modelInterrupted);
       $modelPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     }
   };
@@ -359,16 +371,16 @@ export function App(): JSX.Element {
       await slmProvider.load?.((fraction) => setSlmProgress(Math.round(fraction * 100)));
       setSlmProgress(100);
       $slmPackageStatus.set(PackageStatusEnum.DOWNLOADED);
-      showToast('On-device AI model installed in browser cache (190 MB)');
+      showToast(tt.slmInstalled);
     } catch (err) {
       if (isSlmAbortedRef.current || (err instanceof DOMException && err.name === 'AbortError')) {
         $slmPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
         setSlmProgress(0);
-        showToast('AI model download cancelled.');
+        showToast(tt.slmCancelled);
         return;
       }
       console.error('SLM download failed:', err);
-      showToast('AI model download interrupted. Check network and try again.');
+      showToast(tt.slmInterrupted);
       $slmPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     }
   };
@@ -391,7 +403,7 @@ export function App(): JSX.Element {
     setAiProgress(0);
     setModelProgress(0);
     setSlmProgress(0);
-    showToast('Offline storage and model cache cleared.');
+    showToast(tt.storageCleared);
   };
 
   const handleOpenStorage = () => {
@@ -430,11 +442,11 @@ export function App(): JSX.Element {
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      showToast('Connected: Back online');
+      showToast(ttRef.current.backOnline);
     };
     const handleOffline = () => {
       setIsOnline(false);
-      showToast('Offline: Local search & reader active');
+      showToast(ttRef.current.offlineActive);
     };
 
     window.addEventListener(NetworkStatusEnum.ONLINE, handleOnline);
@@ -445,7 +457,7 @@ export function App(): JSX.Element {
         const current = navigator.onLine;
         setIsOnline((prev) => {
           if (prev !== current) {
-            showToast(current ? 'Connected: Back online' : 'Offline: Local search & reader active');
+            showToast(current ? ttRef.current.backOnline : ttRef.current.offlineActive);
             return current;
           }
           return prev;
@@ -462,7 +474,7 @@ export function App(): JSX.Element {
 
   const toastTimerRef = useRef<number | null>(null);
 
-  const showToast = (message: string, durationMs = DEFAULT_TOAST_DURATION_MS) => {
+  const showToast = (message: string) => {
     if (toastTimerRef.current !== null) {
       clearTimeout(toastTimerRef.current);
     }
@@ -470,7 +482,7 @@ export function App(): JSX.Element {
     toastTimerRef.current = window.setTimeout(() => {
       setToastMessage(null);
       toastTimerRef.current = null;
-    }, durationMs);
+    }, TOAST_DURATION_MS);
   };
 
   const handleOpenReader = (book: string, chapter: number, verse: number) => {
@@ -491,11 +503,13 @@ export function App(): JSX.Element {
         (v) => v.book === verse.book && v.chapter === verse.chapter && v.verse === verse.verse,
       );
       let next;
+      const localizedBook = getLocalizedBookName(verse.book, $locale.get());
+      const citation = `${localizedBook} ${verse.chapter}:${verse.verse}`;
       if (exists) {
         next = prev.filter(
           (v) => !(v.book === verse.book && v.chapter === verse.chapter && v.verse === verse.verse),
         );
-        showToast(`Removed ${verse.citation} from bookmarks`);
+        showToast(tt.bookmarkRemoved({ citation }));
       } else {
         next = [
           ...prev,
@@ -505,7 +519,7 @@ export function App(): JSX.Element {
             savedAt: Date.now(),
           },
         ];
-        showToast(`Saved ${verse.citation} to bookmarks`);
+        showToast(tt.bookmarkSaved({ citation }));
       }
       return next;
     });

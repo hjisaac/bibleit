@@ -170,3 +170,9 @@ export enum ThemeEnum {
   OBSIDIAN = 'obsidian',
 }
 
+export { LOCALES, DEFAULT_LOCALE, type Locale } from '@bibleit/engine';
+
+export const TRANSLATIONS = ['web', 'lsg'] as const;
+export type TranslationId = (typeof TRANSLATIONS)[number];
+export const DEFAULT_TRANSLATION: TranslationId = 'web';
+

@@ -1,0 +1,13 @@
+name = "bibleit-proxy"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+
+[observability]
+enabled = true
+
+[vars]
+# Configure UPSTREAMS in proxy/.dev.vars (local) or Cloudflare Dashboard / `wrangler secret put UPSTREAMS` (prod).
+UPSTREAM_TIMEOUT_MS = "3500"
+STREAM_TIMEOUT_MS = "12000"
+FAILURE_THRESHOLD = "2"
+COOLDOWN_MS = "30000"

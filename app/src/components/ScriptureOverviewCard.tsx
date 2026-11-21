@@ -1,7 +1,19 @@
 import type { JSX } from 'preact';
+import { useStore } from '@nanostores/preact';
 import type { AudioNarrator } from '../core/ports';
 import type { NarrationState, ScoredPassage } from '../core/types';
 import { renderHighlightedText } from './SearchView';
+import { i18n } from '../stores/i18n';
+import { params } from '@nanostores/i18n';
+import en from '../locales/en.json';
+
+export const messages = i18n('search/scriptureOverviewCard', {
+  ...en['search/scriptureOverviewCard'],
+  ttftMetric: params<{ ms: number }>(en['search/scriptureOverviewCard'].ttftMetric),
+  ttftWithTokPerSec: params<{ ms: number; tok: number }>(en['search/scriptureOverviewCard'].ttftWithTokPerSec),
+  ttftStreaming: params<{ ms: number }>(en['search/scriptureOverviewCard'].ttftStreaming),
+  generatedByModel: params<{ model: string }>(en['search/scriptureOverviewCard'].generatedByModel),
+});
 
 export interface ScriptureOverviewCardProps {
   /** User preference toggle controlling whether AI generation is active. */
@@ -44,14 +56,10 @@ export function ScriptureOverviewCard({
   synthesisTtftMs,
   synthesisTokensPerSec,
 }: ScriptureOverviewCardProps): JSX.Element | null {
-  // 1. isAiEnabled: User opted into AI summaries in preferences.
-  // 2. hasContent: Model streamed at least one token or finished answer.
-  const hasContent = answerText.length > 0;
-  // 3. isSynthesizing: Request started; shows loading pulse before first token arrives.
-  // 4. hasError: Model failed or device offline; shows error state.
-  const hasError = Boolean(synthesisError);
+  const tt = useStore(messages);
 
-  // Mount only when feature is enabled AND there is active state to display.
+  const hasContent = answerText.length > 0;
+  const hasError = Boolean(synthesisError);
   const shouldRender = isAiEnabled && (hasContent || isSynthesizing || hasError);
 
   if (!shouldRender) {
@@ -76,7 +84,7 @@ export function ScriptureOverviewCard({
     narrator.play([
       {
         id: 'synthesis:overview',
-        citation: 'Grounded Summary',
+        citation: tt.badgeTitle,
         text: answerText,
         book: firstPassage?.chunk.book ?? 'GEN',
         chapter: firstPassage?.chunk.start[0] ?? 1,
@@ -119,15 +127,19 @@ export function ScriptureOverviewCard({
               <path d="M9.75 2c0 4.28-3.47 7.75-7.75 7.75 4.28 0 7.75 3.47 7.75 7.75 0-4.28 3.47-7.75 7.75-7.75-4.28 0-7.75-3.47-7.75-7.75z" />
               <path d="M19 13c0 2.21-1.79 4-4 4 2.21 0 4 1.79 4 4 0-2.21 1.79-4 4-4-2.21 0-4-1.79-4-4z" />
             </svg>
-            <span>Grounded Summary</span>
+            <span>{tt.badgeTitle}</span>
           </span>
           {isInspectorMode && (
             <span class="font-mono text-[10px]" style={{ color: 'var(--text-subtle)' }}>
-              {isSynthesizing && synthesisTtftMs === null
-                ? 'Generating...'
-                : synthesisTtftMs !== null
-                  ? `TTFT: ${synthesisTtftMs}ms${synthesisTokensPerSec !== null ? ` (${synthesisTokensPerSec} tok/s)` : isSynthesizing ? ' (streaming...)' : ''}`
-                  : 'TTFT: NA'}
+              {isSynthesizing && (synthesisTtftMs === null || synthesisTtftMs === undefined)
+                ? tt.generatingStatus
+                : synthesisTtftMs !== null && synthesisTtftMs !== undefined
+                  ? synthesisTokensPerSec !== null && synthesisTokensPerSec !== undefined
+                    ? tt.ttftWithTokPerSec({ ms: synthesisTtftMs, tok: synthesisTokensPerSec })
+                    : isSynthesizing
+                      ? tt.ttftStreaming({ ms: synthesisTtftMs })
+                      : tt.ttftMetric({ ms: synthesisTtftMs })
+                  : tt.ttftNa}
             </span>
           )}
         </div>
@@ -139,8 +151,8 @@ export function ScriptureOverviewCard({
               onClick={onDismissError}
               class="p-1 rounded hover:opacity-75 transition-opacity"
               style={{ color: 'var(--text-muted)' }}
-              title="Dismiss note"
-              aria-label="Dismiss note"
+              title={tt.dismissNoteTitle}
+              aria-label={tt.dismissNoteTitle}
             >
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -152,10 +164,8 @@ export function ScriptureOverviewCard({
             <button
               type="button"
               onClick={handleToggleNarration}
-              title={isSynthesisPlaying ? 'Pause narration' : 'Listen to synthesis'}
-              aria-label={
-                isSynthesisPlaying ? 'Pause Grounded Summary' : 'Listen to Grounded Summary'
-              }
+              title={isSynthesisPlaying ? tt.pauseNarrationTitle : tt.listenNarrationTitle}
+              aria-label={isSynthesisPlaying ? tt.pauseNarrationTitle : tt.listenNarrationTitle}
               class="p-1 rounded hover:opacity-75 transition-opacity"
               style={{ color: isSynthesisActive ? 'var(--text-main)' : 'var(--text-muted)' }}
             >
@@ -182,8 +192,8 @@ export function ScriptureOverviewCard({
               onClick={() => onCopyAnswer(answerText)}
               class="p-1 rounded hover:opacity-75 transition-opacity"
               style={{ color: 'var(--text-muted)' }}
-              title="Copy answer"
-              aria-label="Copy Grounded Summary"
+              title={tt.copyAnswerTitle}
+              aria-label={tt.copyAnswerTitle}
             >
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -232,14 +242,10 @@ export function ScriptureOverviewCard({
             onClick={onToggleCollapse}
             class="font-medium flex items-center gap-1 hover:underline"
             style={{ color: 'var(--text-muted)' }}
-            title={isSynthesisCollapsed ? 'Expand overview' : 'Collapse overview'}
-            aria-label={
-              isSynthesisCollapsed
-                ? 'Expand Scripture Synthesis'
-                : 'Collapse Scripture Synthesis'
-            }
+            title={isSynthesisCollapsed ? tt.expandOverviewTitle : tt.collapseOverviewTitle}
+            aria-label={isSynthesisCollapsed ? tt.expandOverviewTitle : tt.collapseOverviewTitle}
           >
-            <span>{isSynthesisCollapsed ? '+ Expand overview' : '- Collapse overview'}</span>
+            <span>{isSynthesisCollapsed ? tt.expandOverviewLabel : tt.collapseOverviewLabel}</span>
           </button>
         ) : (
           <span />
@@ -247,10 +253,10 @@ export function ScriptureOverviewCard({
 
         <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
           {synthesisError
-            ? 'Matching scripture passages below'
+            ? tt.matchingPassagesNote
             : synthesisModel
-              ? `Generated by ${synthesisModel}`
-              : 'Generating...'}
+              ? tt.generatedByModel({ model: synthesisModel })
+              : tt.generatingStatus}
         </span>
       </div>
     </div>

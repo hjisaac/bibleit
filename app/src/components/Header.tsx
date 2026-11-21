@@ -1,5 +1,10 @@
 import type { JSX } from 'preact';
+import { useStore } from '@nanostores/preact';
 import { SearchModeEnum } from '../core/types';
+import { i18n } from '../stores/i18n';
+import en from '../locales/en.json';
+
+export const messages = i18n('main/header', en['main/header']);
 
 interface HeaderProps {
   isOnline: boolean;
@@ -12,6 +17,7 @@ export function Header({
   searchMode = SearchModeEnum.AUTO,
   onOpenHelp,
 }: HeaderProps): JSX.Element {
+  const tt = useStore(messages);
   const isOnDevice = searchMode === SearchModeEnum.DEVICE;
 
   return (
@@ -33,9 +39,9 @@ export function Header({
               backgroundColor: 'var(--bg-surface-elevated)',
               color: 'var(--text-subtle)',
             }}
-            title="On-device mode active: Searching locally on this device."
+            title={tt.onDeviceTitle}
           >
-            On-Device
+            {tt.onDeviceBadge}
           </span>
         )}
       </div>
@@ -45,7 +51,7 @@ export function Header({
         <button
           type="button"
           onClick={onOpenHelp}
-          title="Help & Shortcuts"
+          title={tt.helpButtonTitle}
           class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all hover:opacity-70"
           style={{
             backgroundColor: 'transparent',
