@@ -215,7 +215,7 @@
     "readyForVectors": "Prêt pour la recherche vectorielle",
     "downloadingVectors": "Téléchargement des vecteurs...",
     "pkgModelTitle": "Plongement neuronal de requêtes",
-    "pkgModelDesc": "Modèle neuronal sur l'appareil Nomic v1.5 (ONNX Q8). Convertit les requêtes en plongements de 768 dimensions.",
+    "pkgModelDesc": "Modèle neuronal sur l'appareil Nomic v1.5 (ONNX Q8). Comprend le sens de vos requêtes pour la recherche sémantique hors-ligne.",
     "readyForEmbed": "Prêt pour l'inférence sur l'appareil",
     "downloadingModel": "Téléchargement des poids du modèle...",
     "pkgSlmTitle": "Synthétiseur IA sur l'appareil",

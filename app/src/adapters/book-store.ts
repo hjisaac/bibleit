@@ -187,50 +187,6 @@ export async function loadBook(bookId: string, translation?: string): Promise<Bo
   return data;
 }
 
-/** Returns the number of books already cached locally in Cache API. */
-export async function getCachedBooksCount(translation?: string): Promise<number> {
-  const trans = getActiveTrans(translation);
-  if (typeof caches === 'undefined') {
-    return memoryCache.size;
-  }
-
-  try {
-    const cache = await caches.open(CACHE_NAME);
-    const manifest = getBibleManifest(trans);
-    const bookIds = Object.keys(manifest.books);
-    let count = 0;
-
-    for (const bookId of bookIds) {
-      const match = await cache.match(getBookUrl(bookId, trans));
-      if (match) {
-        count++;
-      }
-    }
-    return count;
-  } catch {
-    return memoryCache.size;
-  }
-}
-
-/** Downloads missing books with CRC32 verification and reports live progress. */
-export async function downloadAllBooks(
-  onProgress?: (progressPercent: number, bookId: string) => void,
-  translation?: string,
-): Promise<void> {
-  const trans = getActiveTrans(translation);
-  const manifest = getBibleManifest(trans);
-  const bookIds = Object.keys(manifest.books);
-  const total = bookIds.length;
-  let done = 0;
-
-  for (const bookId of bookIds) {
-    await loadBook(bookId, trans);
-    done++;
-    const percent = Math.min(100, Math.round((done / total) * 100));
-    onProgress?.(percent, bookId);
-  }
-}
-
 /** Clears all locally cached Scripture books from both memory and browser Cache API. */
 export async function clearBookCache(): Promise<void> {
   memoryCache.clear();

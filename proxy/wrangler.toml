@@ -6,8 +6,7 @@ compatibility_date = "2025-04-01"
 enabled = true
 
 [vars]
-# Comma-separated "name=url" or plain URLs. Override in Cloudflare Dashboard for production.
-UPSTREAMS = "render=https://bibleit-api.onrender.com,serv00=https://bibleit.serv00.net"
+# Configure UPSTREAMS in proxy/.dev.vars (local) or Cloudflare Dashboard / `wrangler secret put UPSTREAMS` (prod).
 UPSTREAM_TIMEOUT_MS = "3500"
 STREAM_TIMEOUT_MS = "12000"
 FAILURE_THRESHOLD = "2"

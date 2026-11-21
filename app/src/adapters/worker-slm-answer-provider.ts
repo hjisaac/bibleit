@@ -126,11 +126,11 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
 
   async clear(): Promise<void> {
     this.cancelLoad();
-    await clearGenModelCache();
+    await clearSlmModelCache();
   }
 
   async hasModel(): Promise<boolean> {
-    return isGenModelCached();
+    return isSlmModelCached();
   }
 
   async *answer(
@@ -198,7 +198,7 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
   }
 }
 
-export async function isGenModelCached(): Promise<boolean> {
+export async function isSlmModelCached(): Promise<boolean> {
   try {
     const storage = new OpfsStorage();
     const files = await storage.list('models');
@@ -235,7 +235,7 @@ export async function isGenModelCached(): Promise<boolean> {
   }
 }
 
-export async function clearGenModelCache(): Promise<void> {
+export async function clearSlmModelCache(): Promise<void> {
   try {
     const storage = new OpfsStorage();
     await storage.delete('models');
@@ -261,5 +261,3 @@ export async function clearGenModelCache(): Promise<void> {
     // Ignore cache deletion errors
   }
 }
-
-export const clearSlmModelCache = clearGenModelCache;

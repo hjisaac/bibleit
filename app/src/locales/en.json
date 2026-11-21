@@ -215,7 +215,7 @@
     "readyForVectors": "Ready for vector search",
     "downloadingVectors": "Downloading vectors...",
     "pkgModelTitle": "Neural Query Embedder",
-    "pkgModelDesc": "Nomic v1.5 on-device neural model (Q8 ONNX). Converts search queries into 768-dim embeddings.",
+    "pkgModelDesc": "Nomic v1.5 on-device neural model (Q8 ONNX). Understands query meaning to power offline semantic search.",
     "readyForEmbed": "Ready for on-device inference",
     "downloadingModel": "Downloading model weights...",
     "pkgSlmTitle": "On-Device AI Summarizer",

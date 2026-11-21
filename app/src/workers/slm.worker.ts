@@ -132,10 +132,10 @@ let generatorPromise: Promise<any> | null = null;
 let lastReportedProgress = 0;
 
 function createPipeline(device: 'webgpu' | 'wasm') {
+  // dtype: 'q4' automatically resolves to onnx/model_q4.onnx matching OPFS cache keys.
   return pipeline('text-generation', MODEL_REPO, {
     dtype: 'q4',
     device,
-    model_file_name: 'onnx/model_q4',
   });
 }
 

@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BruteForceVectorIndex } from '../src/adapters/bruteforce-vector-index';
-import type { Chunk, Manifest } from '../src/core/types';
+import { BruteForceVectorIndex, type Chunk, type Manifest } from '@bibleit/engine';
 
 const mockManifest: Manifest = {
   schema_version: 3,

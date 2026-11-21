@@ -499,7 +499,8 @@ export function SearchView({
       if (!receivedAny) {
         onToast(tt.toastAiOverviewUnavailable);
       }
-    } catch {
+    } catch (err) {
+      console.error('[SearchView] AI overview failed:', err);
       onToast(tt.toastAiOverviewUnavailable);
     } finally {
       setIsSearching(false);

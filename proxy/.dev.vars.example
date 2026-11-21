@@ -1,0 +1,9 @@
+# Comma-separated upstream backends ("name=url" or plain URLs)
+# Example: UPSTREAMS=primary=http://localhost:7860,secondary=http://localhost:7861
+UPSTREAMS=
+
+# Optional overrides (defaults in wrangler.toml)
+# UPSTREAM_TIMEOUT_MS=3500
+# STREAM_TIMEOUT_MS=12000
+# FAILURE_THRESHOLD=2
+# COOLDOWN_MS=30000

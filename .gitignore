@@ -274,6 +274,9 @@ app/.env
 app/.env.*
 app/.env.local
 !app/.env.example
+proxy/.dev.vars
+proxy/.dev.vars.*
+!proxy/.dev.vars.example
 
 # Uncommitted white paper draft and assets
 paper/
