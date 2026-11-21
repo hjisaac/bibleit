@@ -107,6 +107,40 @@ export async function resolveVerseText(
   }
 }
 
+/** Resolves a contiguous [start, end] verse range from the requested translation. */
+export async function resolvePassageText(
+  bookId: string,
+  start: readonly [number, number],
+  end: readonly [number, number],
+  translation?: string,
+): Promise<string | undefined> {
+  const [startCh, startV] = start;
+  const [endCh, endV] = end;
+
+  if (startCh === endCh && startV === endV) {
+    return resolveVerseText(bookId, startCh, startV, translation);
+  }
+
+  try {
+    const bookData = await loadBook(bookId, translation);
+    if (!bookData?.chapters) return undefined;
+
+    const texts: string[] = [];
+    for (let ch = startCh; ch <= endCh; ch++) {
+      const verses = bookData.chapters[String(ch)];
+      if (!verses) continue;
+      for (const v of verses) {
+        if (ch === startCh && v.num < startV) continue;
+        if (ch === endCh && v.num > endV) continue;
+        if (v.text) texts.push(v.text);
+      }
+    }
+    return texts.length > 0 ? texts.join(' ') : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function getBookUrl(bookId: string, translation?: string): string {
   const trans = getActiveTrans(translation);
   const baseUrl = import.meta.env.BASE_URL ?? '/';

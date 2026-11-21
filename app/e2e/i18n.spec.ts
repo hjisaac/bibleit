@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { useSearchCassette } from './fixtures/network';
 import en from '../src/locales/en.json' with { type: 'json' };
 import fr from '../src/locales/fr.json' with { type: 'json' };
 
@@ -44,9 +45,12 @@ test.describe('i18n End-to-End Translations', () => {
     await expect(nav.getByRole('button', { name: fr['main/navbar'].saved })).toBeVisible();
     await expect(nav.getByRole('button', { name: fr['main/navbar'].settings })).toBeVisible();
 
-    // 4. Search view translates placeholder & starter topics
+    // 4. Search view translates placeholder & starter topics (panel opens only on input focus)
     await nav.getByRole('button', { name: fr['main/navbar'].search }).click();
-    await expect(page.getByRole('textbox')).toHaveAttribute('placeholder', fr['search/view'].searchPlaceholder);
+    const searchInput = page.getByRole('textbox');
+    await expect(searchInput).toHaveAttribute('placeholder', fr['search/view'].searchPlaceholder);
+    await expect(page.getByText(fr['search/view'].popularTopics)).toBeHidden();
+    await searchInput.click();
     await expect(page.getByText(fr['search/view'].popularTopics)).toBeVisible();
     await expect(page.getByRole('button', { name: fr.starterTopics.popularTopics[0]! })).toBeVisible();
 
@@ -90,6 +94,53 @@ test.describe('i18n End-to-End Translations', () => {
     // Reload without clearing localStorage (addInitScript only clears on first nav if guarded; use evaluate instead)
     const persistedLocale = await page.evaluate(() => localStorage.getItem('bibleit_locale'));
     expect(persistedLocale).toBe('fr');
+  });
+
+  test('switches scripture text between WEB (en) and LSG (fr) in Search and Reader views', async ({ page }) => {
+    await useSearchCassette(page, 'search-john316');
+    await page.goto('/');
+
+    // 1. Search John 3:16 in English
+    const searchInput = page.getByRole('textbox');
+    await searchInput.fill('John 3:16');
+    await searchInput.press('Enter');
+
+    const enCard = page.locator('article').filter({ hasText: 'John 3:16' });
+    await expect(enCard).toBeVisible({ timeout: 25000 });
+    await expect(enCard).toContainText('For God so loved the world');
+
+    // 2. Switch language to French in Settings
+    const nav = page.getByRole('navigation');
+    await nav.getByRole('button', { name: en['main/navbar'].settings }).click();
+    await page.locator('select').selectOption('fr');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
+
+    // 3. Return to Search: card citation AND scripture text are now French (LSG)
+    await nav.getByRole('button', { name: fr['main/navbar'].search }).click();
+    const frCard = page.locator('article').filter({ hasText: 'Jean 3:16' });
+    await expect(frCard).toBeVisible();
+    await expect(frCard).toContainText('Car Dieu a tant aimé le monde');
+    await expect(frCard).not.toContainText('For God so loved the world');
+
+    // 4. Open chapter in Reader: heading and verse 16 text are French (LSG)
+    await frCard.getByRole('button', { name: fr['search/view'].readChapter }).click();
+    await expect(page.locator('h1')).toContainText('Jean Chapitre 3', { timeout: 10000 });
+    await expect(page.locator('#verse-16')).toContainText('Car Dieu a tant aimé le monde');
+
+    // 5. Switch back to English and verify Reader + Search revert to WEB
+    await page.locator('#reader-scroll-container').evaluate((el) => {
+      el.scrollTo({ top: 0, behavior: 'instant' });
+      el.dispatchEvent(new Event('scroll'));
+    });
+    await nav.getByRole('button', { name: fr['main/navbar'].settings }).click();
+    await page.locator('select').selectOption('en');
+
+    await nav.getByRole('button', { name: en['main/navbar'].reader }).click();
+    await expect(page.locator('h1')).toContainText('John Chapter 3', { timeout: 10000 });
+    await expect(page.locator('#verse-16')).toContainText('For God so loved the world');
+
+    await nav.getByRole('button', { name: en['main/navbar'].search }).click();
+    await expect(enCard).toContainText('For God so loved the world');
   });
 });
 

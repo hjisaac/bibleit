@@ -417,6 +417,35 @@ describe('SearchView Cold Start and Search Persistence', () => {
     // Panel P is now open, old results still unremoved
     expect(screen.getByText('Suggestions')).toBeTruthy();
     expect(screen.getByText('For God so loved the world...')).toBeTruthy();
+
+    // Blur closes Panel P while keeping previous results visible
+    fireEvent.blur(input);
+    expect(screen.queryByText('Suggestions')).toBeNull();
+    expect(screen.getByText('For God so loved the world...')).toBeTruthy();
+  });
+
+  it('auto-focuses on empty landing, hides Panel P on blur, and prevents premature blur when clicking chips', () => {
+    renderSearchView();
+
+    const input = screen.getByRole('textbox') as HTMLInputElement;
+    expect(document.activeElement).toBe(input);
+    expect(screen.getByText('Suggestions')).toBeTruthy();
+
+    // Pressing mouse down on a chip calls preventDefault so blur does not hide the panel before click
+    const chip = screen.getByRole('button', { name: getPopularTopics('en')[0]! });
+    const mouseDownEvent = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    chip.dispatchEvent(mouseDownEvent);
+    expect(mouseDownEvent.defaultPrevented).toBe(true);
+
+    // Losing focus hides Panel P immediately
+    fireEvent.blur(input);
+    expect(screen.queryByText('Suggestions')).toBeNull();
+    expect(screen.queryByText('Popular Topics')).toBeNull();
+
+    // Refocusing reopens Panel P
+    fireEvent.focus(input);
+    expect(screen.getByText('Suggestions')).toBeTruthy();
+    expect(screen.getByText('Popular Topics')).toBeTruthy();
   });
 
   it('keeps previous results and shows Panel P when clearing the query', () => {

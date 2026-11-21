@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import type { AudioNarrator, SearchEngine } from '../core/ports';
 import {
+  DEFAULT_TRANSLATION,
   getChunkKey,
   PackageStatusEnum,
   type NarrationSegment,
@@ -12,7 +13,7 @@ import {
   type ScoredPassage,
 } from '../core/types';
 import { findBookByPrefix, formatCitation, getLocalizedBookName } from '@bibleit/engine';
-import { resolveVerseText } from '../adapters/book-store';
+import { resolvePassageText, resolveVerseText } from '../adapters/book-store';
 import { getPopularTopics, getSearchSuggestions } from '../core/starter-topics';
 import type { SavedVerse } from './SavedView';
 import {
@@ -25,6 +26,7 @@ import {
 } from '../stores/search';
 import { ScriptureOverviewCard } from './ScriptureOverviewCard';
 import { $locale, i18n } from '../stores/i18n';
+import { $activeTranslation } from '../stores/preferences';
 import { params } from '@nanostores/i18n';
 import en from '../locales/en.json';
 
@@ -88,13 +90,17 @@ export function renderHighlightedText(
   );
 }
 
-function buildPassageSegments(passageList: ScoredPassage[], locale?: string): NarrationSegment[] {
+function buildPassageSegments(
+  passageList: ScoredPassage[],
+  locale?: string,
+  getText?: (p: ScoredPassage) => string,
+): NarrationSegment[] {
   return passageList.map((p) => {
     const key = getChunkKey(p.chunk);
     return {
       id: `chunk-${key}`,
       citation: formatCitation(p.chunk.book, p.chunk.start, p.chunk.end, locale),
-      text: p.chunk.text,
+      text: getText ? getText(p) : p.chunk.text,
       book: p.chunk.book,
       chapter: p.chunk.start[0],
       verse: p.chunk.start[1],
@@ -112,7 +118,9 @@ interface ChunkSectionView {
 function getChunkSectionViews(
   p: ScoredPassage,
   splitIdx?: number,
+  displayText?: string,
 ): ChunkSectionView[] {
+  const text = displayText ?? p.chunk.text;
   const headings = p.chunk.headings;
   const isSameChapter = p.chunk.start[0] === p.chunk.end[0];
   const isSameVerse = isSameChapter && p.chunk.start[1] === p.chunk.end[1];
@@ -127,25 +135,25 @@ function getChunkSectionViews(
       {
         heading: headings?.[0]?.[2],
         scope: fullScope,
-        text: p.chunk.text,
+        text,
       },
     ];
   }
 
   // Multi-heading passages (e.g. Romans 13:8-14)
-  if (splitIdx && splitIdx > 0 && splitIdx < p.chunk.text.length) {
+  if (splitIdx && splitIdx > 0 && splitIdx < text.length) {
     const h1 = headings[0]!;
     const h2 = headings[1]!;
     return [
       {
         heading: h1[2],
         scope: `${p.chunk.start[1]}–${h2[1] - 1}`,
-        text: p.chunk.text.slice(0, splitIdx).trim(),
+        text: text.slice(0, splitIdx).trim(),
       },
       {
         heading: h2[2],
         scope: `${h2[1]}–${p.chunk.end[1]}`,
-        text: p.chunk.text.slice(splitIdx).trim(),
+        text: text.slice(splitIdx).trim(),
       },
     ];
   }
@@ -154,7 +162,7 @@ function getChunkSectionViews(
     {
       heading: headings[0]![2],
       scope: fullScope,
-      text: p.chunk.text,
+      text,
     },
   ];
 }
@@ -188,6 +196,7 @@ export function SearchView({
 }: SearchViewProps): JSX.Element {
   const tt = useStore(messages);
   const currentLocale = useStore($locale);
+  const activeTranslation = useStore($activeTranslation);
   const suggestions = getSearchSuggestions(currentLocale);
   const popularTopics = getPopularTopics(currentLocale);
   const [initialSearch] = useState(() => $lastSearch.get());
@@ -195,13 +204,19 @@ export function SearchView({
   const [passages, setPassages] = useState<ScoredPassage[]>(initialSearch.passages);
   const [searchOrigin, setSearchOrigin] = useState<SearchOriginEnum | undefined>(() => initialSearch.origin);
   const [searchDurationMs, setSearchDurationMs] = useState<number | null>(() => initialSearch.durationMs ?? null);
-  const [isPanelOpen, setIsPanelOpen] = useState(initialSearch.query.trim().length === 0);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
   const lastSubmittedQueryRef = useRef(initialSearch.query);
   const [expandedCardKey, setExpandedCardKey] = useState<string | null>(null);
+  const [localizedTexts, setLocalizedTexts] = useState<Record<string, string>>({});
   const [surroundingVerses, setSurroundingVerses] = useState<
     Record<string, { prev?: string; next?: string }>
   >({});
   const [splitPoints, setSplitPoints] = useState<Record<string, number>>({});
+
+  const getDisplayText = (p: ScoredPassage): string =>
+    activeTranslation === DEFAULT_TRANSLATION
+      ? p.chunk.text
+      : (localizedTexts[`${activeTranslation}:${getChunkKey(p.chunk)}`] ?? p.chunk.text);
 
   const [answerText, setAnswerText] = useState<string>(initialSearch.answerText);
   const [synthesisModel, setSynthesisModel] = useState<string | null>(
@@ -216,6 +231,13 @@ export function SearchView({
   const [hasSearched, setHasSearched] = useState<boolean>(initialSearch.query.trim().length > 0);
   const searchHistory = useStore($searchHistory);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus empty landing search input so the guidance panel opens immediately.
+  useEffect(() => {
+    if (initialSearch.query.trim().length === 0) {
+      inputRef.current?.focus();
+    }
+  }, []);
 
   const searchRunIdRef = useRef(0);
 
@@ -358,10 +380,38 @@ export function SearchView({
     }
   }, [isAiEnabled]);
 
+  // Resolve retrieved passage text into the active translation (e.g., WEB -> LSG).
+  useEffect(() => {
+    if (activeTranslation === DEFAULT_TRANSLATION || passages.length === 0) return;
+
+    let cancelled = false;
+    void Promise.all(
+      passages.map(async (p) => {
+        const cacheKey = `${activeTranslation}:${getChunkKey(p.chunk)}`;
+        const text = await resolvePassageText(p.chunk.book, p.chunk.start, p.chunk.end, activeTranslation);
+        return text ? ([cacheKey, text] as const) : null;
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+      const updates: Record<string, string> = {};
+      for (const entry of entries) {
+        if (entry) updates[entry[0]] = entry[1];
+      }
+      if (Object.keys(updates).length > 0) {
+        setLocalizedTexts((prev) => ({ ...prev, ...updates }));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [passages, activeTranslation]);
+
   useEffect(() => {
     if (expandedCardKey === null) return;
     const passage = passages.find((p) => getChunkKey(p.chunk) === expandedCardKey);
-    if (!passage || surroundingVerses[expandedCardKey]) return;
+    const cacheKey = `${activeTranslation}:${expandedCardKey}`;
+    if (!passage || surroundingVerses[cacheKey]) return;
 
     let isSubscribed = true;
     const book = passage.chunk.book;
@@ -371,13 +421,13 @@ export function SearchView({
     const vEnd = passage.chunk.end[1];
 
     void Promise.all([
-      vStart > 1 ? resolveVerseText(book, chStart, vStart - 1) : Promise.resolve(undefined),
-      resolveVerseText(book, chEnd, vEnd + 1),
+      vStart > 1 ? resolveVerseText(book, chStart, vStart - 1, activeTranslation) : Promise.resolve(undefined),
+      resolveVerseText(book, chEnd, vEnd + 1, activeTranslation),
     ]).then(([prev, next]) => {
       if (isSubscribed) {
         setSurroundingVerses((curr) => ({
           ...curr,
-          [expandedCardKey]: { prev, next },
+          [cacheKey]: { prev, next },
         }));
       }
     });
@@ -385,7 +435,7 @@ export function SearchView({
     return () => {
       isSubscribed = false;
     };
-  }, [expandedCardKey, passages, surroundingVerses]);
+  }, [expandedCardKey, passages, surroundingVerses, activeTranslation]);
 
   useEffect(() => {
     const multi = passages.filter((p) => p.chunk.headings && p.chunk.headings.length > 1);
@@ -394,14 +444,17 @@ export function SearchView({
     let isSubscribed = true;
     for (const p of multi) {
       const key = getChunkKey(p.chunk);
-      if (splitPoints[key] !== undefined) continue;
+      const cacheKey = `${activeTranslation}:${key}`;
+      if (splitPoints[cacheKey] !== undefined) continue;
+      const displayText =
+        activeTranslation === DEFAULT_TRANSLATION ? p.chunk.text : (localizedTexts[cacheKey] ?? p.chunk.text);
       const h2 = p.chunk.headings![1]!;
-      void resolveVerseText(p.chunk.book, h2[0], h2[1]).then((vText) => {
+      void resolveVerseText(p.chunk.book, h2[0], h2[1], activeTranslation).then((vText) => {
         if (!isSubscribed || !vText) return;
         const snippet = vText.trim().slice(0, 20);
-        const idx = p.chunk.text.indexOf(snippet);
+        const idx = displayText.indexOf(snippet);
         if (idx > 0) {
-          setSplitPoints((prev) => ({ ...prev, [key]: idx }));
+          setSplitPoints((prev) => ({ ...prev, [cacheKey]: idx }));
         }
       });
     }
@@ -409,7 +462,7 @@ export function SearchView({
     return () => {
       isSubscribed = false;
     };
-  }, [passages, splitPoints]);
+  }, [passages, splitPoints, activeTranslation, localizedTexts]);
 
   useEffect(() => {
     const activeId = narrationState?.activeSegment?.id;
@@ -437,6 +490,7 @@ export function SearchView({
     if (!trimmed || isSynthesizing || !isAiEnabled) return;
     lastSubmittedQueryRef.current = trimmed;
     setIsPanelOpen(false);
+    inputRef.current?.blur();
     setIsSynthesizing(true);
     setIsSearching(true);
     setPassages([]);
@@ -468,10 +522,22 @@ export function SearchView({
         setIsSynthesizing(false);
         return;
       }
+
+      let contextForAnswer = res;
+      if (activeTranslation !== DEFAULT_TRANSLATION) {
+        const localizedTop = await Promise.all(
+          res.passages.slice(0, 5).map(async (p) => {
+            const text = await resolvePassageText(p.chunk.book, p.chunk.start, p.chunk.end, activeTranslation);
+            return text ? { ...p, chunk: { ...p.chunk, text } } : p;
+          }),
+        );
+        contextForAnswer = { ...res, passages: [...localizedTop, ...res.passages.slice(5)] };
+      }
+
       const streamStartTime = performance.now();
       let firstTokenTime: number | null = null;
       let totalChars = 0;
-      const stream = engine.answerProvider.answer(trimmed, res, (meta) => {
+      const stream = engine.answerProvider.answer(trimmed, contextForAnswer, (meta) => {
         const modelName = meta.model || meta.provider;
         if (modelName) setSynthesisModel(modelName);
       });
@@ -603,6 +669,7 @@ export function SearchView({
           <button
             type="submit"
             aria-label={tt.searchButtonLabel}
+            onMouseDown={(e) => e.preventDefault()}
             class="w-5 h-5 shrink-0 flex items-center justify-center mr-2 hover:opacity-80 transition-opacity cursor-pointer"
             style={{ color: 'var(--text-muted)' }}
           >
@@ -640,7 +707,6 @@ export function SearchView({
             }}
             onInput={(e) => {
               setQuery((e.target as HTMLInputElement).value);
-              setIsPanelOpen(true);
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.keyCode === 13) {
@@ -649,17 +715,18 @@ export function SearchView({
             }}
             onBlur={() => {
               addQueryToHistory(query);
+              setIsPanelOpen(false);
             }}
           />
           {query.length > 0 && (
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.stopPropagation();
                 searchRunIdRef.current++;
                 setQuery('');
                 setSearchDurationMs(null);
-                setIsPanelOpen(true);
                 inputRef.current?.focus();
               }}
               class="text-xs p-1 rounded-full hover:opacity-75 shrink-0 ml-1.5"
@@ -724,9 +791,12 @@ export function SearchView({
         );
       })()}
 
-      {/* Guidance Panel P (Shown on cold start or when search is focused/empty) */}
+      {/* Guidance Panel P (Shown only while search input has focus) */}
       {isPanelOpen && (
-        <div class="py-3 mb-2 flex flex-col gap-4 animate-fadeIn">
+        <div
+          onMouseDown={(e) => e.preventDefault()}
+          class="py-3 mb-2 flex flex-col gap-4 animate-fadeIn"
+        >
           {/* Recent Searches */}
           {searchHistory.length > 0 && (
             <div>
@@ -963,9 +1033,11 @@ export function SearchView({
 
         {!isSearching && passages.map((p, cardIdx) => {
           const chunkKey = getChunkKey(p.chunk);
+          const transKey = `${activeTranslation}:${chunkKey}`;
           const isExpanded = expandedCardKey === chunkKey;
           const refString = formatCitation(p.chunk.book, p.chunk.start, p.chunk.end, currentLocale);
-          const sections = getChunkSectionViews(p, splitPoints[chunkKey]);
+          const displayText = getDisplayText(p);
+          const sections = getChunkSectionViews(p, splitPoints[transKey], displayText);
 
           const isSaved =
             savedVerses?.some(
@@ -975,7 +1047,7 @@ export function SearchView({
                 v.verse === p.chunk.start[1],
             ) ?? false;
 
-          const surrounding = surroundingVerses[chunkKey];
+          const surrounding = surroundingVerses[transKey];
           const segmentId = `chunk-${chunkKey}`;
           const isCardActive =
             narrationState?.status !== 'idle' &&
@@ -1056,7 +1128,7 @@ export function SearchView({
                           return;
                         }
                         setExpandedCardKey(chunkKey);
-                        const segments = buildPassageSegments(passages, currentLocale);
+                        const segments = buildPassageSegments(passages, currentLocale, getDisplayText);
                         narrator.play(segments, cardIdx);
                       }}
                       title={isCardPlaying ? tt.pauseNarrationTitle : tt.listenPassageTitle}
@@ -1092,7 +1164,7 @@ export function SearchView({
                           chapter: p.chunk.start[0],
                           verse: p.chunk.start[1],
                           citation: refString,
-                          text: p.chunk.text,
+                          text: displayText,
                         });
                       }}
                       title={isSaved ? tt.removeFromBookmarksTitle : tt.saveToBookmarksTitle}
@@ -1117,7 +1189,7 @@ export function SearchView({
 
                   <button
                     type="button"
-                    onClick={() => copyToClipboard(`${refString} - ${p.chunk.text}`)}
+                    onClick={() => copyToClipboard(`${refString} - ${displayText}`)}
                     title={tt.copyPassageTitle}
                     class="p-1 rounded hover:opacity-75 transition-opacity"
                     style={{ color: 'var(--text-muted)' }}
