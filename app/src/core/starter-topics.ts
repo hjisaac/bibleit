@@ -1,20 +1,21 @@
-import starterData from '../locales/starter-topics.json';
-import { DEFAULT_LOCALE } from './types';
+import en from '../locales/en.json';
+import fr from '../locales/fr.json';
+import { DEFAULT_LOCALE, type Locale } from './types';
 
 interface LocaleTopics {
   readonly popularTopics: readonly string[];
   readonly searchSuggestions: readonly string[];
 }
 
-const topicsByLocale: Record<string, LocaleTopics> = starterData;
-const defaultTopics: LocaleTopics = starterData[DEFAULT_LOCALE];
+const topicsByLocale: Readonly<Record<Locale, LocaleTopics>> = {
+  en: en.starterTopics,
+  fr: fr.starterTopics,
+};
 
 export function getPopularTopics(locale: string = DEFAULT_LOCALE): readonly string[] {
-  const data = topicsByLocale[locale] ?? defaultTopics;
-  return data.popularTopics;
+  return (topicsByLocale[locale as Locale] ?? topicsByLocale[DEFAULT_LOCALE]).popularTopics;
 }
 
 export function getSearchSuggestions(locale: string = DEFAULT_LOCALE): readonly string[] {
-  const data = topicsByLocale[locale] ?? defaultTopics;
-  return data.searchSuggestions;
+  return (topicsByLocale[locale as Locale] ?? topicsByLocale[DEFAULT_LOCALE]).searchSuggestions;
 }

@@ -48,33 +48,19 @@ import {
 } from './stores/preferences';
 import { $readerLocation, $savedVerses, type ReaderLocation } from './stores/reader';
 
+import en from './locales/en.json';
+
 export const messages = i18n('app', {
-  aiOverviewEnabled: 'AI Scripture Overview enabled',
-  aiOverviewDisabled: 'AI Scripture Overview deactivated',
-  headingsEnabled: 'Pericope headings enabled',
-  headingsHidden: 'Pericope headings hidden',
-  searchModeDevice: 'Device-only search enabled: Searching locally',
-  searchModeAuto: 'Auto mode: Cloud search with offline fallback',
-  textInstalled: 'Scripture text verified & installed in OPFS (1.2 MB)',
-  textCancelled: 'Scripture download cancelled.',
-  downloadInterrupted: 'Download interrupted. Check network and try again.',
-  vectorsInstalled: 'Verse vectors verified & installed in OPFS (2.1 MB)',
-  vectorsCancelled: 'AI vectors download cancelled.',
-  vectorsInterrupted: 'AI download interrupted. Check network and try again.',
-  modelInstalled: 'Neural query model installed in browser cache (137 MB)',
-  modelCancelled: 'Model download cancelled.',
-  modelInterrupted: 'Model download interrupted. Check network and try again.',
-  slmInstalled: 'On-device AI model installed in OPFS (370 MB)',
-  slmCancelled: 'AI model download cancelled.',
-  slmInterrupted: 'AI model download interrupted. Check network and try again.',
-  storageCleared: 'Offline storage and model cache cleared.',
-  backOnline: 'Connected: Back online',
-  offlineActive: 'Offline: Local search & reader active',
-  bookmarkRemoved: params('Removed {citation} from bookmarks'),
-  bookmarkSaved: params('Saved {citation} to bookmarks'),
+  ...en.app,
+  bookmarkRemoved: params<{ citation: string }>(en.app.bookmarkRemoved),
+  bookmarkSaved: params<{ citation: string }>(en.app.bookmarkSaved),
 });
 
 export function App(): JSX.Element {
+  const tt = useStore(messages);
+  const ttRef = useRef(tt);
+  ttRef.current = tt;
+
   // Composition root wires production adapters for the app lifecycle.
   const store = useMemo(() => createArtifactStore(), []);
   const embedder = useMemo(() => createEmbedder(), []);
@@ -179,22 +165,19 @@ export function App(): JSX.Element {
   const isAiEnabled = useStore($isAiEnabled);
   const handleToggleAi = (enabled: boolean) => {
     $isAiEnabled.set(enabled);
-    const t = messages.get();
-    showToast(enabled ? t.aiOverviewEnabled : t.aiOverviewDisabled);
+    showToast(enabled ? tt.aiOverviewEnabled : tt.aiOverviewDisabled);
   };
 
   const showHeadings = useStore($showHeadings);
   const handleToggleHeadings = (enabled: boolean) => {
     $showHeadings.set(enabled);
-    const t = messages.get();
-    showToast(enabled ? t.headingsEnabled : t.headingsHidden);
+    showToast(enabled ? tt.headingsEnabled : tt.headingsHidden);
   };
 
   const searchMode = useStore($searchMode);
   const handleToggleSearchMode = (mode: SearchModeEnum) => {
     $searchMode.set(mode);
-    const t = messages.get();
-    showToast(mode === SearchModeEnum.DEVICE ? t.searchModeDevice : t.searchModeAuto);
+    showToast(mode === SearchModeEnum.DEVICE ? tt.searchModeDevice : tt.searchModeAuto);
   };
 
   // Reconcile in-memory state if page was reloaded mid-download
@@ -284,19 +267,19 @@ export function App(): JSX.Element {
       setTextProgress(100);
       await engine.sync?.();
       $textPackageStatus.set(PackageStatusEnum.DOWNLOADED);
-      showToast(messages.get().textInstalled);
+      showToast(tt.textInstalled);
     } catch (err) {
       if (controller.signal.aborted) {
         $textPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
         setTextProgress(0);
-        showToast(messages.get().textCancelled);
+        showToast(tt.textCancelled);
         return;
       }
       console.error('Download failed:', err);
       showToast(
         err instanceof Error && (err.name === 'CorruptArtifactError' || err.name === 'StorageUnavailableError')
           ? err.message
-          : messages.get().downloadInterrupted,
+          : tt.downloadInterrupted,
       );
       $textPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     } finally {
@@ -322,19 +305,19 @@ export function App(): JSX.Element {
       setAiProgress(100);
       await engine.sync?.();
       $aiPackageStatus.set(PackageStatusEnum.DOWNLOADED);
-      showToast(messages.get().vectorsInstalled);
+      showToast(tt.vectorsInstalled);
     } catch (err) {
       if (controller.signal.aborted) {
         $aiPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
         setAiProgress(0);
-        showToast(messages.get().vectorsCancelled);
+        showToast(tt.vectorsCancelled);
         return;
       }
       console.error('Download failed:', err);
       showToast(
         err instanceof Error && (err.name === 'CorruptArtifactError' || err.name === 'StorageUnavailableError')
           ? err.message
-          : messages.get().vectorsInterrupted,
+          : tt.vectorsInterrupted,
       );
       $aiPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     } finally {
@@ -359,16 +342,16 @@ export function App(): JSX.Element {
       setModelProgress(100);
       await engine.sync?.();
       $modelPackageStatus.set(PackageStatusEnum.DOWNLOADED);
-      showToast(messages.get().modelInstalled);
+      showToast(tt.modelInstalled);
     } catch (err) {
       if (isModelAbortedRef.current || (err instanceof DOMException && err.name === 'AbortError')) {
         $modelPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
         setModelProgress(0);
-        showToast(messages.get().modelCancelled);
+        showToast(tt.modelCancelled);
         return;
       }
       console.error('Model download failed:', err);
-      showToast(messages.get().modelInterrupted);
+      showToast(tt.modelInterrupted);
       $modelPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     }
   };
@@ -388,16 +371,16 @@ export function App(): JSX.Element {
       await slmProvider.load?.((fraction) => setSlmProgress(Math.round(fraction * 100)));
       setSlmProgress(100);
       $slmPackageStatus.set(PackageStatusEnum.DOWNLOADED);
-      showToast(messages.get().slmInstalled);
+      showToast(tt.slmInstalled);
     } catch (err) {
       if (isSlmAbortedRef.current || (err instanceof DOMException && err.name === 'AbortError')) {
         $slmPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
         setSlmProgress(0);
-        showToast(messages.get().slmCancelled);
+        showToast(tt.slmCancelled);
         return;
       }
       console.error('SLM download failed:', err);
-      showToast(messages.get().slmInterrupted);
+      showToast(tt.slmInterrupted);
       $slmPackageStatus.set(PackageStatusEnum.NOT_DOWNLOADED);
     }
   };
@@ -420,7 +403,7 @@ export function App(): JSX.Element {
     setAiProgress(0);
     setModelProgress(0);
     setSlmProgress(0);
-    showToast(messages.get().storageCleared);
+    showToast(tt.storageCleared);
   };
 
   const handleOpenStorage = () => {
@@ -459,11 +442,11 @@ export function App(): JSX.Element {
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      showToast(messages.get().backOnline);
+      showToast(ttRef.current.backOnline);
     };
     const handleOffline = () => {
       setIsOnline(false);
-      showToast(messages.get().offlineActive);
+      showToast(ttRef.current.offlineActive);
     };
 
     window.addEventListener(NetworkStatusEnum.ONLINE, handleOnline);
@@ -474,8 +457,7 @@ export function App(): JSX.Element {
         const current = navigator.onLine;
         setIsOnline((prev) => {
           if (prev !== current) {
-            const t = messages.get();
-            showToast(current ? t.backOnline : t.offlineActive);
+            showToast(current ? ttRef.current.backOnline : ttRef.current.offlineActive);
             return current;
           }
           return prev;
@@ -523,12 +505,11 @@ export function App(): JSX.Element {
       let next;
       const localizedBook = getLocalizedBookName(verse.book, $locale.get());
       const citation = `${localizedBook} ${verse.chapter}:${verse.verse}`;
-      const t = messages.get();
       if (exists) {
         next = prev.filter(
           (v) => !(v.book === verse.book && v.chapter === verse.chapter && v.verse === verse.verse),
         );
-        showToast(t.bookmarkRemoved({ citation }));
+        showToast(tt.bookmarkRemoved({ citation }));
       } else {
         next = [
           ...prev,
@@ -538,7 +519,7 @@ export function App(): JSX.Element {
             savedAt: Date.now(),
           },
         ];
-        showToast(t.bookmarkSaved({ citation }));
+        showToast(tt.bookmarkSaved({ citation }));
       }
       return next;
     });

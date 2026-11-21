@@ -4,63 +4,12 @@ import { useStore } from '@nanostores/preact';
 import { PackageStatusEnum, ThemeEnum, SearchModeEnum, type Manifest } from '../core/types';
 import { i18n, $locale, $localeSetting, $isMultilingualEnabled, LOCALES, type Locale } from '../stores/i18n';
 import { params } from '@nanostores/i18n';
+import en from '../locales/en.json';
 
 export const messages = i18n('settings/view', {
-  pageTitle: 'Settings',
-  pageSubtitle: 'Preferences, reading atmosphere, retrieval inspector, and offline storage.',
-  atmosphereTitle: 'Reading Atmosphere',
-  themeDay: 'Day',
-  themeDayDesc: 'Crisp linen',
-  themeWarm: 'Warm',
-  themeWarmDesc: 'Parchment',
-  themeDark: 'Dark',
-  themeDarkDesc: 'OLED black',
-  aiOverviewTitle: 'AI Scripture Overview',
-  aiOverviewBadge: 'AI',
-  aiOverviewDesc: 'Generate grounded scripture summaries when searching topics and questions.',
-  inspectorTitle: 'Retrieval Inspector Mode',
-  inspectorBadge: 'Scholar',
-  inspectorDesc: 'Show search signal badges, cosine scores, BM25 metrics, and latencies.',
-  headingsTitle: 'Pericope Headings',
-  headingsBadge: 'Context',
-  headingsDesc: 'Display topical section headings above retrieved passages.',
-  onDeviceTitle: 'On-Device Only',
-  onDeviceBadge: 'Offline',
-  onDeviceDescReady: 'Search scripture strictly on this device without contacting backend servers.',
-  onDeviceDescDownload: 'Download the scripture package below to unlock on-device search.',
-  storageTitle: 'Offline Packages & Storage',
-  storageDesc: 'Manage local data stored in Origin Private File System (OPFS).',
-  storageRestrictedTitle: 'Offline storage restricted',
-  storageRestrictedDesc: 'Your browser disables device storage (common in Private/Incognito windows). Switch to a standard window to download scripture for offline use.',
-  pkgTextTitle: 'Essential Scripture Text',
-  pkgTextDesc: 'All 66 Protestant books, 31,095 verses (WEB translation). Unlocks offline reading & keyword search.',
-  installedBadge: '✓ Installed',
-  readyToRead: 'Ready for offline reading',
-  downloadingVerses: 'Downloading verses...',
-  notStoredLocally: 'Not stored locally',
-  cancelButton: 'Cancel',
-  downloadButton: params('Download ({size})'),
-  pkgAiTitle: 'Precomputed Verse Vectors',
-  pkgAiDesc: 'Nomic v1.5 int8 quantized vectors for 2,655 passages. Enables offline vector similarity comparison.',
-  readyForVectors: 'Ready for vector search',
-  downloadingVectors: 'Downloading vectors...',
-  pkgModelTitle: 'Neural Query Embedder',
-  pkgModelDesc: 'Nomic v1.5 on-device neural model (Q8 ONNX). Converts search queries into 768-dim embeddings.',
-  readyForEmbed: 'Ready for on-device inference',
-  downloadingModel: 'Downloading model weights...',
-  pkgSlmTitle: 'On-Device AI Summarizer',
-  pkgSlmDesc: 'SmolLM2 360M Instruct on-device language model (Q4 ONNX). Generates grounded scripture summaries completely offline (inference is currently a bit slower).',
-  readyForSlm: 'Ready for offline AI overviews',
-  compilingSlm: 'Compiling and initializing model...',
-  downloadingSlmProgress: params('Downloading model weights ({percent}%)...'),
-  deleteConfirmTitle: 'Delete all local offline data?',
-  deleteConfirmDesc: 'Removes downloaded scripture text and AI models from OPFS. You can re-download anytime.',
-  deleteConfirmYes: 'Yes, Delete All',
-  freeSpaceButton: 'Free Up Local Space (Clear Artifacts)',
-  languageTitle: 'Interface Language',
-  languageDesc: 'Setting your language also switches the Scripture translation (English uses WEB; French uses Louis Segond 1910).',
-  languageEnglish: 'English (World English Bible - WEB)',
-  languageFrench: 'Français (Louis Segond 1910 - LSG)',
+  ...en['settings/view'],
+  downloadButton: params<{ size: string }>(en['settings/view'].downloadButton),
+  downloadingSlmProgress: params<{ percent: number }>(en['settings/view'].downloadingSlmProgress),
 });
 
 interface SettingsViewProps {
@@ -130,7 +79,7 @@ export function SettingsView({
   onCancelDownloadSlm,
   onClearStorage,
 }: SettingsViewProps): JSX.Element {
-  const t = useStore(messages);
+  const tt = useStore(messages);
   const currentLocale = useStore($locale);
   const isMultilingual = useStore($isMultilingualEnabled);
 
@@ -190,10 +139,10 @@ export function SettingsView({
     <section class="flex-1 flex flex-col p-4 sm:p-8 pb-24 sm:pb-24 overflow-y-auto overscroll-y-contain space-y-6 max-w-2xl mx-auto w-full">
       <div>
         <h1 class="text-xl font-bold tracking-tight" style={{ color: 'var(--text-main)' }}>
-          {t.pageTitle}
+          {tt.pageTitle}
         </h1>
         <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-          {t.pageSubtitle}
+          {tt.pageSubtitle}
         </p>
       </div>
 
@@ -206,7 +155,7 @@ export function SettingsView({
         }}
       >
         <span class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
-          {t.atmosphereTitle}
+          {tt.atmosphereTitle}
         </span>
         <div class="grid grid-cols-3 gap-2.5">
           <button
@@ -221,8 +170,8 @@ export function SettingsView({
               color: '#1C1917',
             }}
           >
-            <div class="text-xs font-semibold">{t.themeDay}</div>
-            <div class="text-[10px] text-stone-500 mt-0.5">{t.themeDayDesc}</div>
+            <div class="text-xs font-semibold">{tt.themeDay}</div>
+            <div class="text-[10px] text-stone-500 mt-0.5">{tt.themeDayDesc}</div>
           </button>
 
           <button
@@ -237,8 +186,8 @@ export function SettingsView({
               color: '#2D241E',
             }}
           >
-            <div class="text-xs font-semibold">{t.themeWarm}</div>
-            <div class="text-[10px] text-stone-600 mt-0.5">{t.themeWarmDesc}</div>
+            <div class="text-xs font-semibold">{tt.themeWarm}</div>
+            <div class="text-[10px] text-stone-600 mt-0.5">{tt.themeWarmDesc}</div>
           </button>
 
           <button
@@ -253,8 +202,8 @@ export function SettingsView({
               color: '#F5F5F4',
             }}
           >
-            <div class="text-xs font-semibold">{t.themeDark}</div>
-            <div class="text-[10px] text-stone-400 mt-0.5">{t.themeDarkDesc}</div>
+            <div class="text-xs font-semibold">{tt.themeDark}</div>
+            <div class="text-[10px] text-stone-400 mt-0.5">{tt.themeDarkDesc}</div>
           </button>
         </div>
       </div>
@@ -270,13 +219,13 @@ export function SettingsView({
         <div class="flex items-center justify-between">
           <div class="pr-3">
             <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-              <span>{t.aiOverviewTitle}</span>
+              <span>{tt.aiOverviewTitle}</span>
               <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-mono font-medium">
-                {t.aiOverviewBadge}
+                {tt.aiOverviewBadge}
               </span>
             </div>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {t.aiOverviewDesc}
+              {tt.aiOverviewDesc}
             </p>
           </div>
 
@@ -304,13 +253,13 @@ export function SettingsView({
         <div class="flex items-center justify-between">
           <div class="pr-3">
             <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-              <span>{t.inspectorTitle}</span>
+              <span>{tt.inspectorTitle}</span>
               <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 font-mono font-medium">
-                {t.inspectorBadge}
+                {tt.inspectorBadge}
               </span>
             </div>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {t.inspectorDesc}
+              {tt.inspectorDesc}
             </p>
           </div>
 
@@ -358,13 +307,13 @@ export function SettingsView({
         <div class="flex items-center justify-between">
           <div class="pr-3">
             <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-              <span>{t.headingsTitle}</span>
+              <span>{tt.headingsTitle}</span>
               <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 font-mono font-medium">
-                {t.headingsBadge}
+                {tt.headingsBadge}
               </span>
             </div>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {t.headingsDesc}
+              {tt.headingsDesc}
             </p>
           </div>
 
@@ -392,10 +341,10 @@ export function SettingsView({
         >
           <div>
             <div class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
-              {t.languageTitle}
+              {tt.languageTitle}
             </div>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {t.languageDesc}
+              {tt.languageDesc}
             </p>
           </div>
           <select
@@ -413,7 +362,7 @@ export function SettingsView({
           >
             {LOCALES.map((loc) => (
               <option key={loc} value={loc}>
-                {({ en: t.languageEnglish, fr: t.languageFrench } satisfies Record<Locale, string>)[loc]}
+                {({ en: tt.languageEnglish, fr: tt.languageFrench } satisfies Record<Locale, string>)[loc]}
               </option>
             ))}
           </select>
@@ -431,15 +380,15 @@ export function SettingsView({
         <div class="flex items-center justify-between">
           <div class="pr-3">
             <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-              <span>{t.onDeviceTitle}</span>
+              <span>{tt.onDeviceTitle}</span>
               <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono font-medium">
-                {t.onDeviceBadge}
+                {tt.onDeviceBadge}
               </span>
             </div>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
               {textPackageStatus === PackageStatusEnum.DOWNLOADED
-                ? t.onDeviceDescReady
-                : t.onDeviceDescDownload}
+                ? tt.onDeviceDescReady
+                : tt.onDeviceDescDownload}
             </p>
           </div>
 
@@ -476,10 +425,10 @@ export function SettingsView({
         <div class="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border-subtle)' }}>
           <div>
             <span class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
-              {t.storageTitle}
+              {tt.storageTitle}
             </span>
             <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {t.storageDesc}
+              {tt.storageDesc}
             </p>
           </div>
           <span class="text-xs font-mono font-medium text-emerald-600">
@@ -508,9 +457,9 @@ export function SettingsView({
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
               <div class="text-xs">
-                <p class="font-semibold text-red-600 dark:text-red-400">{t.storageRestrictedTitle}</p>
+                <p class="font-semibold text-red-600 dark:text-red-400">{tt.storageRestrictedTitle}</p>
                 <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  {t.storageRestrictedDesc}
+                  {tt.storageRestrictedDesc}
                 </p>
               </div>
             </div>
@@ -528,20 +477,20 @@ export function SettingsView({
               <div>
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
-                    {t.pkgTextTitle}
+                    {tt.pkgTextTitle}
                   </span>
                   <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
                     1.2 MB
                   </span>
                 </div>
                 <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  {t.pkgTextDesc}
+                  {tt.pkgTextDesc}
                 </p>
               </div>
 
               {textPackageStatus === PackageStatusEnum.DOWNLOADED ? (
                 <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
-                  {t.installedBadge}
+                  {tt.installedBadge}
                 </span>
               ) : textPackageStatus === PackageStatusEnum.DOWNLOADING ? (
                 <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
@@ -562,10 +511,10 @@ export function SettingsView({
             <div class="flex items-center justify-between text-xs pt-1">
               <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
                 {textPackageStatus === PackageStatusEnum.DOWNLOADED
-                  ? t.readyToRead
+                  ? tt.readyToRead
                   : textPackageStatus === PackageStatusEnum.DOWNLOADING
-                  ? t.downloadingVerses
-                  : t.notStoredLocally}
+                  ? tt.downloadingVerses
+                  : tt.notStoredLocally}
               </span>
               {textPackageStatus === PackageStatusEnum.DOWNLOADING ? (
                 <button
@@ -578,7 +527,7 @@ export function SettingsView({
                     backgroundColor: 'var(--bg-surface-elevated)',
                   }}
                 >
-                  {t.cancelButton}
+                  {tt.cancelButton}
                 </button>
               ) : textPackageStatus !== PackageStatusEnum.DOWNLOADED ? (
                 <button
@@ -594,7 +543,7 @@ export function SettingsView({
                     color: '#FFFFFF',
                   }}
                 >
-                  {t.downloadButton({ size: '1.2 MB' })}
+                  {tt.downloadButton({ size: '1.2 MB' })}
                 </button>
               ) : null}
             </div>
@@ -612,20 +561,20 @@ export function SettingsView({
               <div>
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
-                    {t.pkgAiTitle}
+                    {tt.pkgAiTitle}
                   </span>
                   <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
                     2.1 MB
                   </span>
                 </div>
                 <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  {t.pkgAiDesc}
+                  {tt.pkgAiDesc}
                 </p>
               </div>
 
               {aiPackageStatus === PackageStatusEnum.DOWNLOADED ? (
                 <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
-                  {t.installedBadge}
+                  {tt.installedBadge}
                 </span>
               ) : aiPackageStatus === PackageStatusEnum.DOWNLOADING ? (
                 <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
@@ -646,10 +595,10 @@ export function SettingsView({
             <div class="flex items-center justify-between text-xs pt-1">
               <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
                 {aiPackageStatus === PackageStatusEnum.DOWNLOADED
-                  ? t.readyForVectors
+                  ? tt.readyForVectors
                   : aiPackageStatus === PackageStatusEnum.DOWNLOADING
-                  ? t.downloadingVectors
-                  : t.notStoredLocally}
+                  ? tt.downloadingVectors
+                  : tt.notStoredLocally}
               </span>
               {aiPackageStatus === PackageStatusEnum.DOWNLOADING ? (
                 <button
@@ -662,7 +611,7 @@ export function SettingsView({
                     backgroundColor: 'var(--bg-surface-elevated)',
                   }}
                 >
-                  {t.cancelButton}
+                  {tt.cancelButton}
                 </button>
               ) : aiPackageStatus !== PackageStatusEnum.DOWNLOADED ? (
                 <button
@@ -678,7 +627,7 @@ export function SettingsView({
                     color: '#FFFFFF',
                   }}
                 >
-                  {t.downloadButton({ size: '2.1 MB' })}
+                  {tt.downloadButton({ size: '2.1 MB' })}
                 </button>
               ) : null}
             </div>
@@ -696,20 +645,20 @@ export function SettingsView({
               <div>
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
-                    {t.pkgModelTitle}
+                    {tt.pkgModelTitle}
                   </span>
                   <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
                     137 MB
                   </span>
                 </div>
                 <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  {t.pkgModelDesc}
+                  {tt.pkgModelDesc}
                 </p>
               </div>
 
               {modelPackageStatus === PackageStatusEnum.DOWNLOADED ? (
                 <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
-                  {t.installedBadge}
+                  {tt.installedBadge}
                 </span>
               ) : modelPackageStatus === PackageStatusEnum.DOWNLOADING ? (
                 <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
@@ -730,10 +679,10 @@ export function SettingsView({
             <div class="flex items-center justify-between text-xs pt-1">
               <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
                 {modelPackageStatus === PackageStatusEnum.DOWNLOADED
-                  ? t.readyForEmbed
+                  ? tt.readyForEmbed
                   : modelPackageStatus === PackageStatusEnum.DOWNLOADING
-                  ? t.downloadingModel
-                  : t.notStoredLocally}
+                  ? tt.downloadingModel
+                  : tt.notStoredLocally}
               </span>
               {modelPackageStatus === PackageStatusEnum.DOWNLOADING ? (
                 <button
@@ -746,7 +695,7 @@ export function SettingsView({
                     backgroundColor: 'var(--bg-surface-elevated)',
                   }}
                 >
-                  {t.cancelButton}
+                  {tt.cancelButton}
                 </button>
               ) : modelPackageStatus !== PackageStatusEnum.DOWNLOADED ? (
                 <button
@@ -762,7 +711,7 @@ export function SettingsView({
                     color: '#FFFFFF',
                   }}
                 >
-                  {t.downloadButton({ size: '137 MB' })}
+                  {tt.downloadButton({ size: '137 MB' })}
                 </button>
               ) : null}
             </div>
@@ -780,20 +729,20 @@ export function SettingsView({
               <div>
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-semibold" style={{ color: 'var(--text-main)' }}>
-                    {t.pkgSlmTitle}
+                    {tt.pkgSlmTitle}
                   </span>
                   <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-stone-500/10" style={{ color: 'var(--text-subtle)' }}>
                     370 MB
                   </span>
                 </div>
                 <p class="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  {t.pkgSlmDesc}
+                  {tt.pkgSlmDesc}
                 </p>
               </div>
 
               {slmPackageStatus === PackageStatusEnum.DOWNLOADED ? (
                 <span class="text-[10px] font-semibold text-emerald-600 shrink-0 px-2 py-0.5 rounded-full bg-emerald-500/10">
-                  {t.installedBadge}
+                  {tt.installedBadge}
                 </span>
               ) : slmPackageStatus === PackageStatusEnum.DOWNLOADING ? (
                 <span class="text-[10px] font-medium text-amber-600 dark:text-amber-400 shrink-0">
@@ -814,12 +763,12 @@ export function SettingsView({
             <div class="flex items-center justify-between text-xs pt-1">
               <span class="text-[11px]" style={{ color: 'var(--text-subtle)' }}>
                 {slmPackageStatus === PackageStatusEnum.DOWNLOADED
-                  ? t.readyForSlm
+                  ? tt.readyForSlm
                   : slmPackageStatus === PackageStatusEnum.DOWNLOADING
                   ? slmProgress >= 98
-                    ? t.compilingSlm
-                    : t.downloadingSlmProgress({ percent: slmProgress })
-                  : t.notStoredLocally}
+                    ? tt.compilingSlm
+                    : tt.downloadingSlmProgress({ percent: slmProgress })
+                  : tt.notStoredLocally}
               </span>
               {slmPackageStatus === PackageStatusEnum.DOWNLOADING ? (
                 <button
@@ -832,7 +781,7 @@ export function SettingsView({
                     backgroundColor: 'var(--bg-surface-elevated)',
                   }}
                 >
-                  {t.cancelButton}
+                  {tt.cancelButton}
                 </button>
               ) : slmPackageStatus !== PackageStatusEnum.DOWNLOADED ? (
                 <button
@@ -848,7 +797,7 @@ export function SettingsView({
                     color: '#FFFFFF',
                   }}
                 >
-                  {t.downloadButton({ size: '370 MB' })}
+                  {tt.downloadButton({ size: '370 MB' })}
                 </button>
               ) : null}
             </div>
@@ -873,11 +822,11 @@ export function SettingsView({
                   d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                 />
               </svg>
-              <span>{t.deleteConfirmTitle}</span>
+              <span>{tt.deleteConfirmTitle}</span>
             </div>
 
             <p class="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              {t.deleteConfirmDesc}
+              {tt.deleteConfirmDesc}
             </p>
 
             {/* Countdown progress bar */}
@@ -899,14 +848,14 @@ export function SettingsView({
                   color: 'var(--text-main)',
                 }}
               >
-                {t.cancelButton}
+                {tt.cancelButton}
               </button>
               <button
                 type="button"
                 onClick={handleConfirmClear}
                 class="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition-all shadow-sm"
               >
-                {t.deleteConfirmYes}
+                {tt.deleteConfirmYes}
               </button>
             </div>
           </div>
@@ -921,7 +870,7 @@ export function SettingsView({
               backgroundColor: 'var(--bg-surface)',
             }}
           >
-            {t.freeSpaceButton}
+            {tt.freeSpaceButton}
           </button>
         )}
       </div>

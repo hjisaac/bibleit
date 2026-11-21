@@ -5,14 +5,9 @@ import { $locale, i18n } from '../stores/i18n';
 import { $activeTranslation } from '../stores/preferences';
 import { getLocalizedBookName } from '@bibleit/engine';
 import { resolveVerseText } from '../adapters/book-store';
+import en from '../locales/en.json';
 
-export const messages = i18n('saved/view', {
-  title: 'Saved Passages',
-  subtitle: 'Stored privately in your browser.',
-  emptyMessage: 'No saved verses yet. Tap the bookmark icon in search results or long-press a verse in the reader to save passages.',
-  removeBookmarkTitle: 'Remove from bookmarks',
-  unsaveButton: 'Unsave',
-});
+export const messages = i18n('saved/view', en['saved/view']);
 
 export interface SavedVerse {
   id: string;
@@ -113,7 +108,7 @@ function SavedVerseCard({
 }
 
 export function SavedView({ savedVerses, onOpenVerse, onUnsaveVerse }: SavedViewProps): JSX.Element {
-  const t = useStore(messages);
+  const tt = useStore(messages);
   const currentLocale = useStore($locale);
   const activeTranslation = useStore($activeTranslation);
 
@@ -121,10 +116,10 @@ export function SavedView({ savedVerses, onOpenVerse, onUnsaveVerse }: SavedView
     <section class="flex-1 flex flex-col p-4 sm:p-8 pb-24 sm:pb-24 overflow-y-auto overscroll-y-contain space-y-4 max-w-2xl mx-auto w-full">
       <div>
         <h1 class="text-lg font-bold" style={{ color: 'var(--text-main)' }}>
-          {t.title}
+          {tt.title}
         </h1>
         <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-          {t.subtitle}
+          {tt.subtitle}
         </p>
       </div>
 
@@ -133,7 +128,7 @@ export function SavedView({ savedVerses, onOpenVerse, onUnsaveVerse }: SavedView
           class="py-8 text-center text-xs leading-relaxed"
           style={{ color: 'var(--text-muted)' }}
         >
-          {t.emptyMessage}
+          {tt.emptyMessage}
         </p>
       ) : (
         <div class="flex flex-col space-y-3">
@@ -143,8 +138,8 @@ export function SavedView({ savedVerses, onOpenVerse, onUnsaveVerse }: SavedView
               item={item}
               locale={currentLocale}
               activeTranslation={activeTranslation}
-              removeBookmarkTitle={t.removeBookmarkTitle}
-              unsaveButton={t.unsaveButton}
+              removeBookmarkTitle={tt.removeBookmarkTitle}
+              unsaveButton={tt.unsaveButton}
               onOpenVerse={onOpenVerse}
               onUnsaveVerse={onUnsaveVerse}
             />

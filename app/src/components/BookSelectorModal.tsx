@@ -5,23 +5,14 @@ import { BIBLE_BOOKS, BIBLE_BOOKS_BY_ID, type BibleBook, getLocalizedBookName } 
 import { getVerseCount } from '../core/verse-counts';
 import { $locale, i18n } from '../stores/i18n';
 import { params } from '@nanostores/i18n';
+import en from '../locales/en.json';
 
 export const messages = i18n('modal/bookSelector', {
-  backToChapters: 'Back to chapters',
-  backToBooks: 'Back to books',
-  selectPassage: 'Select Passage',
-  stepBook: '1. Book',
-  stepChapter: params('2. Chapter {ch}'),
-  stepVerse: '3. Verse',
-  filterPlaceholder: 'Filter books (e.g. John, Rom, Ps)...',
-  filterAll: 'All (66)',
-  filterOt: 'Old (39)',
-  filterNt: 'New (27)',
-  chaptersSingular: 'ch',
-  chaptersPlural: 'chs',
-  selectChapterSubtitle: params('Select chapter (1–{max})'),
-  chapterHeader: params('{book} Chapter {ch}'),
-  selectVerseSubtitle: params('Select verse (1–{max})'),
+  ...en['modal/bookSelector'],
+  stepChapter: params<{ ch: string | number }>(en['modal/bookSelector'].stepChapter),
+  selectChapterSubtitle: params<{ max: number }>(en['modal/bookSelector'].selectChapterSubtitle),
+  chapterHeader: params<{ book: string; ch: number }>(en['modal/bookSelector'].chapterHeader),
+  selectVerseSubtitle: params<{ max: number }>(en['modal/bookSelector'].selectVerseSubtitle),
 });
 
 interface BookSelectorModalProps {

@@ -302,5 +302,23 @@
     "offlineActive": "Hors-ligne : recherche locale et lecteur actifs",
     "bookmarkRemoved": "{citation} retiré des favoris",
     "bookmarkSaved": "{citation} enregistré dans les favoris"
+  },
+  "starterTopics": {
+    "popularTopics": [
+      "Paix dans l'anxiété",
+      "Force et courage",
+      "Sagesse et discernement",
+      "Pardon et grâce",
+      "Consolation dans le deuil",
+      "Foi et confiance",
+      "Aime ton prochain",
+      "Espérance pour l'avenir"
+    ],
+    "searchSuggestions": [
+      "Philippiens 4:7",
+      "paix qui surpasse",
+      "Qu'a enseigné Jésus sur l'inquiétude ?",
+      "Romains 8:28"
+    ]
   }
 }
