@@ -27,6 +27,8 @@ jobs:
 
       - name: Install dependencies
         working-directory: app
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip
         run: pnpm install --frozen-lockfile
 
       - name: Build app
