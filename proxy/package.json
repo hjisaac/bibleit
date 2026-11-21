@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@bibleit/engine": "workspace:*",
+    "cockatiel": "^4.0.0",
     "hono": "^4.6.14"
   },
   "devDependencies": {

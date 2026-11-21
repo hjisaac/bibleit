@@ -422,26 +422,26 @@ export function SettingsView({
           borderColor: isPulsing ? 'rgba(245, 158, 11, 0.6)' : 'var(--border-subtle)',
         }}
       >
-        <div class="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--border-subtle)' }}>
-          <div>
+        <div class="border-b pb-3" style={{ borderColor: 'var(--border-subtle)' }}>
+          <div class="flex items-baseline justify-between gap-2">
             <span class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
               {tt.storageTitle}
             </span>
-            <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {tt.storageDesc}
-            </p>
+            <span class="text-[11px] font-mono font-medium text-emerald-600 shrink-0 whitespace-nowrap">
+              {(() => {
+                let mb = 0;
+                if (textPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 1.2;
+                if (aiPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 2.1;
+                if (modelPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 137;
+                if (slmPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 370;
+                if (mb === 0) return '0 MB in OPFS';
+                return `${mb.toFixed(1)} MB in OPFS`;
+              })()}
+            </span>
           </div>
-          <span class="text-xs font-mono font-medium text-emerald-600">
-            {(() => {
-              let mb = 0;
-              if (textPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 1.2;
-              if (aiPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 2.1;
-              if (modelPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 137;
-              if (slmPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 370;
-              if (mb === 0) return '0 MB in OPFS';
-              return `${mb.toFixed(1)} MB in OPFS`;
-            })()}
-          </span>
+          <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            {tt.storageDesc}
+          </p>
         </div>
 
         <div
