@@ -8,6 +8,7 @@ import type {
   AudioNarrator,
   QueryEmbedder,
   SearchEngine,
+  Telemetry,
 } from './core/ports';
 import {
   LocalEngine,
@@ -24,6 +25,7 @@ import { WorkerSlmAnswerProvider } from './adapters/worker-slm-answer-provider';
 import { HttpAnswerProvider } from './adapters/http-answer-provider';
 import { RemoteEngine } from './adapters/remote-engine';
 import { createHybridEngine } from './adapters/hybrid-engine';
+import { PostHogTelemetry } from './adapters/posthog-telemetry';
 import { env } from './env';
 import { $locale } from './stores/i18n';
 
@@ -65,4 +67,8 @@ export function createEngine(
 
 export function createNarrator(): AudioNarrator {
   return new WebSpeechNarrator(undefined, undefined, () => $locale.get());
+}
+
+export function createTelemetry(): Telemetry {
+  return new PostHogTelemetry(env.posthogKey, env.posthogHost);
 }

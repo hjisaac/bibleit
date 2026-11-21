@@ -139,6 +139,10 @@ test.describe('i18n End-to-End Translations', () => {
     await expect(page.locator('h1')).toContainText('John Chapter 3', { timeout: 10000 });
     await expect(page.locator('#verse-16')).toContainText('For God so loved the world');
 
+    await page.locator('#reader-scroll-container').evaluate((el) => {
+      el.scrollTo({ top: 0, behavior: 'instant' });
+      el.dispatchEvent(new Event('scroll'));
+    });
     await nav.getByRole('button', { name: en['main/navbar'].search }).click();
     await expect(enCard).toContainText('For God so loved the world');
   });

@@ -166,3 +166,7 @@ export interface AudioNarrator {
   setRate(rate: number): void;
 }
 
+export interface Telemetry {
+  capture(event: string, properties?: Record<string, unknown>): void;
+}
+

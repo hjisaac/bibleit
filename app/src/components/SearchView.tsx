@@ -1,7 +1,7 @@
 import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
-import type { AudioNarrator, SearchEngine } from '../core/ports';
+import type { AudioNarrator, SearchEngine, Telemetry } from '../core/ports';
 import {
   DEFAULT_TRANSLATION,
   getChunkKey,
@@ -25,6 +25,7 @@ import {
   SEARCH_STORAGE_KEY,
 } from '../stores/search';
 import { ScriptureOverviewCard } from './ScriptureOverviewCard';
+import { VoteButtons, type VoteDirection } from './VoteButtons';
 import { $locale, i18n } from '../stores/i18n';
 import { $activeTranslation } from '../stores/preferences';
 import { params } from '@nanostores/i18n';
@@ -44,6 +45,7 @@ export { MAX_HISTORY_ITEMS, SEARCH_HISTORY_KEY, SEARCH_STORAGE_KEY };
 interface SearchViewProps {
   engine: SearchEngine;
   narrator?: AudioNarrator;
+  telemetry?: Telemetry;
   narrationState?: NarrationState;
   isOnline: boolean;
   isAiEnabled: boolean;
@@ -179,6 +181,7 @@ function stripPreamble(text: string): string {
 export function SearchView({
   engine,
   narrator,
+  telemetry,
   narrationState,
   isOnline,
   isAiEnabled,
@@ -207,6 +210,8 @@ export function SearchView({
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const lastSubmittedQueryRef = useRef(initialSearch.query);
   const [expandedCardKey, setExpandedCardKey] = useState<string | null>(null);
+  const [cardVotes, setCardVotes] = useState<Record<string, VoteDirection>>({});
+  const [overviewVote, setOverviewVote] = useState<VoteDirection | null>(null);
   const [localizedTexts, setLocalizedTexts] = useState<Record<string, string>>({});
   const [surroundingVerses, setSurroundingVerses] = useState<
     Record<string, { prev?: string; next?: string }>
@@ -273,6 +278,8 @@ export function SearchView({
     }
     setIsSearching(true);
     setPassages([]);
+    setCardVotes({});
+    setOverviewVote(null);
     setHasSearched(true);
     const startTime = performance.now();
     void engine
@@ -283,6 +290,13 @@ export function SearchView({
           setSearchDurationMs(duration);
           setPassages(res.passages);
           setSearchOrigin(res.origin);
+          telemetry?.capture('search', {
+            query: trimmed,
+            locale: currentLocale,
+            origin: res.origin ?? 'local',
+            duration_ms: duration,
+            result_count: res.passages.length,
+          });
           if (res.fallbackReason === 'timeout') {
             onToast(tt.toastServerTimeout);
           } else if (res.fallbackReason === 'error') {
@@ -480,9 +494,37 @@ export function SearchView({
     setExpandedCardKey((prev) => (prev === key ? null : key));
   };
 
-  const copyToClipboard = (text: string) => {
-    void navigator.clipboard.writeText(text);
-    onToast(tt.toastCopied);
+  const handleVotePassage = (p: ScoredPassage, rank: number, direction: VoteDirection) => {
+    const key = getChunkKey(p.chunk);
+    const nextVote = cardVotes[key] === direction ? undefined : direction;
+    setCardVotes((prev) => {
+      const updated = { ...prev };
+      if (nextVote) updated[key] = nextVote;
+      else delete updated[key];
+      return updated;
+    });
+    if (nextVote) {
+      telemetry?.capture('passage_feedback', {
+        query: lastSubmittedQueryRef.current || query.trim(),
+        ref: formatCitation(p.chunk.book, p.chunk.start, p.chunk.end, 'en'),
+        rank,
+        vote: nextVote,
+        locale: currentLocale,
+      });
+    }
+  };
+
+  const handleVoteOverview = (direction: VoteDirection) => {
+    const nextVote = overviewVote === direction ? null : direction;
+    setOverviewVote(nextVote);
+    if (nextVote) {
+      telemetry?.capture('overview_feedback', {
+        query: lastSubmittedQueryRef.current || query.trim(),
+        model: synthesisModel ?? 'unknown',
+        vote: nextVote,
+        locale: currentLocale,
+      });
+    }
   };
 
   const handleSynthesize = async () => {
@@ -494,6 +536,8 @@ export function SearchView({
     setIsSynthesizing(true);
     setIsSearching(true);
     setPassages([]);
+    setCardVotes({});
+    setOverviewVote(null);
     setAnswerText('');
     setSynthesisModel(null);
     setSynthesisError(null);
@@ -510,6 +554,13 @@ export function SearchView({
       setPassages(res.passages);
       setSearchOrigin(res.origin);
       setIsSearching(false);
+      telemetry?.capture('search', {
+        query: trimmed,
+        locale: currentLocale,
+        origin: res.origin ?? 'local',
+        duration_ms: duration,
+        result_count: res.passages.length,
+      });
       if (res.fallbackReason === 'timeout') {
         onToast(tt.toastServerTimeout);
       } else if (res.fallbackReason === 'error') {
@@ -985,7 +1036,8 @@ export function SearchView({
         isSynthesisCollapsed={isSynthesisCollapsed}
         onToggleCollapse={() => setIsSynthesisCollapsed(!isSynthesisCollapsed)}
         onDismissError={() => setSynthesisError(null)}
-        onCopyAnswer={copyToClipboard}
+        vote={overviewVote}
+        onVote={handleVoteOverview}
         narrator={narrator}
         narrationState={narrationState}
         firstPassage={passages[0]}
@@ -1187,22 +1239,12 @@ export function SearchView({
                     </button>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(`${refString} - ${displayText}`)}
-                    title={tt.copyPassageTitle}
-                    class="p-1 rounded hover:opacity-75 transition-opacity"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </button>
+                  <VoteButtons
+                    vote={cardVotes[chunkKey]}
+                    onVote={(direction) => handleVotePassage(p, cardIdx, direction)}
+                    helpfulTitle={tt.voteHelpfulTitle}
+                    notHelpfulTitle={tt.voteNotHelpfulTitle}
+                  />
                 </div>
               </div>
 

@@ -25,6 +25,8 @@ export const env = {
   feedbackEmail: requireEnv('VITE_FEEDBACK_EMAIL', import.meta.env.VITE_FEEDBACK_EMAIL),
   r2Url: requireEnv('VITE_CLOUDFLARE_R2_URL', import.meta.env.VITE_CLOUDFLARE_R2_URL).replace(/\/+$/, ''),
   backendApiUrl: (import.meta.env.VITE_BACKEND_API_URL?.trim() || '').replace(/\/+$/, ''),
+  posthogKey: import.meta.env.VITE_POSTHOG_KEY?.trim() || '',
+  posthogHost: (import.meta.env.VITE_POSTHOG_HOST?.trim() || 'https://eu.i.posthog.com').replace(/\/+$/, ''),
   isMultilingualEnabled:
     import.meta.env.VITE_MULTILINGUAL_ENABLED !== undefined
       ? import.meta.env.VITE_MULTILINGUAL_ENABLED === 'true'

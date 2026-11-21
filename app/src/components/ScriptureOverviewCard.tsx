@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/preact';
 import type { AudioNarrator } from '../core/ports';
 import type { NarrationState, ScoredPassage } from '../core/types';
 import { renderHighlightedText } from './SearchView';
+import { VoteButtons, type VoteDirection } from './VoteButtons';
 import { i18n } from '../stores/i18n';
 import { params } from '@nanostores/i18n';
 import en from '../locales/en.json';
@@ -30,7 +31,8 @@ export interface ScriptureOverviewCardProps {
   isSynthesisCollapsed: boolean;
   onToggleCollapse: () => void;
   onDismissError: () => void;
-  onCopyAnswer: (text: string) => void;
+  vote?: VoteDirection | null;
+  onVote?: (direction: VoteDirection) => void;
   narrator?: AudioNarrator;
   narrationState?: NarrationState;
   firstPassage?: ScoredPassage;
@@ -48,7 +50,8 @@ export function ScriptureOverviewCard({
   isSynthesisCollapsed,
   onToggleCollapse,
   onDismissError,
-  onCopyAnswer,
+  vote,
+  onVote,
   narrator,
   narrationState,
   firstPassage,
@@ -186,24 +189,13 @@ export function ScriptureOverviewCard({
             </button>
           )}
 
-          {hasContent && !isSynthesizing && (
-            <button
-              type="button"
-              onClick={() => onCopyAnswer(answerText)}
-              class="p-1 rounded hover:opacity-75 transition-opacity"
-              style={{ color: 'var(--text-muted)' }}
-              title={tt.copyAnswerTitle}
-              aria-label={tt.copyAnswerTitle}
-            >
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                />
-              </svg>
-            </button>
+          {hasContent && !isSynthesizing && onVote && (
+            <VoteButtons
+              vote={vote}
+              onVote={onVote}
+              helpfulTitle={tt.voteHelpfulTitle}
+              notHelpfulTitle={tt.voteNotHelpfulTitle}
+            />
           )}
         </div>
       </div>

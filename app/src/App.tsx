@@ -6,6 +6,7 @@ import {
   createEngine,
   createNarrator,
   createAnswerProvider,
+  createTelemetry,
 } from './composition';
 import { Header } from './components/Header';
 import { Navbar } from './components/Navbar';
@@ -79,6 +80,7 @@ export function App(): JSX.Element {
     [store, embedder, slmProvider],
   );
   const narrator = useMemo(() => createNarrator(), []);
+  const telemetry = useMemo(() => createTelemetry(), []);
   const [narrationState, setNarrationState] = useState<NarrationState>(() => narrator.getState());
   const [manifest, setManifest] = useState<Manifest | null>(null);
 
@@ -545,6 +547,7 @@ export function App(): JSX.Element {
           <SearchView
             engine={engine}
             narrator={narrator}
+            telemetry={telemetry}
             narrationState={narrationState}
             isOnline={isOnline}
             isAiEnabled={isAiEnabled}

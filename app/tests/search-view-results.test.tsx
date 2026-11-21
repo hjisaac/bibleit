@@ -164,28 +164,65 @@ describe('SearchView Result Cards & User Actions', () => {
     expect(onOpenReaderSpy).toHaveBeenCalledWith('PHP', 4, 4);
   });
 
-  it('copies scripture citation and text to clipboard and triggers toast feedback', async () => {
-    const originalClipboard = navigator.clipboard;
-    const writeTextSpy = vi.fn().mockResolvedValue(undefined);
-    Object.assign(navigator, {
-      clipboard: { writeText: writeTextSpy },
+  it('captures passage_feedback and toggles pressed state when voting thumbs up or down', () => {
+    const captureSpy = vi.fn();
+    renderSearchView({ telemetry: { capture: captureSpy } });
+
+    const upBtn = screen.getByTitle('Relevant passage');
+    const downBtn = screen.getByTitle('Not relevant');
+    expect(upBtn.getAttribute('aria-pressed')).toBe('false');
+
+    fireEvent.click(upBtn);
+    expect(upBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(captureSpy).toHaveBeenCalledWith('passage_feedback', {
+      query: 'peace and joy',
+      ref: 'Philippians 4:4–7',
+      rank: 0,
+      vote: 'up',
+      locale: 'en',
     });
 
-    try {
-      renderSearchView();
+    fireEvent.click(downBtn);
+    expect(downBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(upBtn.getAttribute('aria-pressed')).toBe('false');
+    expect(captureSpy).toHaveBeenCalledWith('passage_feedback', {
+      query: 'peace and joy',
+      ref: 'Philippians 4:4–7',
+      rank: 0,
+      vote: 'down',
+      locale: 'en',
+    });
 
-      const copyButton = screen.getByTitle('Copy passage citation and text');
-      fireEvent.click(copyButton);
+    // Clicking active vote again clears selection without emitting another event
+    captureSpy.mockClear();
+    fireEvent.click(downBtn);
+    expect(downBtn.getAttribute('aria-pressed')).toBe('false');
+    expect(captureSpy).not.toHaveBeenCalled();
+  });
 
-      await waitFor(() => {
-        expect(writeTextSpy).toHaveBeenCalledWith(
-          `Philippians 4:4–7 - ${samplePassages[0]!.chunk.text}`
-        );
-        expect(onToastSpy).toHaveBeenCalledWith('Copied to clipboard');
-      });
-    } finally {
-      Object.assign(navigator, { clipboard: originalClipboard });
-    }
+  it('captures overview_feedback when rating Grounded Summary', () => {
+    const captureSpy = vi.fn();
+    localStorage.setItem(
+      'bibleit_last_search',
+      JSON.stringify({
+        query: 'peace and joy',
+        passages: samplePassages,
+        answerText: 'Rejoice in the Lord always [PHP 4:4].',
+        model: 'SmolLM2-360M',
+      }),
+    );
+
+    renderSearchView({ isAiEnabled: true, telemetry: { capture: captureSpy } });
+
+    const upBtn = screen.getByTitle('Helpful summary');
+    fireEvent.click(upBtn);
+    expect(upBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(captureSpy).toHaveBeenCalledWith('overview_feedback', {
+      query: 'peace and joy',
+      model: 'SmolLM2-360M',
+      vote: 'up',
+      locale: 'en',
+    });
   });
 
   it('renders passage with collapsed height by default and expands with inside-scroll on toggle', () => {

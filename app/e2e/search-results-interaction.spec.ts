@@ -114,4 +114,19 @@ test.describe('Search Results - Card Expansion & Inside-Scroll', () => {
     await expect(input).not.toBeFocused();
     await expect(page.getByText('Popular Topics')).toBeHidden();
   });
+
+  test('toggles discrete relevance thumbs up and down buttons on passage cards', async ({ page }) => {
+    const card1 = page.locator('article').nth(0);
+    const upBtn = card1.getByRole('button', { name: 'Relevant passage' });
+    const downBtn = card1.getByRole('button', { name: 'Not relevant' });
+
+    await expect(upBtn).toHaveAttribute('aria-pressed', 'false');
+    await upBtn.click();
+    await expect(upBtn).toHaveAttribute('aria-pressed', 'true');
+    await expect(downBtn).toHaveAttribute('aria-pressed', 'false');
+
+    await downBtn.click();
+    await expect(downBtn).toHaveAttribute('aria-pressed', 'true');
+    await expect(upBtn).toHaveAttribute('aria-pressed', 'false');
+  });
 });
