@@ -45,8 +45,14 @@ export class NodeQueryEmbedder implements QueryEmbedder {
 
   async load(): Promise<void> {
     if (!this.extractorPromise) {
+      // onnxruntime-node has no prebuilt FreeBSD binary; fall back to WASM on FreeBSD (e.g. Serv00).
+      const device = (process.env.ONNX_DEVICE ?? (process.platform === 'freebsd' ? 'wasm' : undefined)) as
+        | 'cpu'
+        | 'wasm'
+        | undefined;
       this.extractorPromise = pipeline('feature-extraction', this.modelId, {
         dtype: 'q8',
+        ...(device ? { device } : {}),
         session_options: {
           intraOpNumThreads: BACKEND_ONNX_NUM_THREADS,
           interOpNumThreads: BACKEND_ONNX_NUM_THREADS,

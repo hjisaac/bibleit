@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/preact';
 import { SearchView } from '../src/components/SearchView';
-import { EngineManager } from '../src/adapters/engine-manager';
+import { createHybridEngine } from '../src/adapters/hybrid-engine';
 import { RemoteEngine } from '../src/adapters/remote-engine';
 import type { SearchEngine, AudioNarrator } from '../src/core/ports';
 import type { ComponentProps } from 'preact';
@@ -370,11 +370,11 @@ describe('SearchView Result Cards & User Actions', () => {
     );
   });
 
-  it('retrieves and displays results seamlessly when backed by EngineManager with failing remote backend', async () => {
+  it('retrieves and displays results seamlessly when backed by createHybridEngine with failing remote backend', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Backend Connection Refused'));
-    const engineManager = new EngineManager(new RemoteEngine('https://api.bibleit.test'), mockEngine);
+    const hybridEngine = createHybridEngine(new RemoteEngine('https://api.bibleit.test'), mockEngine);
 
-    renderSearchView({ engine: engineManager });
+    renderSearchView({ engine: hybridEngine });
 
     const input = screen.getByRole('textbox') as HTMLInputElement;
     fireEvent.input(input, { target: { value: 'peace and joy' } });
@@ -416,10 +416,10 @@ describe('SearchView Result Cards & User Actions', () => {
       retrieve: vi.fn().mockResolvedValue({ passages: [], parsedRefs: [], origin: 'local' }),
       answerProvider: { available: false, answer: async function* () {} },
     };
-    const engineManager = new EngineManager(new RemoteEngine('https://api.bibleit.test'), emptyLocalEngine);
+    const hybridEngine = createHybridEngine(new RemoteEngine('https://api.bibleit.test'), emptyLocalEngine);
 
     renderSearchView({
-      engine: engineManager,
+      engine: hybridEngine,
       isOnline: true,
       offlineTextStatus: PackageStatusEnum.NOT_DOWNLOADED,
     });

@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EngineManager } from '../src/adapters/engine-manager';
+import { createHybridEngine } from '../src/adapters/hybrid-engine';
 import { RemoteEngine } from '../src/adapters/remote-engine';
 import { HttpAnswerProvider } from '../src/adapters/http-answer-provider';
 import type { AnswerProvider, SearchEngine } from '../src/core/ports';
 import { SearchOriginEnum, type RetrievalResult } from '../src/core/types';
 import { API_ROUTES } from '@bibleit/engine';
 
-describe('EngineManager & RemoteEngine', () => {
+describe('createHybridEngine & RemoteEngine', () => {
   const mockLocalResult: RetrievalResult = {
     passages: [
       {
@@ -46,7 +46,7 @@ describe('EngineManager & RemoteEngine', () => {
     const remote = cleanUrl
       ? new RemoteEngine(cleanUrl, new HttpAnswerProvider(cleanUrl, isDeviceOnly))
       : null;
-    return new EngineManager(remote, mockLocalEngine, isDeviceOnly);
+    return createHybridEngine(remote, mockLocalEngine, isDeviceOnly);
   };
 
   it('delegates to RemoteEngine when online and healthy', async () => {
@@ -88,13 +88,14 @@ describe('EngineManager & RemoteEngine', () => {
     expect(result.passages[0]?.chunk.text).toContain('For God so loved the world');
   });
 
-  it('calls localEngine directly without network call when remoteEngine is null', async () => {
+  it('returns localEngine directly without network call when remoteEngine is null', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const engine = createManager(null);
+    expect(engine).toBe(mockLocalEngine);
     const result = await engine.retrieve('love');
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
+    expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love');
     expect(result).toEqual(mockLocalResult);
   });
 
@@ -155,13 +156,14 @@ describe('EngineManager & RemoteEngine', () => {
     onLineSpy.mockRestore();
   });
 
-  it('calls localEngine directly without network call when remoteUrl is whitespace', async () => {
+  it('returns localEngine directly without network call when remoteUrl is whitespace', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const engine = createManager('   ');
+    expect(engine).toBe(mockLocalEngine);
     const result = await engine.retrieve('love');
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love', 10);
+    expect(mockLocalEngine.retrieve).toHaveBeenCalledWith('love');
     expect(result).toEqual(mockLocalResult);
   });
 

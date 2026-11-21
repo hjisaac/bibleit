@@ -23,7 +23,7 @@ import { WebSpeechNarrator } from './adapters/web-speech-narrator';
 import { WorkerSlmAnswerProvider } from './adapters/worker-slm-answer-provider';
 import { HttpAnswerProvider } from './adapters/http-answer-provider';
 import { RemoteEngine } from './adapters/remote-engine';
-import { EngineManager } from './adapters/engine-manager';
+import { createHybridEngine } from './adapters/hybrid-engine';
 import { env } from './env';
 import { $locale } from './stores/i18n';
 
@@ -60,7 +60,7 @@ export function createEngine(
     ? new RemoteEngine(remoteUrl, new HttpAnswerProvider(remoteUrl, isDeviceOnly))
     : null;
 
-  return new EngineManager(remoteEngine, localEngine, isDeviceOnly);
+  return createHybridEngine(remoteEngine, localEngine, isDeviceOnly);
 }
 
 export function createNarrator(): AudioNarrator {
