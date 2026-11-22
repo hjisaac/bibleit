@@ -25,7 +25,7 @@ import {
   SEARCH_STORAGE_KEY,
 } from '../stores/search';
 import { ScriptureOverviewCard } from './ScriptureOverviewCard';
-import type { VoteDirection } from './VoteButtons';
+import type { VoteDirection } from '../core/types';
 import { $locale, i18n, isOnDeviceSupported } from '../stores/i18n';
 import { $activeTranslation, $telemetryEnabled } from '../stores/preferences';
 import { params } from '@nanostores/i18n';
@@ -213,7 +213,6 @@ export function SearchView({
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const lastSubmittedQueryRef = useRef(initialSearch.query);
   const [expandedCardKey, setExpandedCardKey] = useState<string | null>(null);
-  const [overviewVote, setOverviewVote] = useState<VoteDirection | null>(null);
   const [searchFeedbackVote, setSearchFeedbackVote] = useState<VoteDirection | null>(null);
   const [localizedTexts, setLocalizedTexts] = useState<Record<string, string>>({});
   const [surroundingVerses, setSurroundingVerses] = useState<
@@ -283,7 +282,6 @@ export function SearchView({
     }
     setIsSearching(true);
     setPassages([]);
-    setOverviewVote(null);
     setSearchFeedbackVote(null);
     setHasSearched(true);
     const startTime = performance.now();
@@ -516,21 +514,9 @@ export function SearchView({
     setExpandedCardKey((prev) => (prev === key ? null : key));
   };
 
-  const handleVoteOverview = (direction: VoteDirection) => {
-    const nextVote = overviewVote === direction ? null : direction;
-    setOverviewVote(nextVote);
-    if (nextVote) {
-      telemetry?.capture('overview_feedback', {
-        query: lastSubmittedQueryRef.current || query.trim(),
-        model: synthesisModel ?? 'unknown',
-        vote: nextVote,
-        locale: currentLocale,
-      });
-    }
-  };
-
   const handleSearchFeedback = (direction: VoteDirection) => {
     setSearchFeedbackVote(direction);
+    onToast(tt.searchFeedbackThanks);
     telemetry?.capture('search_feedback', {
       query: lastSubmittedQueryRef.current || query.trim(),
       vote: direction,
@@ -548,7 +534,6 @@ export function SearchView({
     setIsSynthesizing(true);
     setIsSearching(true);
     setPassages([]);
-    setOverviewVote(null);
     setSearchFeedbackVote(null);
     setAnswerText('');
     setSynthesisModel(null);
@@ -1052,8 +1037,6 @@ export function SearchView({
         isSynthesisCollapsed={isSynthesisCollapsed}
         onToggleCollapse={() => setIsSynthesisCollapsed(!isSynthesisCollapsed)}
         onDismissError={() => setSynthesisError(null)}
-        vote={overviewVote}
-        onVote={isTelemetryEnabled ? handleVoteOverview : undefined}
         narrator={narrator}
         narrationState={narrationState}
         firstPassage={passages[0]}
@@ -1370,36 +1353,30 @@ export function SearchView({
         })}
 
         {/* End-of-Results Relevance Feedback (Borderless Editorial Colophon) */}
-        {isTelemetryEnabled && passages.length > 0 && !isSearching && !isSynthesizing && (
+        {isTelemetryEnabled && passages.length > 0 && !isSearching && !isSynthesizing && !searchFeedbackVote && (
           <div class="pt-5 pb-2 flex flex-col items-center justify-center text-xs text-center transition-colors">
-            {searchFeedbackVote ? (
-              <p class="font-medium animate-fadeIn" style={{ color: 'var(--text-muted)' }}>
-                ✓ {tt.searchFeedbackThanks}
-              </p>
-            ) : (
-              <div class="flex flex-wrap items-center justify-center gap-1.5" style={{ color: 'var(--text-subtle)' }}>
-                <span>{tt.searchFeedbackPrompt}</span>
-                <span class="inline-flex items-center gap-1.5 font-medium ml-1">
-                  <button
-                    type="button"
-                    onClick={() => handleSearchFeedback('up')}
-                    class="hover:underline transition-opacity py-0.5 px-1 rounded"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    {tt.searchFeedbackYes}
-                  </button>
-                  <span aria-hidden="true" style={{ color: 'var(--text-subtle)' }}>·</span>
-                  <button
-                    type="button"
-                    onClick={() => handleSearchFeedback('down')}
-                    class="hover:underline transition-opacity py-0.5 px-1 rounded"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    {tt.searchFeedbackNo}
-                  </button>
-                </span>
-              </div>
-            )}
+            <div class="flex flex-wrap items-center justify-center gap-1.5" style={{ color: 'var(--text-subtle)' }}>
+              <span>{tt.searchFeedbackPrompt}</span>
+              <span class="inline-flex items-center gap-1.5 font-medium ml-1">
+                <button
+                  type="button"
+                  onClick={() => handleSearchFeedback('up')}
+                  class="hover:underline transition-opacity py-0.5 px-1 rounded"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  {tt.searchFeedbackYes}
+                </button>
+                <span aria-hidden="true" style={{ color: 'var(--text-subtle)' }}>·</span>
+                <button
+                  type="button"
+                  onClick={() => handleSearchFeedback('down')}
+                  class="hover:underline transition-opacity py-0.5 px-1 rounded"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  {tt.searchFeedbackNo}
+                </button>
+              </span>
+            </div>
           </div>
         )}
       </div>

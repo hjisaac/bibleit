@@ -185,3 +185,5 @@ export const TRANSLATIONS = ['web', 'lsg'] as const;
 export type TranslationId = (typeof TRANSLATIONS)[number];
 export const DEFAULT_TRANSLATION: TranslationId = 'web';
 
+export type VoteDirection = 'up' | 'down';
+

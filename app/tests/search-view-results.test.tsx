@@ -165,9 +165,9 @@ describe('SearchView Result Cards & User Actions', () => {
     expect(onOpenReaderSpy).toHaveBeenCalledWith('PHP', 4, 4);
   });
 
-  it('captures search_feedback and replaces the prompt with thank-you confirmation', () => {
+  it('captures search_feedback, fires toast and removes prompt from the results feed', () => {
     const captureSpy = vi.fn();
-    renderSearchView({ telemetry: { capture: captureSpy } });
+    renderSearchView({ telemetry: { capture: captureSpy }, onToast: onToastSpy });
 
     // Passage cards themselves have no vote buttons
     expect(screen.queryByTitle('Relevant passage')).toBeNull();
@@ -184,14 +184,16 @@ describe('SearchView Result Cards & User Actions', () => {
       locale: 'en',
     });
 
-    // Once voted, the question and buttons disappear, replaced with quiet thank-you confirmation
-    expect(screen.getByText(/Thank you for your feedback/i)).toBeDefined();
+    // Toast is displayed
+    expect(onToastSpy).toHaveBeenCalledWith('Thank you for your feedback!');
+
+    // Once voted, the question and buttons disappear completely from the DOM
     expect(screen.queryByText('Yes, helpful')).toBeNull();
     expect(screen.queryByText('Not quite')).toBeNull();
+    expect(screen.queryByText('Did these passages answer your search?')).toBeNull();
   });
 
-  it('captures overview_feedback when rating Grounded Summary', () => {
-    const captureSpy = vi.fn();
+  it('renders Grounded Summary card without vote buttons', () => {
     localStorage.setItem(
       SEARCH_STORAGE_KEY,
       JSON.stringify({
@@ -202,17 +204,9 @@ describe('SearchView Result Cards & User Actions', () => {
       }),
     );
 
-    renderSearchView({ isAiEnabled: true, telemetry: { capture: captureSpy } });
-
-    const upBtn = screen.getByTitle('Helpful summary');
-    fireEvent.click(upBtn);
-    expect(upBtn.getAttribute('aria-pressed')).toBe('true');
-    expect(captureSpy).toHaveBeenCalledWith('overview_feedback', {
-      query: 'peace and joy',
-      model: 'SmolLM2-360M',
-      vote: 'up',
-      locale: 'en',
-    });
+    renderSearchView({ isAiEnabled: true });
+    expect(screen.queryByTitle('Helpful summary')).toBeNull();
+    expect(screen.queryByTitle('Not helpful')).toBeNull();
   });
 
   it('renders passage with collapsed height by default and expands with inside-scroll on toggle', () => {
