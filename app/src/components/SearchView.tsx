@@ -1372,62 +1372,42 @@ export function SearchView({
           );
         })}
 
-        {/* End-of-Results Relevance Feedback Bar */}
+        {/* End-of-Results Relevance Feedback (Borderless Editorial Colophon) */}
         {isTelemetryEnabled && passages.length > 0 && !isSearching && !isSynthesizing && (
-          <div
-            class="p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs transition-colors"
-            style={{
-              backgroundColor: 'var(--bg-surface-elevated)',
-              borderColor: 'var(--border-subtle)',
-              color: 'var(--text-muted)',
-            }}
-          >
-            <span class="font-medium text-center sm:text-left" style={{ color: 'var(--text-main)' }}>
-              {searchFeedbackVote ? tt.searchFeedbackThanks : tt.searchFeedbackPrompt}
-            </span>
-            <div class="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => handleSearchFeedback('up')}
-                aria-pressed={searchFeedbackVote === 'up'}
-                class={`px-3 py-1.5 rounded-xl border font-medium transition-all ${
-                  searchFeedbackVote === 'up'
-                    ? 'bg-emerald-600 text-white border-transparent shadow-sm'
-                    : 'hover:opacity-80'
-                }`}
-                style={
-                  searchFeedbackVote === 'up'
-                    ? undefined
-                    : {
-                        backgroundColor: 'var(--bg-surface)',
-                        borderColor: 'var(--border-subtle)',
-                        color: 'var(--text-main)',
-                      }
-                }
-              >
-                {tt.searchFeedbackYes}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSearchFeedback('down')}
-                aria-pressed={searchFeedbackVote === 'down'}
-                class={`px-3 py-1.5 rounded-xl border font-medium transition-all ${
-                  searchFeedbackVote === 'down'
-                    ? 'bg-rose-600 text-white border-transparent shadow-sm'
-                    : 'hover:opacity-80'
-                }`}
-                style={
-                  searchFeedbackVote === 'down'
-                    ? undefined
-                    : {
-                        backgroundColor: 'var(--bg-surface)',
-                        borderColor: 'var(--border-subtle)',
-                        color: 'var(--text-main)',
-                      }
-                }
-              >
-                {tt.searchFeedbackNo}
-              </button>
+          <div class="pt-5 pb-2 flex flex-col items-center justify-center text-xs text-center transition-colors">
+            <div class="flex flex-wrap items-center justify-center gap-1.5" style={{ color: 'var(--text-subtle)' }}>
+              <span>
+                {searchFeedbackVote ? `✓ ${tt.searchFeedbackThanks}` : tt.searchFeedbackPrompt}
+              </span>
+              <span class="inline-flex items-center gap-1.5 font-medium ml-1">
+                <button
+                  type="button"
+                  onClick={() => handleSearchFeedback('up')}
+                  aria-pressed={searchFeedbackVote === 'up'}
+                  class={`hover:underline transition-all py-0.5 px-1.5 rounded ${
+                    searchFeedbackVote === 'up' ? 'underline font-semibold' : ''
+                  }`}
+                  style={{
+                    color: searchFeedbackVote === 'up' ? 'var(--text-main)' : 'var(--text-muted)',
+                  }}
+                >
+                  {tt.searchFeedbackYes}
+                </button>
+                <span aria-hidden="true" style={{ color: 'var(--text-subtle)' }}>·</span>
+                <button
+                  type="button"
+                  onClick={() => handleSearchFeedback('down')}
+                  aria-pressed={searchFeedbackVote === 'down'}
+                  class={`hover:underline transition-all py-0.5 px-1.5 rounded ${
+                    searchFeedbackVote === 'down' ? 'underline font-semibold' : ''
+                  }`}
+                  style={{
+                    color: searchFeedbackVote === 'down' ? 'var(--text-main)' : 'var(--text-muted)',
+                  }}
+                >
+                  {tt.searchFeedbackNo}
+                </button>
+              </span>
             </div>
           </div>
         )}
