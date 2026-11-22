@@ -44,8 +44,9 @@ export function createEmbedder(
 
 export function createAnswerProvider(
   isInstalled?: () => boolean,
+  modelId: string = manifest.generation?.model || 'HuggingFaceTB/SmolLM2-360M-Instruct',
 ): AnswerProvider {
-  return new WorkerSlmAnswerProvider(isInstalled);
+  return new WorkerSlmAnswerProvider(isInstalled, modelId);
 }
 
 export function createEngine(

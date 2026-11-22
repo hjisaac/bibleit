@@ -16,6 +16,7 @@ import {
   type ArtifactStore,
   type SearchEngine,
   type HealthCheckable,
+  isFrenchLocale,
 } from '@bibleit/engine';
 import { fileURLToPath } from 'node:url';
 import { FsArtifactStore } from './adapters/fs-artifact-store';
@@ -204,13 +205,22 @@ const routes = app
 
     try {
       let searchQuery = q;
+      let translatedBy: string | undefined;
       // Cross-lingual search: translate French queries to English when no explicit reference was matched.
-      if (locale.toLowerCase().startsWith('fr') && refParser.parse(q).length === 0) {
-        searchQuery = await translateToEnglish(q);
+      if (isFrenchLocale(locale) && refParser.parse(q).length === 0) {
+        const translation = await translateToEnglish(q);
+        searchQuery = translation.text;
+        translatedBy = translation.provider;
       }
       const result = await engine.retrieve(searchQuery, k);
-      logger.debug({ q, searchQuery, k, hits: result.passages.length }, 'Search executed');
-      return c.json({ ...result, origin: SearchOriginEnum.REMOTE });
+      logger.debug({ q, searchQuery, translatedBy, k, hits: result.passages.length }, 'Search executed');
+      return c.json({
+        ...result,
+        query: q,
+        translatedQuery: translatedBy ? searchQuery : undefined,
+        translatedBy,
+        origin: SearchOriginEnum.REMOTE,
+      });
     } catch (err) {
       captureCrash(err, { endpoint: API_ROUTES.SEARCH, q, k, locale });
       return c.json({ error: 'Search failed' }, StatusCodes.INTERNAL_SERVER_ERROR);

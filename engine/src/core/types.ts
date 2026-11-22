@@ -77,6 +77,12 @@ export interface RetrievalResult {
   passages: ScoredPassage[];
   /** References parsed out of the query, if any (always shown first). */
   parsedRefs: RefRange[];
+  /** Original user query. */
+  query?: string;
+  /** Cross-lingual translated query when applicable. */
+  translatedQuery?: string;
+  /** Provider that translated the query (e.g. 'gemini', 'groq', 'deepl', 'mymemory'). */
+  translatedBy?: string;
   /** Execution origin declared by the engine resolving the query. */
   origin?: SearchOriginEnum;
   /** Optional reason if degraded to local engine after remote failure. */
@@ -107,6 +113,9 @@ export interface Manifest {
     quantization: { type: 'int8'; scales: string } | { type: 'float32' };
     count: number;
     sha256?: string;
+  };
+  generation?: {
+    model: string;
   };
 }
 
@@ -144,3 +153,7 @@ export interface NarrationState {
 export const LOCALES = ['en', 'fr'] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = 'en';
+
+export function isFrenchLocale(locale?: string): boolean {
+  return Boolean(locale && locale.toLowerCase().startsWith('fr'));
+}

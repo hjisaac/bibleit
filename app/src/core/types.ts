@@ -77,6 +77,12 @@ export interface RetrievalResult {
   passages: ScoredPassage[];
   /** References parsed out of the query, if any (always shown first). */
   parsedRefs: RefRange[];
+  /** Original user query. */
+  query?: string;
+  /** Cross-lingual translated query when applicable. */
+  translatedQuery?: string;
+  /** Provider that translated the query (e.g. 'gemini', 'groq', 'deepl', 'mymemory'). */
+  translatedBy?: string;
   /** Execution origin declared by the engine resolving the query. */
   origin?: SearchOriginEnum;
   /** Optional reason if degraded to local engine after remote failure. */
@@ -107,6 +113,9 @@ export interface Manifest {
     quantization: { type: 'int8'; scales: string } | { type: 'float32' };
     count: number;
     sha256?: string;
+  };
+  generation?: {
+    model: string;
   };
 }
 
@@ -170,7 +179,7 @@ export enum ThemeEnum {
   OBSIDIAN = 'obsidian',
 }
 
-export { LOCALES, DEFAULT_LOCALE, type Locale } from '@bibleit/engine';
+export { LOCALES, DEFAULT_LOCALE, isFrenchLocale, type Locale } from '@bibleit/engine';
 
 export const TRANSLATIONS = ['web', 'lsg'] as const;
 export type TranslationId = (typeof TRANSLATIONS)[number];

@@ -165,39 +165,41 @@ describe('SearchView Result Cards & User Actions', () => {
     expect(onOpenReaderSpy).toHaveBeenCalledWith('PHP', 4, 4);
   });
 
-  it('captures passage_feedback and toggles pressed state when voting thumbs up or down', () => {
+  it('captures search_feedback and toggles pressed state when rating search results at the end of the list', () => {
     const captureSpy = vi.fn();
     renderSearchView({ telemetry: { capture: captureSpy } });
 
-    const upBtn = screen.getByTitle('Relevant passage');
-    const downBtn = screen.getByTitle('Not relevant');
-    expect(upBtn.getAttribute('aria-pressed')).toBe('false');
+    // Passage cards themselves have no vote buttons
+    expect(screen.queryByTitle('Relevant passage')).toBeNull();
+    expect(screen.queryByTitle('Not relevant')).toBeNull();
 
-    fireEvent.click(upBtn);
-    expect(upBtn.getAttribute('aria-pressed')).toBe('true');
-    expect(captureSpy).toHaveBeenCalledWith('passage_feedback', {
+    const yesBtn = screen.getByText('Yes, helpful');
+    const noBtn = screen.getByText('Not quite');
+    expect(yesBtn.getAttribute('aria-pressed')).toBe('false');
+
+    fireEvent.click(yesBtn);
+    expect(yesBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(captureSpy).toHaveBeenCalledWith('search_feedback', {
       query: 'peace and joy',
-      ref: 'Philippians 4:4–7',
-      rank: 0,
       vote: 'up',
+      result_count: 1,
       locale: 'en',
     });
 
-    fireEvent.click(downBtn);
-    expect(downBtn.getAttribute('aria-pressed')).toBe('true');
-    expect(upBtn.getAttribute('aria-pressed')).toBe('false');
-    expect(captureSpy).toHaveBeenCalledWith('passage_feedback', {
+    fireEvent.click(noBtn);
+    expect(noBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(yesBtn.getAttribute('aria-pressed')).toBe('false');
+    expect(captureSpy).toHaveBeenCalledWith('search_feedback', {
       query: 'peace and joy',
-      ref: 'Philippians 4:4–7',
-      rank: 0,
       vote: 'down',
+      result_count: 1,
       locale: 'en',
     });
 
     // Clicking active vote again clears selection without emitting another event
     captureSpy.mockClear();
-    fireEvent.click(downBtn);
-    expect(downBtn.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(noBtn);
+    expect(noBtn.getAttribute('aria-pressed')).toBe('false');
     expect(captureSpy).not.toHaveBeenCalled();
   });
 

@@ -1,4 +1,4 @@
-import { getBibleManifest, verifyBookIntegrity } from '../core/bible-manifest';
+import { getBibleManifest, getManifestContentHash, verifyBookIntegrity } from '../core/bible-manifest';
 import { DEFAULT_TRANSLATION, type TranslationId } from '../core/types';
 import { $activeTranslation } from '../stores/preferences';
 
@@ -24,9 +24,11 @@ export const VERSE_ALIASES: Readonly<Record<string, { chapter: number; verse: nu
   'ROM:16:27': { chapter: 14, verse: 23 },
 };
 
+// Suffix is a manifest content CRC32 hash (not a git commit hash) so caches rotate on text edits.
 export function getBookCacheName(translation?: string): string {
   const trans = getActiveTrans(translation);
-  return `bibleit-books-${trans}@v1`;
+  const contentHash = getManifestContentHash(getBibleManifest(trans));
+  return `bibleit-books-${trans}@${contentHash}`;
 }
 
 const memoryCache = new Map<string, BookData>();

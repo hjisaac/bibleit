@@ -20,7 +20,7 @@ import { FeedbackModal } from './components/FeedbackModal';
 import { AudioPlayerBar } from './components/AudioPlayerBar';
 import { TOAST_DURATION_MS } from './constants';
 import { getLocalizedBookName } from '@bibleit/engine';
-import { $locale, i18n } from './stores/i18n';
+import { $locale, i18n, isOnDeviceSupported } from './stores/i18n';
 import { params } from '@nanostores/i18n';
 import { useHeadroom } from './core/headroom';
 import {
@@ -74,7 +74,7 @@ export function App(): JSX.Element {
       createEngine(
         store,
         embedder,
-        () => $searchMode.get() === SearchModeEnum.DEVICE,
+        () => isOnDeviceSupported($locale.get()) && $searchMode.get() === SearchModeEnum.DEVICE,
         slmProvider,
       ),
     [store, embedder, slmProvider],
@@ -181,6 +181,7 @@ export function App(): JSX.Element {
 
   const searchMode = useStore($searchMode);
   const handleToggleSearchMode = (mode: SearchModeEnum) => {
+    if (mode === SearchModeEnum.DEVICE && !isOnDeviceSupported($locale.get())) return;
     $searchMode.set(mode);
     showToast(mode === SearchModeEnum.DEVICE ? tt.searchModeDevice : tt.searchModeAuto);
   };

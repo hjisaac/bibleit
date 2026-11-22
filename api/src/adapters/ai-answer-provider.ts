@@ -53,7 +53,7 @@ interface ProviderBreaker {
 }
 
 const handleProviderError = handleWhen(
-  (err) => !(err.name === 'AbortError' || err.message?.includes('aborted')),
+  (err: any) => !(err?.name === 'AbortError' || err?.message?.includes('aborted')),
 );
 
 const SYSTEM_PROMPT = `You are BibleIt, a focused scripture assistant.

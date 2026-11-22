@@ -47,6 +47,21 @@ export function verifyBookIntegrity(
   return computeCrc32(content) === entry.crc32;
 }
 
+const manifestHashCache = new WeakMap<BibleManifest, string>();
+
+/** Deterministic 8-char CRC32 over book checksums (content hash, not a git commit hash). */
+export function getManifestContentHash(manifest: BibleManifest): string {
+  const cached = manifestHashCache.get(manifest);
+  if (cached) return cached;
+  const fingerprint = Object.keys(manifest.books)
+    .sort()
+    .map((id) => `${id}:${manifest.books[id]!.crc32}`)
+    .join('|');
+  const hash = computeCrc32(fingerprint);
+  manifestHashCache.set(manifest, hash);
+  return hash;
+}
+
 import { DEFAULT_TRANSLATION, type TranslationId } from './types';
 import { LSG_BIBLE_MANIFEST } from './lsg-manifest';
 export { LSG_BIBLE_MANIFEST };

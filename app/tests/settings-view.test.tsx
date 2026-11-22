@@ -153,4 +153,32 @@ describe('SettingsView Component', () => {
     // Reset shared preference for subsequent test files.
     $telemetryEnabled.set(true);
   });
+
+  it('disables On-Device Only switch and explains next version support when French is active', async () => {
+    const { $isMultilingualEnabled, $localeSetting } = await import('../src/stores/i18n');
+    $isMultilingualEnabled.set(true);
+    $localeSetting.set('fr');
+
+    render(
+      <SettingsView
+        {...defaultProps}
+        textPackageStatus={PackageStatusEnum.DOWNLOADED}
+        searchMode={SearchModeEnum.DEVICE}
+      />,
+    );
+
+    const checkbox = (await screen.findByRole('checkbox', {
+      name: 'Appareil uniquement',
+    })) as HTMLInputElement;
+    expect(checkbox.disabled).toBe(true);
+    expect(checkbox.checked).toBe(false);
+    expect(screen.getByText('Prochaine version')).toBeDefined();
+    expect(
+      screen.getByText(/La prochaine version corrigera cela/i),
+    ).toBeDefined();
+
+    // Reset locale state for subsequent tests.
+    $localeSetting.set('en');
+    $isMultilingualEnabled.set(false);
+  });
 });

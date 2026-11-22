@@ -60,4 +60,19 @@ describe('i18n Locale Resolution & Multilingual Feature Gating', () => {
     expect($locale.get()).toBe('en');
     expect($activeTranslation.get()).toBe('web');
   });
+
+  it('disables on-device search mode when switching to French', async () => {
+    const { $searchMode } = await import('../src/stores/preferences');
+    const { SearchModeEnum } = await import('../src/core/types');
+    const { isOnDeviceSupported } = await import('../src/stores/i18n');
+
+    $isMultilingualEnabled.set(true);
+    $localeSetting.set('en');
+    $searchMode.set(SearchModeEnum.DEVICE);
+    expect(isOnDeviceSupported('en')).toBe(true);
+    expect(isOnDeviceSupported('fr')).toBe(false);
+
+    $localeSetting.set('fr');
+    expect($searchMode.get()).toBe(SearchModeEnum.AUTO);
+  });
 });

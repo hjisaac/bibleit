@@ -1,4 +1,4 @@
-import { DEFAULT_TELEMETRY_BATCH_SIZE } from './constants';
+import { DEFAULT_POSTHOG_HOST, DEFAULT_TELEMETRY_BATCH_SIZE } from './constants';
 
 function requireEnv(key: string, value: string | undefined): string {
   const clean = value?.trim();
@@ -47,7 +47,7 @@ export const env = {
     Boolean(import.meta.env.DEV),
     import.meta.env.VITE_TELEMETRY_DEV,
   ),
-  posthogHost: (import.meta.env.VITE_POSTHOG_HOST?.trim() || 'https://eu.i.posthog.com').replace(/\/+$/, ''),
+  posthogHost: (import.meta.env.VITE_POSTHOG_HOST?.trim() || DEFAULT_POSTHOG_HOST).replace(/\/+$/, ''),
   telemetryBatchSize: resolvePositiveInt(
     import.meta.env.VITE_TELEMETRY_BATCH_SIZE,
     DEFAULT_TELEMETRY_BATCH_SIZE,

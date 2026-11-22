@@ -12,6 +12,7 @@ export const DEEPL_FREE_API_URL = 'https://api-free.deepl.com/v2/translate';
 export const DEEPL_PRO_API_URL = 'https://api.deepl.com/v2/translate';
 export const MYMEMORY_API_URL = 'https://api.mymemory.translated.net/get';
 export const TRANSLATION_TIMEOUT_MS = 3000;
+export const DEFAULT_LLM_TRANSLATION_LIMIT_PER_MIN = 30;
 
 export const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
 export const GROQ_DEFAULT_MODEL = 'openai/gpt-oss-120b';

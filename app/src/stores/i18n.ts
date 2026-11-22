@@ -6,12 +6,17 @@ import {
   DEFAULT_LOCALE,
   DEFAULT_TRANSLATION,
   LOCALES,
+  SearchModeEnum,
   type Locale,
   type TranslationId,
 } from '../core/types';
-import { $activeTranslation } from './preferences';
+import { $activeTranslation, $searchMode } from './preferences';
 
 export { DEFAULT_LOCALE, LOCALES, type Locale };
+
+export function isOnDeviceSupported(locale: Locale): boolean {
+  return locale === 'en';
+}
 
 // Multilingual feature gate: in-memory state driven by Vite configuration (enabled in dev, disabled in prod).
 export const $isMultilingualEnabled = atom<boolean>(env.isMultilingualEnabled);
@@ -59,10 +64,13 @@ export const i18n = createI18n($locale, {
   },
 });
 
-// Sync html lang attribute and default active translation with locale
+// Sync html lang attribute, active translation, and on-device eligibility with locale
 $locale.subscribe((code) => {
   if (typeof document !== 'undefined') {
     document.documentElement.lang = code;
   }
   $activeTranslation.set(LOCALE_DEFAULT_TRANSLATION[code as Locale] ?? DEFAULT_TRANSLATION);
+  if (!isOnDeviceSupported(code as Locale) && $searchMode.get() === SearchModeEnum.DEVICE) {
+    $searchMode.set(SearchModeEnum.AUTO);
+  }
 });

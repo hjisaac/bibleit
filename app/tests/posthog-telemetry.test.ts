@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PostHogTelemetry } from '../src/adapters/posthog-telemetry';
+import { DEFAULT_POSTHOG_HOST } from '../src/constants';
 import { resolvePositiveInt, resolvePosthogKey } from '../src/env';
 import { $telemetryEnabled } from '../src/stores/preferences';
 import {
@@ -27,7 +28,7 @@ describe('PostHogTelemetry', () => {
 
   const createTelemetry = (
     apiKey: string,
-    host = 'https://eu.i.posthog.com',
+    host = DEFAULT_POSTHOG_HOST,
     batchSize = 3,
     environment: 'dev' | 'prod' = 'prod',
   ) => {

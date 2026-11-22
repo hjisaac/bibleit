@@ -2,7 +2,15 @@ import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import { PackageStatusEnum, ThemeEnum, SearchModeEnum, type Manifest } from '../core/types';
-import { i18n, $locale, $localeSetting, $isMultilingualEnabled, LOCALES, type Locale } from '../stores/i18n';
+import {
+  i18n,
+  $locale,
+  $localeSetting,
+  $isMultilingualEnabled,
+  isOnDeviceSupported,
+  LOCALES,
+  type Locale,
+} from '../stores/i18n';
 import { $telemetryEnabled } from '../stores/preferences';
 import { setTelemetryEnabled } from '../stores/telemetry';
 import { params } from '@nanostores/i18n';
@@ -373,46 +381,63 @@ export function SettingsView({
       )}
 
       {/* On-Device Only Search Toggle */}
-      <div
-        class="p-4 rounded-2xl border space-y-3"
-        style={{
-          backgroundColor: 'var(--bg-surface-elevated)',
-          borderColor: 'var(--border-subtle)',
-        }}
-      >
-        <div class="flex items-center justify-between">
-          <div class="pr-3">
-            <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-              <span>{tt.onDeviceTitle}</span>
-              <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono font-medium">
-                {tt.onDeviceBadge}
-              </span>
-            </div>
-            <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {textPackageStatus === PackageStatusEnum.DOWNLOADED
-                ? tt.onDeviceDescReady
-                : tt.onDeviceDescDownload}
-            </p>
-          </div>
-
-          <label
-            class={`relative inline-flex items-center shrink-0 ${
-              textPackageStatus === PackageStatusEnum.DOWNLOADED ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
-            }`}
+      {(() => {
+        const onDeviceSupported = isOnDeviceSupported(currentLocale);
+        const canUseOnDevice = onDeviceSupported && textPackageStatus === PackageStatusEnum.DOWNLOADED;
+        return (
+          <div
+            class="p-4 rounded-2xl border space-y-3"
+            style={{
+              backgroundColor: 'var(--bg-surface-elevated)',
+              borderColor: 'var(--border-subtle)',
+            }}
           >
-            <input
-              type="checkbox"
-              disabled={textPackageStatus !== PackageStatusEnum.DOWNLOADED}
-              checked={searchMode === SearchModeEnum.DEVICE}
-              onChange={(e) =>
-                onToggleSearchMode?.((e.target as HTMLInputElement).checked ? SearchModeEnum.DEVICE : SearchModeEnum.AUTO)
-              }
-              class="sr-only peer"
-            />
-            <div class="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
-          </label>
-        </div>
-      </div>
+            <div class="flex items-center justify-between">
+              <div class="pr-3">
+                <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
+                  <span>{tt.onDeviceTitle}</span>
+                  <span
+                    class={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium ${
+                      onDeviceSupported
+                        ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                        : 'bg-stone-500/15 text-stone-600 dark:text-stone-300'
+                    }`}
+                  >
+                    {onDeviceSupported ? tt.onDeviceBadge : tt.onDeviceBadgeSoon}
+                  </span>
+                </div>
+                <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  {!onDeviceSupported
+                    ? tt.onDeviceDescUnsupportedLocale
+                    : textPackageStatus === PackageStatusEnum.DOWNLOADED
+                    ? tt.onDeviceDescReady
+                    : tt.onDeviceDescDownload}
+                </p>
+              </div>
+
+              <label
+                class={`relative inline-flex items-center shrink-0 ${
+                  canUseOnDevice ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  aria-label={tt.onDeviceTitle}
+                  disabled={!canUseOnDevice}
+                  checked={canUseOnDevice && searchMode === SearchModeEnum.DEVICE}
+                  onChange={(e) =>
+                    onToggleSearchMode?.(
+                      (e.target as HTMLInputElement).checked ? SearchModeEnum.DEVICE : SearchModeEnum.AUTO,
+                    )
+                  }
+                  class="sr-only peer"
+                />
+                <div class="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
+              </label>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Offline Packages & Storage Control */}
       <div
