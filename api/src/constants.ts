@@ -8,3 +8,7 @@ export const MAX_PASSAGES = 5;
 export const MAX_PASSAGE_TEXT_LENGTH = 2000;
 export const BACKEND_ONNX_NUM_THREADS = 1;
 
+export const DEEPL_FREE_API_URL = 'https://api-free.deepl.com/v2/translate';
+export const DEEPL_PRO_API_URL = 'https://api.deepl.com/v2/translate';
+export const MYMEMORY_API_URL = 'https://api.mymemory.translated.net/get';
+export const TRANSLATION_TIMEOUT_MS = 3000;

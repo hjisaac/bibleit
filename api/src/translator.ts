@@ -1,3 +1,10 @@
+import {
+  DEEPL_FREE_API_URL,
+  DEEPL_PRO_API_URL,
+  MYMEMORY_API_URL,
+  TRANSLATION_TIMEOUT_MS,
+} from './constants';
+
 export async function translateToEnglish(text: string): Promise<string> {
   const deeplKey = process.env.DEEPL_API_KEY?.trim();
 
@@ -5,8 +12,8 @@ export async function translateToEnglish(text: string): Promise<string> {
   if (deeplKey) {
     try {
       const endpoint = deeplKey.endsWith(':fx')
-        ? 'https://api-free.deepl.com/v2/translate'
-        : 'https://api.deepl.com/v2/translate';
+        ? DEEPL_FREE_API_URL
+        : DEEPL_PRO_API_URL;
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -18,7 +25,7 @@ export async function translateToEnglish(text: string): Promise<string> {
           text: [text],
           target_lang: 'EN',
         }),
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(TRANSLATION_TIMEOUT_MS),
       });
 
       if (res.ok) {
@@ -33,8 +40,8 @@ export async function translateToEnglish(text: string): Promise<string> {
 
   // Free fallback via MyMemory API.
   try {
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=fr|en`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    const url = `${MYMEMORY_API_URL}?q=${encodeURIComponent(text)}&langpair=fr|en`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(TRANSLATION_TIMEOUT_MS) });
     if (res.ok) {
       const data = (await res.json()) as { responseData?: { translatedText?: string } };
       const translated = data.responseData?.translatedText?.trim();
