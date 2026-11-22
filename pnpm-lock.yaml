@@ -26,6 +26,9 @@ importers:
       ai:
         specifier: ^7.0.162
         version: 7.0.162(zod@4.6.7)
+      cockatiel:
+        specifier: ^4.0.0
+        version: 4.0.0
       hono:
         specifier: ^4.6.14
         version: 4.13.14
@@ -121,9 +124,6 @@ importers:
 
   engine:
     dependencies:
-      cockatiel:
-        specifier: ^4.0.0
-        version: 4.0.0
       minisearch:
         specifier: ^7.2.0
         version: 7.2.0

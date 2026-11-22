@@ -50,7 +50,7 @@ describe('AiAnswerProvider candidate list and rotation', () => {
     assert.strictEqual(list2[2]?.name, 'openrouter');
   });
 
-  it('bypasses provider on cooldown and promotes Tier 2 when Tier 1 is exhausted', () => {
+  it('bypasses provider on cooldown and promotes Tier 2 when Tier 1 is exhausted', async () => {
     process.env.GROQ_API_KEY = 'mock_groq';
     process.env.GEMINI_API_KEY = 'mock_gemini';
     process.env.OPENROUTER_API_KEY = 'mock_openrouter';
@@ -58,15 +58,15 @@ describe('AiAnswerProvider candidate list and rotation', () => {
     const provider = new AiAnswerProvider();
 
     // Cool down both Tier 1 providers
-    provider.markCooldown('groq', { responseHeaders: { 'retry-after': '60' } });
-    provider.markCooldown('gemini', { responseHeaders: { 'retry-after': '60' } });
+    await provider.recordFailure('groq', { responseHeaders: { 'retry-after': '60' } });
+    await provider.recordFailure('gemini', { responseHeaders: { 'retry-after': '60' } });
 
     // Tier 2 (openrouter) is selected first
     const list = provider.getCandidateList();
     assert.strictEqual(list[0]?.name, 'openrouter');
   });
 
-  it('reports live provider statuses and cooldown countdowns', () => {
+  it('reports live provider statuses and cooldown countdowns', async () => {
     process.env.GROQ_API_KEY = 'mock_groq';
     process.env.GEMINI_API_KEY = 'mock_gemini';
     delete process.env.OPENROUTER_API_KEY;
@@ -74,7 +74,7 @@ describe('AiAnswerProvider candidate list and rotation', () => {
     delete process.env.COHERE_API_KEY;
 
     const provider = new AiAnswerProvider();
-    provider.markCooldown('groq', { responseHeaders: { 'retry-after': '30' } });
+    await provider.recordFailure('groq', { responseHeaders: { 'retry-after': '30' } });
 
     const statuses = provider.getProviderStatuses();
     const groqStatus = statuses.find((s) => s.name === 'groq');
@@ -88,11 +88,11 @@ describe('AiAnswerProvider candidate list and rotation', () => {
     assert.strictEqual(geminiStatus?.status, 'healthy');
   });
 
-  it('does not cool down provider on client AbortError', () => {
+  it('does not cool down provider on client AbortError', async () => {
     const provider = new AiAnswerProvider();
     const abortErr = new Error('The operation was aborted');
     abortErr.name = 'AbortError';
-    provider.markCooldown('groq', abortErr);
+    await provider.recordFailure('groq', abortErr);
 
     const statuses = provider.getProviderStatuses();
     const groq = statuses.find((s) => s.name === 'groq');
