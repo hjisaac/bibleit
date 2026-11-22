@@ -39,3 +39,13 @@ export const $telemetryEnabled = persistentAtom<boolean>('bibleit:pref:telemetry
   encode: String,
   decode: (v) => v === 'true',
 });
+
+export const $queryTranslationEnabled = persistentAtom<boolean>(
+  'bibleit:pref:query_translation_enabled',
+  true,
+  {
+    encode: String,
+    decode: (v) => v === 'true',
+  },
+);
+

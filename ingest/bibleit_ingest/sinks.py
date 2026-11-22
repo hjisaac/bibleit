@@ -9,6 +9,7 @@ import numpy as np
 
 from rag_core.sinks import BaseSink
 
+from .constants import DEFAULT_GENERATION_MODEL
 from .types import BookCorpus, Passage
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ class StaticArtifactSink(BaseSink):
         query_prefix: str,
         chunk_meta: dict[str, Any],
         scales: np.ndarray | None = None,
+        generation_model: str | None = DEFAULT_GENERATION_MODEL,
         **kwargs: Any,
     ) -> Path:
         if len(chunks) != embeddings.shape[0]:
@@ -87,7 +89,7 @@ class StaticArtifactSink(BaseSink):
             quant_meta = {"type": "float32"}
 
         # 4. Manifest with cryptographic SHA-256 integrity checksums over canonical payloads
-        manifest = {
+        manifest: dict[str, Any] = {
             "schema_version": 3,
             "translation": self.translation,
             "corpus": {
@@ -110,6 +112,8 @@ class StaticArtifactSink(BaseSink):
                 "sha256": hashlib.sha256(emb_bytes).hexdigest(),
             },
         }
+        if generation_model:
+            manifest["generation"] = {"model": generation_model}
         manifest_file = out_dir / "manifest.json"
         manifest_file.write_text(json.dumps(manifest, indent=2))
 

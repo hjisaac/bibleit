@@ -82,4 +82,5 @@ jobs:
           VITE_CLOUDFLARE_R2_URL: ${{ vars.VITE_CLOUDFLARE_R2_URL }}
           VITE_FEEDBACK_EMAIL: ${{ vars.VITE_FEEDBACK_EMAIL }}
           VITE_BACKEND_API_URL: ${{ vars.VITE_BACKEND_API_URL }}
+          VITE_MULTILINGUAL_ENABLED: ${{ vars.VITE_MULTILINGUAL_ENABLED }}
         run: pnpm build

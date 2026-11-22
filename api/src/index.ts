@@ -198,6 +198,7 @@ const routes = app
     const q = c.req.query('q')?.trim() || '';
     const k = Math.min(Number(c.req.query('k')) || 10, 50);
     const locale = c.req.query('locale') || c.req.query('lang') || 'en';
+    const shouldTranslate = c.req.query('translate') !== 'false';
 
     if (!q) {
       return c.json({ passages: [], parsedRefs: [], origin: SearchOriginEnum.REMOTE });
@@ -206,19 +207,20 @@ const routes = app
     try {
       let searchQuery = q;
       let translatedBy: string | undefined;
-      // Cross-lingual search: translate French queries to English when no explicit reference was matched.
-      if (isFrenchLocale(locale) && refParser.parse(q).length === 0) {
+      // Cross-lingual search: translate French queries to English when enabled and no explicit reference was matched.
+      if (shouldTranslate && isFrenchLocale(locale) && refParser.parse(q).length === 0) {
         const translation = await translateToEnglish(q);
         searchQuery = translation.text;
         translatedBy = translation.provider;
       }
       const result = await engine.retrieve(searchQuery, k);
-      logger.debug({ q, searchQuery, translatedBy, k, hits: result.passages.length }, 'Search executed');
+      const isTranslated = !!(translatedBy && searchQuery.toLowerCase() !== q.toLowerCase());
+      logger.debug({ q, searchQuery, translatedBy, isTranslated, k, hits: result.passages.length }, 'Search executed');
       return c.json({
         ...result,
         query: q,
-        translatedQuery: translatedBy ? searchQuery : undefined,
-        translatedBy,
+        translatedQuery: isTranslated ? searchQuery : undefined,
+        translatedBy: isTranslated ? translatedBy : undefined,
         origin: SearchOriginEnum.REMOTE,
       });
     } catch (err) {

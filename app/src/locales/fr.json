@@ -235,7 +235,9 @@
     "languageEnglish": "English (World English Bible - WEB)",
     "languageFrench": "Français (Louis Segond 1910 - LSG)",
     "telemetryTitle": "Aider à améliorer la recherche",
-    "telemetryDesc": "Partager anonymement vos recherches et avis sur les passages pour affiner les résultats. Aucune donnée personnelle."
+    "telemetryDesc": "Partager anonymement vos recherches et avis sur les passages pour affiner les résultats. Aucune donnée personnelle.",
+    "queryTranslationTitle": "Traduction automatique de requête",
+    "queryTranslationDesc": "Traduit les requêtes non anglophones en anglais pour la recherche de passages. Désactivez pour accélérer si vous recherchez directement en anglais."
   },
   "search/view": {
     "searchPlaceholder": "Rechercher versets, thèmes ou questions...",

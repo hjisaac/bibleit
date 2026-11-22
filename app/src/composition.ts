@@ -28,6 +28,7 @@ import { createHybridEngine } from './adapters/hybrid-engine';
 import { PostHogTelemetry } from './adapters/posthog-telemetry';
 import { env } from './env';
 import { $locale } from './stores/i18n';
+import { $queryTranslationEnabled } from './stores/preferences';
 import manifest from '../public/data/manifest.json';
 
 export { LocalEngine, createArtifactStore };
@@ -67,7 +68,12 @@ export function createEngine(
 
   const remoteUrl = env.backendApiUrl?.trim().replace(/\/+$/, '');
   const remoteEngine = remoteUrl
-    ? new RemoteEngine(remoteUrl, new HttpAnswerProvider(remoteUrl, isDeviceOnly), () => $locale.get())
+    ? new RemoteEngine(
+        remoteUrl,
+        new HttpAnswerProvider(remoteUrl, isDeviceOnly),
+        () => $locale.get(),
+        () => $queryTranslationEnabled.get(),
+      )
     : null;
 
   return createHybridEngine(remoteEngine, localEngine, isDeviceOnly);

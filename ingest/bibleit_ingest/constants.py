@@ -27,6 +27,9 @@ ARTIFACT_DIGEST_BYTES = 6
 QUERY_PREFIX = "search_query: "
 DOCUMENT_PREFIX = "search_document: "
 
+# Default on-device synthesis model published in manifest.json.
+DEFAULT_GENERATION_MODEL = "HuggingFaceTB/SmolLM2-360M-Instruct"
+
 EMBED_CORPUS_OUTPUTS = REPO / "ingest/analysis/embed_corpus/outputs"
 APP_DATA_DIR = REPO / "app/public/data"
 

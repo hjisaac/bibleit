@@ -376,6 +376,29 @@ async function fetchWithProgress(
   throw new Error(`Failed to fetch ${url} after retries`);
 }
 
+const ARTIFACTS_DIR = 'bibleit-artifacts';
+const MANIFEST_PATH = `${ARTIFACTS_DIR}/manifest.json`;
+
+// Content-hash suffix derived from each artifact's own SHA-256 (not a git commit hash).
+function shortHash(sha256: string | undefined, fallback: string): string {
+  return sha256 ? sha256.slice(0, 8) : fallback;
+}
+
+export function getArtifactPaths(m: Manifest) {
+  const dir = `${ARTIFACTS_DIR}/${m.translation.id.toLowerCase()}`;
+  const isInt8 = m.embeddings.quantization.type === 'int8';
+  const ext = isInt8 ? 'i8.bin' : 'f32.bin';
+  const scalesSha = isInt8
+    ? (m.embeddings.quantization as { scales_sha256?: string }).scales_sha256
+    : undefined;
+  return {
+    verses: `${dir}/verses-${shortHash(m.corpus.sha256, `v${m.schema_version}`)}.json.gz`,
+    chunks: `${dir}/chunks-${shortHash(m.chunks.sha256, m.chunks.hash)}.json.gz`,
+    embeddings: `${dir}/embeddings-${shortHash(m.embeddings.sha256, m.chunks.hash)}.${ext}`,
+    scales: `${dir}/scales-${shortHash(scalesSha, m.chunks.hash)}.f32.bin`,
+  };
+}
+
 export function createArtifactStore(storage: FileStorage = new OpfsStorage()): ArtifactStore {
   let manifestPromise: Promise<Manifest> | null = null;
 
@@ -394,7 +417,7 @@ export function createArtifactStore(storage: FileStorage = new OpfsStorage()): A
         );
       }
       if (isAvail) {
-        await storage.write('manifest.json', JSON.stringify(m));
+        await storage.write(MANIFEST_PATH, JSON.stringify(m));
       }
       return m;
     } catch (err) {
@@ -406,7 +429,7 @@ export function createArtifactStore(storage: FileStorage = new OpfsStorage()): A
 
     // Offline fallback from local storage
     if (isAvail) {
-      const blob = await storage.read('manifest.json');
+      const blob = await storage.read(MANIFEST_PATH);
       if (blob) {
         try {
           const cached = JSON.parse(await blob.text()) as Manifest;
@@ -490,7 +513,7 @@ export function createArtifactStore(storage: FileStorage = new OpfsStorage()): A
     async verses(onProgress?: (progressPercent: number) => void, signal?: AbortSignal): Promise<VerseCorpusData> {
       const m = await this.manifest();
       return loadVerifiedArtifact(
-        `verses-v${m.schema_version}.json.gz`,
+        getArtifactPaths(m).verses,
         m.corpus.verses,
         m.corpus.sha256,
         (bytes) => JSON.parse(new TextDecoder().decode(bytes)) as VerseCorpusData,
@@ -503,7 +526,7 @@ export function createArtifactStore(storage: FileStorage = new OpfsStorage()): A
     async chunks(onProgress?: (progressPercent: number) => void, signal?: AbortSignal): Promise<RawChunk[]> {
       const m = await this.manifest();
       return loadVerifiedArtifact(
-        `chunks-${m.chunks.hash}.json.gz`,
+        getArtifactPaths(m).chunks,
         m.chunks.file,
         m.chunks.sha256,
         (bytes) => JSON.parse(new TextDecoder().decode(bytes)) as RawChunk[],
@@ -518,10 +541,10 @@ export function createArtifactStore(storage: FileStorage = new OpfsStorage()): A
       signal?: AbortSignal,
     ): Promise<{ data: ArrayBuffer; scales?: ArrayBuffer }> {
       const m = await this.manifest();
+      const paths = getArtifactPaths(m);
       const isInt8 = m.embeddings.quantization.type === 'int8';
-      const ext = isInt8 ? 'i8.bin' : 'f32.bin';
       const data = await loadVerifiedArtifact(
-        `embeddings-${m.chunks.hash}.${ext}`,
+        paths.embeddings,
         m.embeddings.file,
         m.embeddings.sha256,
         (bytes) => toExactArrayBuffer(bytes),
@@ -533,7 +556,7 @@ export function createArtifactStore(storage: FileStorage = new OpfsStorage()): A
       if (isInt8) {
         const scalesMeta = m.embeddings.quantization as { scales: string; scales_sha256?: string };
         const scales = await loadVerifiedArtifact(
-          `scales-${m.chunks.hash}.f32.bin`,
+          paths.scales,
           scalesMeta.scales,
           scalesMeta.scales_sha256,
           (bytes) => toExactArrayBuffer(bytes),
@@ -548,15 +571,29 @@ export function createArtifactStore(storage: FileStorage = new OpfsStorage()): A
     },
 
     async hasVerses(): Promise<boolean> {
-      const blob = await storage.read(`verses-v${SUPPORTED_SCHEMA_VERSION}.json.gz`);
-      return blob !== null && blob.size > 0;
+      try {
+        const m = await this.manifest();
+        const blob = await storage.read(getArtifactPaths(m).verses);
+        return blob !== null && blob.size > 0;
+      } catch {
+        return false;
+      }
     },
 
     async hasEmbeddings(): Promise<boolean> {
-      const names = await storage.list();
-      return names.some(
-        (name) => name.startsWith('embeddings-') && (name.endsWith('.i8.bin') || name.endsWith('.f32.bin')),
-      );
+      try {
+        const m = await this.manifest();
+        const paths = getArtifactPaths(m);
+        const emb = await storage.read(paths.embeddings);
+        if (!emb || emb.size === 0) return false;
+        if (m.embeddings.quantization.type === 'int8') {
+          const scales = await storage.read(paths.scales);
+          return scales !== null && scales.size > 0;
+        }
+        return true;
+      } catch {
+        return false;
+      }
     },
 
     async isStorageAvailable(): Promise<boolean> {
@@ -566,18 +603,7 @@ export function createArtifactStore(storage: FileStorage = new OpfsStorage()): A
     async clear(): Promise<void> {
       manifestPromise = null;
       await clearBookCache();
-      const names = await storage.list();
-      for (const name of names) {
-        if (
-          name.startsWith('verses-') ||
-          name.startsWith('chunks-') ||
-          name.startsWith('embeddings-') ||
-          name.startsWith('scales-') ||
-          name === 'manifest.json'
-        ) {
-          await storage.delete(name);
-        }
-      }
+      await storage.delete(ARTIFACTS_DIR);
     },
   };
 }

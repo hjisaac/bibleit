@@ -414,6 +414,21 @@ export function SearchView({
     }
   }, [isAiEnabled]);
 
+  const prevTranslationRef = useRef(activeTranslation);
+  const prevLocaleRef = useRef(currentLocale);
+  useEffect(() => {
+    if (prevTranslationRef.current !== activeTranslation || prevLocaleRef.current !== currentLocale) {
+      prevTranslationRef.current = activeTranslation;
+      prevLocaleRef.current = currentLocale;
+      setIsSynthesizing(false);
+      setAnswerText('');
+      setSynthesisError(null);
+      setSynthesisModel(null);
+      setSynthesisTtftMs(null);
+      setSynthesisTokensPerSec(null);
+    }
+  }, [activeTranslation, currentLocale]);
+
   // Resolve retrieved passage text into the active translation (e.g., WEB -> LSG).
   useEffect(() => {
     if (activeTranslation === DEFAULT_TRANSLATION || passages.length === 0) return;

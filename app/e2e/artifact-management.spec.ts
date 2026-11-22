@@ -9,7 +9,7 @@ test.describe('Artifact Management & OPFS Storage', () => {
         const root = await navigator.storage.getDirectory();
         for await (const name of (root as any).keys?.() ?? []) {
           try {
-            await root.removeEntry(name);
+            await root.removeEntry(name, { recursive: true });
           } catch {
             // Ignore removal errors during cleanup
           }
@@ -38,10 +38,19 @@ test.describe('Artifact Management & OPFS Storage', () => {
     // await expect(page.getByRole('button', { name: 'Re-download' })).toBeVisible();
     await expect(clearBtn).toBeEnabled();
 
-    // Verify browser OPFS directly has compressed .gz bytes (~1.2 MB)
+    // Verify browser OPFS directly has compressed .gz bytes (~1.2 MB) under bibleit-artifacts/web/
     const opfsFile = await page.evaluate(async () => {
       const root = await navigator.storage.getDirectory();
-      const handle = await root.getFileHandle('verses-v3.json.gz');
+      const artifactsDir = await root.getDirectoryHandle('bibleit-artifacts');
+      const webDir = await artifactsDir.getDirectoryHandle('web');
+      let versesName = '';
+      for await (const name of (webDir as any).keys?.() ?? []) {
+        if (typeof name === 'string' && name.startsWith('verses-') && name.endsWith('.json.gz')) {
+          versesName = name;
+          break;
+        }
+      }
+      const handle = await webDir.getFileHandle(versesName);
       const file = await handle.getFile();
       const header = new Uint8Array(await file.slice(0, 2).arrayBuffer());
       return {
@@ -51,7 +60,7 @@ test.describe('Artifact Management & OPFS Storage', () => {
       };
     });
 
-    expect(opfsFile.name).toBe('verses-v3.json.gz');
+    expect(opfsFile.name).toMatch(/^verses-[0-9a-f]{8}\.json\.gz$/);
     expect(opfsFile.size).toBeGreaterThan(1_000_000);
     expect(opfsFile.size).toBeLessThan(2_000_000);
     expect(opfsFile.isGzip).toBe(true);
@@ -81,7 +90,7 @@ test.describe('Artifact Management & OPFS Storage', () => {
     await expect(page.getByText('0 MB cached')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Free Up Local Space (Clear Artifacts)' })).toBeDisabled();
 
-    // Verify file is purged from OPFS
+    // Verify artifacts directory is purged from OPFS
     const remainingFiles = await page.evaluate(async () => {
       const root = await navigator.storage.getDirectory();
       const names: string[] = [];
@@ -90,6 +99,6 @@ test.describe('Artifact Management & OPFS Storage', () => {
       }
       return names;
     });
-    expect(remainingFiles).not.toContain('verses-v3.json.gz');
+    expect(remainingFiles).not.toContain('bibleit-artifacts');
   });
 });

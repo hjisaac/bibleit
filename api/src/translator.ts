@@ -114,6 +114,14 @@ async function translateViaDeepL(text: string): Promise<TranslationResult | null
       const translated = data.translations?.[0]?.text?.trim();
       if (translated) return { text: translated, provider: 'deepl' };
     }
+
+    if (res.status === 400) {
+      const errData = (await res.json().catch(() => null)) as { message?: string } | null;
+      if (errData?.message?.toLowerCase().includes('equal')) {
+        // Query is already in English; return original text directly without fallback.
+        return { text };
+      }
+    }
   } catch {
     // Degrade to free fallback.
   }

@@ -67,4 +67,21 @@ describe('GET /api/v1/search route', () => {
     assert.strictEqual(data.translatedBy, undefined);
     assert.strictEqual(fetchCalled, false);
   });
+
+  it('skips translation when translate=false parameter is passed', async () => {
+    let fetchCalled = false;
+    globalThis.fetch = async () => {
+      fetchCalled = true;
+      throw new Error('Should not fetch translation when translate=false');
+    };
+
+    const res = await app.request(`${API_ROUTES.SEARCH}?q=paix&locale=fr&translate=false`);
+    assert.strictEqual(res.status, StatusCodes.OK);
+
+    const data = await res.json();
+    assert.strictEqual(data.query, 'paix');
+    assert.strictEqual(data.translatedQuery, undefined);
+    assert.strictEqual(data.translatedBy, undefined);
+    assert.strictEqual(fetchCalled, false);
+  });
 });

@@ -9,9 +9,19 @@ export class BibleitApiClient {
     this.client = hc<AppType>(baseUrl);
   }
 
-  async search(query: string, k = 10, signal?: AbortSignal, locale?: string): Promise<RetrievalResult | null> {
-    const queryParams: { q: string; k: string; locale?: string } = { q: query, k: String(k) };
-    if (locale) queryParams.locale = locale;
+  async search(
+    query: string,
+    k = 10,
+    signal?: AbortSignal,
+    locale?: string,
+    translate?: boolean,
+  ): Promise<RetrievalResult | null> {
+    const queryParams: { q: string; k: string; locale?: string; translate?: string } = {
+      q: query,
+      k: String(k),
+    };
+    if (locale && locale !== 'en') queryParams.locale = locale;
+    if (translate === false) queryParams.translate = 'false';
     const res = await this.client.api.v1.search.$get(
       { query: queryParams },
       { init: { signal } },

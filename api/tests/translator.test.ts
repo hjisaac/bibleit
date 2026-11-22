@@ -129,6 +129,21 @@ describe('translateToEnglish', () => {
     assert.strictEqual(calledHeaders['Authorization'], 'DeepL-Auth-Key mock_key:fx');
   });
 
+  it('returns text as-is when DeepL detects identical source and target language (HTTP 400)', async () => {
+    process.env.DEEPL_API_KEY = 'mock_key:fx';
+
+    globalThis.fetch = async () => {
+      return new Response(
+        JSON.stringify({ message: 'Source and target language are equal.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+      );
+    };
+
+    const result = await translateToEnglish('peace in anxiety');
+    assert.strictEqual(result.text, 'peace in anxiety');
+    assert.strictEqual(result.provider, undefined);
+  });
+
   it('falls back to MyMemory API when neither LLM nor DeepL is configured', async () => {
     let calledUrl = '';
 
