@@ -87,6 +87,10 @@ export interface RetrievalResult {
   origin?: SearchOriginEnum;
   /** Optional reason if degraded to local engine after remote failure. */
   fallbackReason?: 'timeout' | 'error';
+  /** Detected query language (e.g. 'en', 'fr'). */
+  detectedLanguage?: 'en' | 'fr' | null;
+  /** Reason why query translation was bypassed, if applicable. */
+  translationBypassReason?: string;
 }
 
 // ---------------------------------------------------------------------------

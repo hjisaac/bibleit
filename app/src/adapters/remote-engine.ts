@@ -27,13 +27,19 @@ export class RemoteEngine implements SearchEngine {
   async retrieve(query: string, k = 10, signal?: AbortSignal): Promise<RetrievalResult> {
     const locale = this.getLocale?.();
     let shouldTranslate: boolean | undefined = undefined;
+    let detectedLanguage: 'en' | 'fr' | null = null;
+    let clientBypassReason: string | undefined = undefined;
 
     if (isFrenchLocale(locale)) {
-      shouldTranslate = this.getTranslate?.() !== false;
-      if (shouldTranslate) {
-        const detected = await detectQueryLanguage(query);
-        if (detected === 'en') {
+      if (this.getTranslate?.() === false) {
+        shouldTranslate = false;
+        clientBypassReason = 'user_opt_out';
+      } else {
+        shouldTranslate = true;
+        detectedLanguage = await detectQueryLanguage(query);
+        if (detectedLanguage === 'en') {
           shouldTranslate = false;
+          clientBypassReason = 'client_detected_english';
         }
       }
     }
@@ -44,6 +50,8 @@ export class RemoteEngine implements SearchEngine {
     }
     return {
       ...result,
+      detectedLanguage: detectedLanguage ?? result.detectedLanguage,
+      translationBypassReason: clientBypassReason ?? result.translationBypassReason,
       origin: SearchOriginEnum.REMOTE,
     };
   }

@@ -65,6 +65,7 @@ describe('GET /api/v1/search route', () => {
     assert.strictEqual(data.query, 'Jean 3:16');
     assert.strictEqual(data.translatedQuery, undefined);
     assert.strictEqual(data.translatedBy, undefined);
+    assert.strictEqual(data.translationBypassReason, 'scripture_reference');
     assert.strictEqual(fetchCalled, false);
   });
 
@@ -82,6 +83,26 @@ describe('GET /api/v1/search route', () => {
     assert.strictEqual(data.query, 'paix');
     assert.strictEqual(data.translatedQuery, undefined);
     assert.strictEqual(data.translatedBy, undefined);
+    assert.strictEqual(data.translationBypassReason, 'client_opt_out');
     assert.strictEqual(fetchCalled, false);
+  });
+
+  it('records english_identity bypass reason when DeepL returns 400 identical language', async () => {
+    process.env.DEEPL_API_KEY = 'mock_key:fx';
+
+    globalThis.fetch = async () => {
+      return new Response(
+        JSON.stringify({ message: 'Source and target language are equal.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+      );
+    };
+
+    const res = await app.request(`${API_ROUTES.SEARCH}?q=peace%20in%20anxiety&locale=fr`);
+    assert.strictEqual(res.status, StatusCodes.OK);
+
+    const data = await res.json();
+    assert.strictEqual(data.query, 'peace in anxiety');
+    assert.strictEqual(data.translatedQuery, undefined);
+    assert.strictEqual(data.translationBypassReason, 'english_identity');
   });
 });

@@ -27,7 +27,7 @@ import {
 import { ScriptureOverviewCard } from './ScriptureOverviewCard';
 import type { VoteDirection } from '../core/types';
 import { $locale, i18n, isOnDeviceSupported } from '../stores/i18n';
-import { $activeTranslation, $telemetryEnabled } from '../stores/preferences';
+import { $activeTranslation, $telemetryEnabled, $queryTranslationEnabled } from '../stores/preferences';
 import { params } from '@nanostores/i18n';
 import en from '../locales/en.json';
 
@@ -201,6 +201,7 @@ export function SearchView({
   const currentLocale = useStore($locale);
   const activeTranslation = useStore($activeTranslation);
   const isTelemetryEnabled = useStore($telemetryEnabled);
+  const isQueryTranslationEnabled = useStore($queryTranslationEnabled);
   const suggestions = getSearchSuggestions(currentLocale);
   const popularTopics = getPopularTopics(currentLocale);
   const [initialSearch] = useState(() => $lastSearch.get());
@@ -303,6 +304,10 @@ export function SearchView({
             result_count: res.passages.length,
             translated_query: res.translatedQuery,
             translated_by: res.translatedBy,
+            detected_language: res.detectedLanguage,
+            translation_bypass_reason: res.translationBypassReason,
+            query_translation_enabled: isQueryTranslationEnabled,
+            is_scripture_reference: res.parsedRefs.length > 0,
           });
           if (res.fallbackReason === 'timeout') {
             onToast(tt.toastServerTimeout);
@@ -572,6 +577,12 @@ export function SearchView({
         origin: res.origin ?? 'local',
         duration_ms: duration,
         result_count: res.passages.length,
+        translated_query: res.translatedQuery,
+        translated_by: res.translatedBy,
+        detected_language: res.detectedLanguage,
+        translation_bypass_reason: res.translationBypassReason,
+        query_translation_enabled: isQueryTranslationEnabled,
+        is_scripture_reference: res.parsedRefs.length > 0,
       });
       if (res.fallbackReason === 'timeout') {
         onToast(tt.toastServerTimeout);

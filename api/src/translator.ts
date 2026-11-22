@@ -17,6 +17,7 @@ export interface TranslationResult {
   text: string;
   provider?: string;
   model?: string;
+  isIdentical?: boolean;
 }
 
 export class MinuteRateLimiter {
@@ -119,7 +120,7 @@ async function translateViaDeepL(text: string): Promise<TranslationResult | null
       const errData = (await res.json().catch(() => null)) as { message?: string } | null;
       if (errData?.message?.toLowerCase().includes('equal')) {
         // Query is already in English; return original text directly without fallback.
-        return { text };
+        return { text, isIdentical: true };
       }
     }
   } catch {

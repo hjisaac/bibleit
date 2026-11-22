@@ -207,20 +207,46 @@ const routes = app
     try {
       let searchQuery = q;
       let translatedBy: string | undefined;
-      // Cross-lingual search: translate French queries to English when enabled and no explicit reference was matched.
-      if (shouldTranslate && isFrenchLocale(locale) && refParser.parse(q).length === 0) {
-        const translation = await translateToEnglish(q);
-        searchQuery = translation.text;
-        translatedBy = translation.provider;
+      let translationBypassReason: string | undefined;
+
+      const isExplicitRef = refParser.parse(q).length > 0;
+      if (isFrenchLocale(locale)) {
+        if (!shouldTranslate) {
+          translationBypassReason = 'client_opt_out';
+        } else if (isExplicitRef) {
+          translationBypassReason = 'scripture_reference';
+        } else {
+          const translation = await translateToEnglish(q);
+          searchQuery = translation.text;
+          translatedBy = translation.provider;
+          if (translation.isIdentical) {
+            translationBypassReason = 'english_identity';
+          }
+        }
       }
+
       const result = await engine.retrieve(searchQuery, k);
       const isTranslated = !!(translatedBy && searchQuery.toLowerCase() !== q.toLowerCase());
-      logger.debug({ q, searchQuery, translatedBy, isTranslated, k, hits: result.passages.length }, 'Search executed');
+      logger.info(
+        {
+          q,
+          searchQuery,
+          locale,
+          shouldTranslate,
+          translatedBy,
+          isTranslated,
+          translationBypassReason,
+          k,
+          hits: result.passages.length,
+        },
+        'Search executed',
+      );
       return c.json({
         ...result,
         query: q,
         translatedQuery: isTranslated ? searchQuery : undefined,
         translatedBy: isTranslated ? translatedBy : undefined,
+        translationBypassReason,
         origin: SearchOriginEnum.REMOTE,
       });
     } catch (err) {
