@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import { PackageStatusEnum, ThemeEnum, SearchModeEnum, type Manifest } from '../core/types';
 import { i18n, $locale, $localeSetting, $isMultilingualEnabled, LOCALES, type Locale } from '../stores/i18n';
+import { $telemetryEnabled } from '../stores/preferences';
+import { setTelemetryEnabled } from '../stores/telemetry';
 import { params } from '@nanostores/i18n';
 import en from '../locales/en.json';
 
@@ -82,6 +84,7 @@ export function SettingsView({
   const tt = useStore(messages);
   const currentLocale = useStore($locale);
   const isMultilingual = useStore($isMultilingualEnabled);
+  const isTelemetryEnabled = useStore($telemetryEnabled);
 
   const storageSectionRef = useRef<HTMLDivElement>(null);
   const [isPulsing, setIsPulsing] = useState<boolean>(false);
@@ -873,6 +876,37 @@ export function SettingsView({
             {tt.freeSpaceButton}
           </button>
         )}
+      </div>
+
+      {/* Help Improve Search (Anonymous Analytics Toggle) */}
+      <div
+        class="p-4 rounded-2xl border space-y-3"
+        style={{
+          backgroundColor: 'var(--bg-surface-elevated)',
+          borderColor: 'var(--border-subtle)',
+        }}
+      >
+        <div class="flex items-center justify-between">
+          <div class="pr-3">
+            <div class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+              {tt.telemetryTitle}
+            </div>
+            <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {tt.telemetryDesc}
+            </p>
+          </div>
+
+          <label class="relative inline-flex items-center cursor-pointer shrink-0">
+            <input
+              type="checkbox"
+              aria-label={tt.telemetryTitle}
+              checked={isTelemetryEnabled}
+              onChange={(e) => setTelemetryEnabled((e.target as HTMLInputElement).checked)}
+              class="sr-only peer"
+            />
+            <div class="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
+          </label>
+        </div>
       </div>
 
       {/* App Version & Commit Details */}

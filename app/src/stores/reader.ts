@@ -29,7 +29,7 @@ const DEFAULT_SAVED_VERSES: SavedVerse[] = [
 ];
 
 export const $readerLocation = persistentAtom<ReaderLocation>(
-  'bibleit_last_read',
+  'bibleit:activity:last_read',
   DEFAULT_LOCATION,
   {
     encode: JSON.stringify,
@@ -51,7 +51,7 @@ export const $readerLocation = persistentAtom<ReaderLocation>(
 );
 
 export const $savedVerses = persistentAtom<SavedVerse[]>(
-  'bibleit_saved_verses',
+  'bibleit:activity:saved_verses',
   DEFAULT_SAVED_VERSES,
   {
     encode: JSON.stringify,

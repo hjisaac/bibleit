@@ -96,6 +96,9 @@ export function App(): JSX.Element {
     };
   }, [narrator]);
 
+  useEffect(() => () => embedder.cancelLoad?.(), [embedder]);
+  useEffect(() => () => telemetry.dispose?.(), [telemetry]);
+
 
   const theme = useStore($theme);
   const handleThemeChange = (nextTheme: ThemeEnum) => $theme.set(nextTheme);
@@ -201,16 +204,12 @@ export function App(): JSX.Element {
       if (has) setAiProgress(100);
     });
     embedder.hasModel?.().then((isCached) => {
-      if (isCached) {
-        $modelPackageStatus.set(PackageStatusEnum.DOWNLOADED);
-        setModelProgress(100);
-      }
+      $modelPackageStatus.set(isCached ? PackageStatusEnum.DOWNLOADED : PackageStatusEnum.NOT_DOWNLOADED);
+      setModelProgress(isCached ? 100 : 0);
     });
     slmProvider.hasModel?.().then((isCached) => {
-      if (isCached) {
-        $slmPackageStatus.set(PackageStatusEnum.DOWNLOADED);
-        setSlmProgress(100);
-      }
+      $slmPackageStatus.set(isCached ? PackageStatusEnum.DOWNLOADED : PackageStatusEnum.NOT_DOWNLOADED);
+      setSlmProgress(isCached ? 100 : 0);
     });
   }, [store, embedder, slmProvider]);
 

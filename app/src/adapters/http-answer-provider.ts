@@ -24,11 +24,12 @@ export class HttpAnswerProvider implements AnswerProvider {
     query: string,
     context: RetrievalResult,
     onMeta?: (meta: AnswerMetadata) => void,
+    locale?: string,
   ): AsyncIterable<string> {
     if (!this.available || !this.client) return;
 
     try {
-      const res = await this.client.generate(query, context.passages);
+      const res = await this.client.generate(query, context.passages, locale);
 
       if (!res.ok || !res.body) return;
 

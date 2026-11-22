@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/preact';
 import { SearchView } from '../src/components/SearchView';
+import { SEARCH_STORAGE_KEY } from '../src/stores/search';
 import { createHybridEngine } from '../src/adapters/hybrid-engine';
 import { RemoteEngine } from '../src/adapters/remote-engine';
 import type { SearchEngine, AudioNarrator } from '../src/core/ports';
@@ -80,9 +81,9 @@ describe('SearchView Result Cards & User Actions', () => {
 
   function renderSearchView(overrides: Partial<SearchViewProps> = {}) {
     // Pre-populate search in localStorage if not already provided
-    if (!localStorage.getItem('bibleit_last_search')) {
+    if (!localStorage.getItem(SEARCH_STORAGE_KEY)) {
       localStorage.setItem(
-        'bibleit_last_search',
+        SEARCH_STORAGE_KEY,
         JSON.stringify({
           query: 'peace and joy',
           passages: samplePassages,
@@ -203,7 +204,7 @@ describe('SearchView Result Cards & User Actions', () => {
   it('captures overview_feedback when rating Grounded Summary', () => {
     const captureSpy = vi.fn();
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({
         query: 'peace and joy',
         passages: samplePassages,
@@ -263,7 +264,7 @@ describe('SearchView Result Cards & User Actions', () => {
     ];
 
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({
         query: 'love and joy',
         passages: twoPassages,
@@ -328,7 +329,7 @@ describe('SearchView Result Cards & User Actions', () => {
     };
 
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({
         query: 'love your neighbor',
         passages: [multiHeadingPassage],
@@ -382,7 +383,7 @@ describe('SearchView Result Cards & User Actions', () => {
     };
 
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({
         query: 'peace and joy',
         passages: [samplePassages[0]!, passage2],
@@ -483,7 +484,7 @@ describe('SearchView Result Cards & User Actions', () => {
 
   it('automatically refreshes and retrieves passages when offlineTextStatus transitions to DOWNLOADED', async () => {
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({ query: 'love your neighbor', passages: [], answerText: '' })
     );
 
@@ -510,7 +511,7 @@ describe('SearchView Result Cards & User Actions', () => {
 
   it('re-runs a persisted empty search on remount when text is already downloaded', async () => {
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({ query: 'love your neighbor', passages: [], answerText: '', origin: 'local' })
     );
 
@@ -525,7 +526,7 @@ describe('SearchView Result Cards & User Actions', () => {
 
   it('renders search timing and source telemetry when isInspectorMode is enabled', () => {
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({
         query: 'rejoice',
         passages: samplePassages,
@@ -545,7 +546,7 @@ describe('SearchView Result Cards & User Actions', () => {
 
   it('renders TTFT and throughput tok/s in Inspector Mode when available', () => {
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({
         query: 'peace',
         passages: samplePassages,
@@ -595,7 +596,7 @@ describe('SearchView Result Cards & User Actions', () => {
 
   it('renders Grounded Summary badge with restored palette styling', () => {
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({
         query: 'peace',
         passages: samplePassages,

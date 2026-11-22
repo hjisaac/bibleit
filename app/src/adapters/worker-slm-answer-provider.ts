@@ -137,6 +137,7 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
     query: string,
     context: RetrievalResult,
     onMeta?: (meta: AnswerMetadata) => void,
+    locale?: string,
   ): AsyncIterable<string> {
     if (!this.available || context.passages.length === 0) return;
 
@@ -176,7 +177,7 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
     });
 
     const passages = context.passages.slice(0, 5).map((p) => renderChunk(p.chunk));
-    worker.postMessage({ type: 'generate', id, query, passages });
+    worker.postMessage({ type: 'generate', id, query, passages, locale });
 
     try {
       while (true) {
@@ -209,30 +210,9 @@ export async function isSlmModelCached(): Promise<boolean> {
       }
     }
   } catch {
-    // Fall back to Cache API
+    // Return false on storage read failure
   }
-
-  if (typeof caches === 'undefined') return false;
-  try {
-    const cacheNames = await caches.keys();
-    for (const name of cacheNames) {
-      if (name.includes('transformers') || name.includes('onnx')) {
-        const cache = await caches.open(name);
-        const keys = await cache.keys();
-        for (const req of keys) {
-          if (req.url.includes('SmolLM2-360M-Instruct') && req.url.includes('.onnx')) {
-            const res = await cache.match(req);
-            if (res && res.ok) {
-              return true;
-            }
-          }
-        }
-      }
-    }
-    return false;
-  } catch {
-    return false;
-  }
+  return false;
 }
 
 export async function clearSlmModelCache(): Promise<void> {
@@ -241,23 +221,5 @@ export async function clearSlmModelCache(): Promise<void> {
     await storage.delete('models');
   } catch {
     // Ignore OPFS removal errors
-  }
-
-  if (typeof caches === 'undefined') return;
-  try {
-    const cacheNames = await caches.keys();
-    for (const name of cacheNames) {
-      if (name.includes('transformers') || name.includes('onnx')) {
-        const cache = await caches.open(name);
-        const keys = await cache.keys();
-        for (const req of keys) {
-          if (req.url.includes('SmolLM2-360M-Instruct')) {
-            await cache.delete(req);
-          }
-        }
-      }
-    }
-  } catch {
-    // Ignore cache deletion errors
   }
 }

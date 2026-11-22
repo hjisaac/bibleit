@@ -93,6 +93,7 @@ export interface AnswerProvider {
     query: string,
     context: RetrievalResult,
     onMeta?: (meta: AnswerMetadata) => void,
+    locale?: string,
   ): AsyncIterable<string>;
 }
 

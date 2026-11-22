@@ -31,9 +31,9 @@ export function createHybridEngine(
       await local.sync?.();
     },
 
-    async retrieve(query: string, k = 10): Promise<RetrievalResult> {
+    async retrieve(query: string, k = 10, signal?: AbortSignal): Promise<RetrievalResult> {
       if (isDeviceOnly?.()) {
-        return local.retrieve(query, k);
+        return signal ? local.retrieve(query, k, signal) : local.retrieve(query, k);
       }
 
       const canAttemptRemote =
@@ -47,8 +47,11 @@ export function createHybridEngine(
         try {
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), REMOTE_TIMEOUT_MS);
+          const abortCombined = () => controller.abort();
+          signal?.addEventListener('abort', abortCombined, { once: true });
           const result = await remote.retrieve(query, k, controller.signal);
           clearTimeout(timeout);
+          signal?.removeEventListener('abort', abortCombined);
 
           remoteDownUntil = 0;
           return result;
@@ -62,7 +65,9 @@ export function createHybridEngine(
         }
       }
 
-      const localResult = await local.retrieve(query, k);
+      const localResult = signal
+        ? await local.retrieve(query, k, signal)
+        : await local.retrieve(query, k);
       return fallbackReason ? { ...localResult, fallbackReason } : localResult;
     },
   };

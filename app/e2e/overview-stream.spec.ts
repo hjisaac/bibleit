@@ -6,7 +6,7 @@ test.describe('AI Scripture Overview Streaming', () => {
     await page.addInitScript(() => {
       localStorage.clear();
       sessionStorage.clear();
-      localStorage.setItem('bibleit_active_tab', 'search');
+      localStorage.setItem('bibleit:ui:active_tab', 'search');
     });
   });
 

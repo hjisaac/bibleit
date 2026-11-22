@@ -30,13 +30,17 @@ Rules:
 
 const SYSTEM_PREFIX = `<|im_start|>system\n${SYSTEM_PROMPT}<|im_end|>\n<|im_start|>user\n`;
 
-function buildChatPrompt(query: string, passages: (string | { text?: string })[]): string {
+function buildChatPrompt(query: string, passages: (string | { text?: string })[], locale?: string): string {
   const context = (passages || [])
     .slice(0, 5)
     .map((c) => (typeof c === 'string' ? c : c.text ?? ''))
     .join('\n\n');
 
-  return `${SYSTEM_PREFIX}Passages:\n${context}\n\nTopic / Question: ${query}\nDirect answer (plain text, no preamble):<|im_end|>\n<|im_start|>assistant\n`;
+  const answerInstruction = locale?.toLowerCase().startsWith('fr')
+    ? 'Direct answer in French (plain text, no preamble):'
+    : 'Direct answer (plain text, no preamble):';
+
+  return `${SYSTEM_PREFIX}Passages:\n${context}\n\nTopic / Question: ${query}\n${answerInstruction}<|im_end|>\n<|im_start|>assistant\n`;
 }
 
 let systemPromptCacheEntries: Record<string, Tensor> | null = null;
@@ -203,7 +207,7 @@ self.onmessage = async (e: MessageEvent) => {
       await warmSystemPromptCache(generator);
       if (!activeGenerations.has(id)) return;
 
-      const prompt = buildChatPrompt(data.query, data.passages);
+      const prompt = buildChatPrompt(data.query, data.passages, data.locale);
       const prefixCache = getClonedSystemPromptCache();
 
       const streamer = new TextStreamer(generator.tokenizer, {

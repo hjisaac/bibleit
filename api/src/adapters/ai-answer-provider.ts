@@ -36,13 +36,24 @@ Rules:
 - Citations: Cite specific references in brackets, e.g. [MAT 22:39] or [ROM 13:8-10]. Use a regular hyphen in verse ranges.
 - Length: Keep the summary cohesive, concise, and focused (1 to 2 paragraphs, under 150 words).`;
 
-function buildPrompt(query: string, passages: ScoredPassage[]): string {
+function getSystemPrompt(locale?: string): string {
+  if (locale?.toLowerCase().startsWith('fr')) {
+    return `${SYSTEM_PROMPT}\n- Language: Respond in French (rédige la réponse en français).`;
+  }
+  return SYSTEM_PROMPT;
+}
+
+function buildPrompt(query: string, passages: ScoredPassage[], locale?: string): string {
   const context = passages
     .slice(0, 5)
     .map((p) => renderChunk(p.chunk))
     .join('\n\n');
 
-  return `Passages:\n${context}\n\nTopic / Question: ${query}\nDirect answer (plain text, no preamble or introductory phrase):`;
+  const answerInstruction = locale?.toLowerCase().startsWith('fr')
+    ? 'Direct answer in French (plain text, no preamble or introductory phrase):'
+    : 'Direct answer (plain text, no preamble or introductory phrase):';
+
+  return `Passages:\n${context}\n\nTopic / Question: ${query}\n${answerInstruction}`;
 }
 
 /**
@@ -220,11 +231,17 @@ export class AiAnswerProvider implements AnswerProvider {
     );
   }
 
-  async *answer(query: string, context: RetrievalResult): AsyncIterable<string> {
+  async *answer(
+    query: string,
+    context: RetrievalResult,
+    _onMeta?: unknown,
+    locale?: string,
+  ): AsyncIterable<string> {
     const candidates = this.getCandidateList();
     if (candidates.length === 0) return;
 
-    const prompt = buildPrompt(query, context.passages);
+    const prompt = buildPrompt(query, context.passages, locale);
+    const system = getSystemPrompt(locale);
 
     for (const provider of candidates) {
       let yieldedAny = false;
@@ -235,7 +252,7 @@ export class AiAnswerProvider implements AnswerProvider {
         });
         const result = streamText({
           model: client.chat(provider.model),
-          system: SYSTEM_PROMPT,
+          system,
           prompt,
           maxOutputTokens: 300,
         });
@@ -257,6 +274,7 @@ export class AiAnswerProvider implements AnswerProvider {
     query: string,
     passages: ScoredPassage[],
     signal?: AbortSignal,
+    locale?: string,
   ): Promise<Response> {
     const candidates = this.getCandidateList();
     if (candidates.length === 0) {
@@ -268,7 +286,8 @@ export class AiAnswerProvider implements AnswerProvider {
       );
     }
 
-    const prompt = buildPrompt(query, passages);
+    const prompt = buildPrompt(query, passages, locale);
+    const system = getSystemPrompt(locale);
 
     for (let i = 0; i < candidates.length; i++) {
       const provider = candidates[i]!;
@@ -280,7 +299,7 @@ export class AiAnswerProvider implements AnswerProvider {
 
         const result = streamText({
           model: client.chat(provider.model),
-          system: SYSTEM_PROMPT,
+          system,
           prompt,
           abortSignal: signal,
           maxOutputTokens: 300,

@@ -23,13 +23,14 @@ export class HybridAnswerProvider implements AnswerProvider {
     query: string,
     context: RetrievalResult,
     onMeta?: (meta: AnswerMetadata) => void,
+    locale?: string,
   ): AsyncIterable<string> {
     const canAttemptRemote = !this.isDeviceOnly?.() && (this.remote?.available ?? false);
 
     if (canAttemptRemote && this.remote) {
       try {
         let yielded = false;
-        for await (const chunk of this.remote.answer(query, context, onMeta)) {
+        for await (const chunk of this.remote.answer(query, context, onMeta, locale)) {
           yielded = true;
           yield chunk;
         }
@@ -40,7 +41,7 @@ export class HybridAnswerProvider implements AnswerProvider {
     }
 
     if (this.local.available) {
-      yield* this.local.answer(query, context, onMeta);
+      yield* this.local.answer(query, context, onMeta, locale);
     }
   }
 }

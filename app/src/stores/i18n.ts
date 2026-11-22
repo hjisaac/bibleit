@@ -16,8 +16,7 @@ export { DEFAULT_LOCALE, LOCALES, type Locale };
 // Multilingual feature gate: in-memory state driven by Vite configuration (enabled in dev, disabled in prod).
 export const $isMultilingualEnabled = atom<boolean>(env.isMultilingualEnabled);
 
-// Manual user override from settings (persisted). Undefined initially so device language takes effect.
-export const $localeSetting = persistentAtom<Locale | undefined>('bibleit_locale', undefined);
+export const $localeSetting = persistentAtom<Locale | undefined>('bibleit:pref:locale', undefined);
 
 // Match regional tags like 'fr-FR' or 'fr-CA' against supported base locales.
 function detectBrowserLocale(): Locale {

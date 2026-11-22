@@ -565,6 +565,7 @@ export function createArtifactStore(storage: FileStorage = new OpfsStorage()): A
 
     async clear(): Promise<void> {
       manifestPromise = null;
+      await clearBookCache();
       const names = await storage.list();
       for (const name of names) {
         if (

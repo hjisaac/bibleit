@@ -14,12 +14,17 @@ if (env.backends?.onnx?.wasm) {
 }
 
 let extractorPromise: Promise<any> | null = null;
+let extractorModelId: string | null = null;
 let lastReportedProgress = 0;
 
-async function getExtractor() {
-  if (!extractorPromise) {
+async function getExtractor(modelId: string) {
+  if (!modelId) {
+    throw new Error('Missing modelId for feature-extraction pipeline');
+  }
+  if (!extractorPromise || extractorModelId !== modelId) {
+    extractorModelId = modelId;
     lastReportedProgress = 0;
-    extractorPromise = pipeline('feature-extraction', 'nomic-ai/nomic-embed-text-v1.5', {
+    extractorPromise = pipeline('feature-extraction', modelId, {
       dtype: 'q8',
       progress_callback: (item: any) => {
         if (item.status === 'progress') {
@@ -38,6 +43,11 @@ async function getExtractor() {
           }
         }
       },
+    }).catch((err) => {
+      extractorPromise = null;
+      extractorModelId = null;
+      lastReportedProgress = 0;
+      throw err;
     });
   }
   return extractorPromise;
@@ -49,12 +59,10 @@ self.onmessage = async (e: MessageEvent) => {
 
   if (data.type === 'load') {
     try {
-      await getExtractor();
+      await getExtractor(data.modelId);
       self.postMessage({ type: 'progress', progress: 1.0 });
       self.postMessage({ type: 'loaded' });
     } catch (err) {
-      extractorPromise = null;
-      lastReportedProgress = 0;
       self.postMessage({
         type: 'load_error',
         error: err instanceof Error ? err.message : String(err),
@@ -62,7 +70,7 @@ self.onmessage = async (e: MessageEvent) => {
     }
   } else if (data.type === 'embed') {
     try {
-      const extractor = await getExtractor();
+      const extractor = await getExtractor(data.modelId);
       const output = await extractor(data.text, { pooling: 'mean', normalize: true });
       const vector = output.data as Float32Array;
       self.postMessage({ type: 'embed_result', id: data.id, vector });

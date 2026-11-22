@@ -27,7 +27,7 @@ import {
 import { ScriptureOverviewCard } from './ScriptureOverviewCard';
 import { VoteButtons, type VoteDirection } from './VoteButtons';
 import { $locale, i18n } from '../stores/i18n';
-import { $activeTranslation } from '../stores/preferences';
+import { $activeTranslation, $telemetryEnabled } from '../stores/preferences';
 import { params } from '@nanostores/i18n';
 import en from '../locales/en.json';
 
@@ -200,6 +200,7 @@ export function SearchView({
   const tt = useStore(messages);
   const currentLocale = useStore($locale);
   const activeTranslation = useStore($activeTranslation);
+  const isTelemetryEnabled = useStore($telemetryEnabled);
   const suggestions = getSearchSuggestions(currentLocale);
   const popularTopics = getPopularTopics(currentLocale);
   const [initialSearch] = useState(() => $lastSearch.get());
@@ -282,8 +283,8 @@ export function SearchView({
     setOverviewVote(null);
     setHasSearched(true);
     const startTime = performance.now();
-    void engine
-      .retrieve(trimmed)
+    const searchPromise = engine.retrieve(trimmed);
+    void searchPromise
       .then((res) => {
         if (searchRunIdRef.current === runId) {
           const duration = Math.round(performance.now() - startTime);
@@ -588,10 +589,14 @@ export function SearchView({
       const streamStartTime = performance.now();
       let firstTokenTime: number | null = null;
       let totalChars = 0;
-      const stream = engine.answerProvider.answer(trimmed, contextForAnswer, (meta) => {
+      const onMeta = (meta: { model?: string; provider?: string }) => {
         const modelName = meta.model || meta.provider;
         if (modelName) setSynthesisModel(modelName);
-      });
+      };
+      const stream =
+        currentLocale && currentLocale !== 'en'
+          ? engine.answerProvider.answer(trimmed, contextForAnswer, onMeta, currentLocale)
+          : engine.answerProvider.answer(trimmed, contextForAnswer, onMeta);
       let receivedAny = false;
       let tokenCount = 0;
       for await (const chunk of stream) {
@@ -1037,7 +1042,7 @@ export function SearchView({
         onToggleCollapse={() => setIsSynthesisCollapsed(!isSynthesisCollapsed)}
         onDismissError={() => setSynthesisError(null)}
         vote={overviewVote}
-        onVote={handleVoteOverview}
+        onVote={isTelemetryEnabled ? handleVoteOverview : undefined}
         narrator={narrator}
         narrationState={narrationState}
         firstPassage={passages[0]}
@@ -1239,12 +1244,14 @@ export function SearchView({
                     </button>
                   )}
 
-                  <VoteButtons
-                    vote={cardVotes[chunkKey]}
-                    onVote={(direction) => handleVotePassage(p, cardIdx, direction)}
-                    helpfulTitle={tt.voteHelpfulTitle}
-                    notHelpfulTitle={tt.voteNotHelpfulTitle}
-                  />
+                  {isTelemetryEnabled && (
+                    <VoteButtons
+                      vote={cardVotes[chunkKey]}
+                      onVote={(direction) => handleVotePassage(p, cardIdx, direction)}
+                      helpfulTitle={tt.voteHelpfulTitle}
+                      notHelpfulTitle={tt.voteNotHelpfulTitle}
+                    />
+                  )}
                 </div>
               </div>
 

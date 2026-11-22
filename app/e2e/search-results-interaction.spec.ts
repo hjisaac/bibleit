@@ -3,9 +3,9 @@ import { test, expect } from '@playwright/test';
 test.describe('Search Results - Card Expansion & Inside-Scroll', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('bibleit_active_tab', 'search');
+      localStorage.setItem('bibleit:ui:active_tab', 'search');
       localStorage.setItem(
-        'bibleit_last_search',
+        'bibleit:ui:last_search',
         JSON.stringify({
           query: 'love your neighbor',
           passages: [

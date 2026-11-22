@@ -9,18 +9,20 @@ export class BibleitApiClient {
     this.client = hc<AppType>(baseUrl);
   }
 
-  async search(query: string, k = 10, signal?: AbortSignal): Promise<RetrievalResult | null> {
+  async search(query: string, k = 10, signal?: AbortSignal, locale?: string): Promise<RetrievalResult | null> {
+    const queryParams: { q: string; k: string; locale?: string } = { q: query, k: String(k) };
+    if (locale) queryParams.locale = locale;
     const res = await this.client.api.v1.search.$get(
-      { query: { q: query, k: String(k) } },
+      { query: queryParams },
       { init: { signal } },
     );
     if (!res.ok) return null;
     return (await res.json()) as RetrievalResult;
   }
 
-  async generate(query: string, passages: ScoredPassage[]): Promise<Response> {
+  async generate(query: string, passages: ScoredPassage[], locale?: string): Promise<Response> {
     return await this.client.api.v1.generate.$post({
-      json: { query, passages },
+      json: { query, passages, locale },
     });
   }
 }

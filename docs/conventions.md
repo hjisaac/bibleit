@@ -15,3 +15,12 @@
    plus a CLI flag, never an edit to the pipeline core.
 6. **UI chrome localization is separated from Scripture translations.**
    UI strings use `@nanostores/i18n` with component-scoped keys and lazy-loaded catalogs (`app/src/locales/`). Canonical Scripture texts, pericopes, and book names stay bound to version-gated artifacts. See [docs/i18n.md](file:///home/hjisaac/Devs/bibleit/docs/i18n.md).
+7. **Storage namespacing and versioning are decoupled from app shell releases.**
+   Storage keys follow `bibleit:<category>:<identity>` across browser storage tiers:
+   - **App Shell**: `bibleit-shell-v{appVersion}` (Cache API; managed by Service Worker, pruned on SW activate).
+   - **Scripture Text**: `bibleit-books-{translation}@{version}` (Cache API; e.g. `bibleit-books-web@v1`).
+   - **Artifacts & Vectors**: `bibleit-artifacts-{translation}@{version}` (OPFS; e.g. chunks, embeddings).
+   - **User Activity**: `bibleit:activity:*` (localStorage/IDB; saved verses, reading state, history). Never automatically pruned.
+   - **Preferences**: `bibleit:pref:*` (localStorage; theme, locale, search mode).
+   - **UI State**: `bibleit:ui:*` (localStorage; active tab, ephemeral search state).
+

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Artifact Management & OPFS Storage', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(async () => {
-      localStorage.setItem('bibleit_active_tab', 'settings');
+      localStorage.setItem('bibleit:ui:active_tab', 'settings');
       // Ensure pristine OPFS state before each test run
       if (navigator.storage?.getDirectory) {
         const root = await navigator.storage.getDirectory();

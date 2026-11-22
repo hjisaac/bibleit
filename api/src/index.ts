@@ -22,6 +22,7 @@ import { FsArtifactStore } from './adapters/fs-artifact-store';
 import { HttpArtifactStore } from './adapters/http-artifact-store';
 import { NodeQueryEmbedder } from './adapters/node-query-embedder';
 import { AiAnswerProvider } from './adapters/ai-answer-provider';
+import { translateToEnglish } from './translator';
 import { StatusCodes } from 'http-status-codes';
 import {
   DEFAULT_PORT,
@@ -77,12 +78,13 @@ const store: ArtifactStore = artifactBaseUrl
   : new FsArtifactStore(dataDir);
 const embedder = new NodeQueryEmbedder();
 const answerProvider = new AiAnswerProvider();
+const refParser = new RegexRefParser();
 
 const eagerSemantic = process.env.EAGER_SEMANTIC === 'true';
 const engine: SearchEngine & HealthCheckable = new LocalEngine(
   {
     artifactStore: store,
-    refParser: new RegexRefParser(),
+    refParser,
     lexicalIndex: new MiniSearchLexicalIndex(),
     queryEmbedder: embedder,
     vectorIndex: new BruteForceVectorIndex(),
@@ -194,22 +196,28 @@ const routes = app
   .get(API_ROUTES.SEARCH, searchLimiter, async (c) => {
     const q = c.req.query('q')?.trim() || '';
     const k = Math.min(Number(c.req.query('k')) || 10, 50);
+    const locale = c.req.query('locale') || c.req.query('lang') || 'en';
 
     if (!q) {
       return c.json({ passages: [], parsedRefs: [], origin: SearchOriginEnum.REMOTE });
     }
 
     try {
-      const result = await engine.retrieve(q, k);
-      logger.debug({ q, k, hits: result.passages.length }, 'Search executed');
+      let searchQuery = q;
+      // Cross-lingual search: translate French queries to English when no explicit reference was matched.
+      if (locale.toLowerCase().startsWith('fr') && refParser.parse(q).length === 0) {
+        searchQuery = await translateToEnglish(q);
+      }
+      const result = await engine.retrieve(searchQuery, k);
+      logger.debug({ q, searchQuery, k, hits: result.passages.length }, 'Search executed');
       return c.json({ ...result, origin: SearchOriginEnum.REMOTE });
     } catch (err) {
-      captureCrash(err, { endpoint: API_ROUTES.SEARCH, q, k });
+      captureCrash(err, { endpoint: API_ROUTES.SEARCH, q, k, locale });
       return c.json({ error: 'Search failed' }, StatusCodes.INTERNAL_SERVER_ERROR);
     }
   })
   .post(API_ROUTES.GENERATE, generateLimiter, async (c) => {
-    let body: { query?: string; passages?: any[] };
+    let body: { query?: string; passages?: any[]; locale?: string };
     try {
       body = await c.req.json();
     } catch {
@@ -220,6 +228,7 @@ const routes = app
     if (!query) {
       return c.json({ error: 'Missing "query" parameter' }, StatusCodes.BAD_REQUEST);
     }
+    const locale = body.locale || c.req.query('locale') || c.req.query('lang') || 'en';
     if (query.length > MAX_QUERY_LENGTH) {
       return c.json(
         { error: `Query exceeds maximum length of ${MAX_QUERY_LENGTH} characters` },
@@ -256,7 +265,7 @@ const routes = app
         );
       }
 
-      return await answerProvider.streamResponse(query, passages, c.req.raw.signal);
+      return await answerProvider.streamResponse(query, passages, c.req.raw.signal, locale);
     } catch (err) {
       captureCrash(err, { endpoint: API_ROUTES.GENERATE, query });
       return c.json({ error: 'Failed to generate answer' }, StatusCodes.INTERNAL_SERVER_ERROR);

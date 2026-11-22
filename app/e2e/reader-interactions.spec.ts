@@ -4,9 +4,9 @@ test.describe('Reader View Interactions', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to reader tab by default
     await page.addInitScript(() => {
-      localStorage.setItem('bibleit_active_tab', 'reader');
+      localStorage.setItem('bibleit:ui:active_tab', 'reader');
       localStorage.setItem(
-        'bibleit_last_read',
+        'bibleit:activity:last_read',
         JSON.stringify({ book: 'GEN', chapter: 1, targetVerse: 1 }),
       );
     });
@@ -62,7 +62,7 @@ test.describe('Reader View Interactions', () => {
     // Seed localStorage with verse 3 saved
     await page.addInitScript(() => {
       localStorage.setItem(
-        'bibleit_saved_verses',
+        'bibleit:activity:saved_verses',
         JSON.stringify([
           {
             book: 'GEN',

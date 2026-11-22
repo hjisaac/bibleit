@@ -1,8 +1,8 @@
 import { persistentAtom } from '@nanostores/persistent';
 import type { ScoredPassage, SearchOriginEnum } from '../core/types';
 
-export const SEARCH_HISTORY_KEY = 'bibleit_search_history';
-export const SEARCH_STORAGE_KEY = 'bibleit_last_search';
+export const SEARCH_HISTORY_KEY = 'bibleit:activity:search_history';
+export const SEARCH_STORAGE_KEY = 'bibleit:ui:last_search';
 export const MAX_HISTORY_ITEMS = 3;
 
 export interface StoredSearch {

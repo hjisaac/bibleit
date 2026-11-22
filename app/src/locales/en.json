@@ -231,7 +231,9 @@
     "languageTitle": "Interface Language",
     "languageDesc": "Setting your language also switches the Scripture translation (English uses WEB; French uses Louis Segond 1910).",
     "languageEnglish": "English (World English Bible - WEB)",
-    "languageFrench": "Français (Louis Segond 1910 - LSG)"
+    "languageFrench": "Français (Louis Segond 1910 - LSG)",
+    "telemetryTitle": "Help improve search",
+    "telemetryDesc": "Share anonymous searches and passage ratings to help refine results. No personal data is collected."
   },
   "search/view": {
     "searchPlaceholder": "Search verses, topics, or questions...",
