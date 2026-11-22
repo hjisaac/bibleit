@@ -165,7 +165,7 @@ describe('SearchView Result Cards & User Actions', () => {
     expect(onOpenReaderSpy).toHaveBeenCalledWith('PHP', 4, 4);
   });
 
-  it('captures search_feedback and toggles pressed state when rating search results at the end of the list', () => {
+  it('captures search_feedback and replaces the prompt with thank-you confirmation', () => {
     const captureSpy = vi.fn();
     renderSearchView({ telemetry: { capture: captureSpy } });
 
@@ -174,11 +174,9 @@ describe('SearchView Result Cards & User Actions', () => {
     expect(screen.queryByTitle('Not relevant')).toBeNull();
 
     const yesBtn = screen.getByText('Yes, helpful');
-    const noBtn = screen.getByText('Not quite');
-    expect(yesBtn.getAttribute('aria-pressed')).toBe('false');
+    expect(screen.getByText('Not quite')).toBeDefined();
 
     fireEvent.click(yesBtn);
-    expect(yesBtn.getAttribute('aria-pressed')).toBe('true');
     expect(captureSpy).toHaveBeenCalledWith('search_feedback', {
       query: 'peace and joy',
       vote: 'up',
@@ -186,21 +184,10 @@ describe('SearchView Result Cards & User Actions', () => {
       locale: 'en',
     });
 
-    fireEvent.click(noBtn);
-    expect(noBtn.getAttribute('aria-pressed')).toBe('true');
-    expect(yesBtn.getAttribute('aria-pressed')).toBe('false');
-    expect(captureSpy).toHaveBeenCalledWith('search_feedback', {
-      query: 'peace and joy',
-      vote: 'down',
-      result_count: 1,
-      locale: 'en',
-    });
-
-    // Clicking active vote again clears selection without emitting another event
-    captureSpy.mockClear();
-    fireEvent.click(noBtn);
-    expect(noBtn.getAttribute('aria-pressed')).toBe('false');
-    expect(captureSpy).not.toHaveBeenCalled();
+    // Once voted, the question and buttons disappear, replaced with quiet thank-you confirmation
+    expect(screen.getByText(/Thank you for your feedback/i)).toBeDefined();
+    expect(screen.queryByText('Yes, helpful')).toBeNull();
+    expect(screen.queryByText('Not quite')).toBeNull();
   });
 
   it('captures overview_feedback when rating Grounded Summary', () => {

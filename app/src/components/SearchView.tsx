@@ -530,16 +530,13 @@ export function SearchView({
   };
 
   const handleSearchFeedback = (direction: VoteDirection) => {
-    const nextVote = searchFeedbackVote === direction ? null : direction;
-    setSearchFeedbackVote(nextVote);
-    if (nextVote) {
-      telemetry?.capture('search_feedback', {
-        query: lastSubmittedQueryRef.current || query.trim(),
-        vote: nextVote,
-        result_count: passages.length,
-        locale: currentLocale,
-      });
-    }
+    setSearchFeedbackVote(direction);
+    telemetry?.capture('search_feedback', {
+      query: lastSubmittedQueryRef.current || query.trim(),
+      vote: direction,
+      result_count: passages.length,
+      locale: currentLocale,
+    });
   };
 
   const handleSynthesize = async () => {
@@ -1375,40 +1372,34 @@ export function SearchView({
         {/* End-of-Results Relevance Feedback (Borderless Editorial Colophon) */}
         {isTelemetryEnabled && passages.length > 0 && !isSearching && !isSynthesizing && (
           <div class="pt-5 pb-2 flex flex-col items-center justify-center text-xs text-center transition-colors">
-            <div class="flex flex-wrap items-center justify-center gap-1.5" style={{ color: 'var(--text-subtle)' }}>
-              <span>
-                {searchFeedbackVote ? `✓ ${tt.searchFeedbackThanks}` : tt.searchFeedbackPrompt}
-              </span>
-              <span class="inline-flex items-center gap-1.5 font-medium ml-1">
-                <button
-                  type="button"
-                  onClick={() => handleSearchFeedback('up')}
-                  aria-pressed={searchFeedbackVote === 'up'}
-                  class={`hover:underline transition-all py-0.5 px-1.5 rounded ${
-                    searchFeedbackVote === 'up' ? 'underline font-semibold' : ''
-                  }`}
-                  style={{
-                    color: searchFeedbackVote === 'up' ? 'var(--text-main)' : 'var(--text-muted)',
-                  }}
-                >
-                  {tt.searchFeedbackYes}
-                </button>
-                <span aria-hidden="true" style={{ color: 'var(--text-subtle)' }}>·</span>
-                <button
-                  type="button"
-                  onClick={() => handleSearchFeedback('down')}
-                  aria-pressed={searchFeedbackVote === 'down'}
-                  class={`hover:underline transition-all py-0.5 px-1.5 rounded ${
-                    searchFeedbackVote === 'down' ? 'underline font-semibold' : ''
-                  }`}
-                  style={{
-                    color: searchFeedbackVote === 'down' ? 'var(--text-main)' : 'var(--text-muted)',
-                  }}
-                >
-                  {tt.searchFeedbackNo}
-                </button>
-              </span>
-            </div>
+            {searchFeedbackVote ? (
+              <p class="font-medium animate-fadeIn" style={{ color: 'var(--text-muted)' }}>
+                ✓ {tt.searchFeedbackThanks}
+              </p>
+            ) : (
+              <div class="flex flex-wrap items-center justify-center gap-1.5" style={{ color: 'var(--text-subtle)' }}>
+                <span>{tt.searchFeedbackPrompt}</span>
+                <span class="inline-flex items-center gap-1.5 font-medium ml-1">
+                  <button
+                    type="button"
+                    onClick={() => handleSearchFeedback('up')}
+                    class="hover:underline transition-opacity py-0.5 px-1 rounded"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    {tt.searchFeedbackYes}
+                  </button>
+                  <span aria-hidden="true" style={{ color: 'var(--text-subtle)' }}>·</span>
+                  <button
+                    type="button"
+                    onClick={() => handleSearchFeedback('down')}
+                    class="hover:underline transition-opacity py-0.5 px-1 rounded"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    {tt.searchFeedbackNo}
+                  </button>
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
