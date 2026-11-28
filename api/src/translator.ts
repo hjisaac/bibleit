@@ -12,6 +12,8 @@ import {
   RATE_LIMIT_WINDOW_MS,
   TRANSLATION_TIMEOUT_MS,
 } from './constants';
+import { logger } from './logger';
+import { TRANSLATE_TO_ENGLISH_SYSTEM_PROMPT } from './prompts';
 
 export interface TranslationResult {
   text: string;
@@ -45,11 +47,8 @@ export const llmTranslationLimiter = new MinuteRateLimiter(
   () => Number(process.env.RATE_LIMIT_LLM_TRANSLATION) || DEFAULT_LLM_TRANSLATION_LIMIT_PER_MIN,
 );
 
-const LLM_TRANSLATE_SYSTEM =
-  'Translate this French Bible search query into concise English keywords for Bible passage retrieval. Output ONLY the English keywords, without explanation or punctuation.';
-
-async function translateViaLlm(text: string): Promise<TranslationResult | null> {
-  if (!llmTranslationLimiter.allow()) return null;
+async function translateViaLlm(text: string, signal: AbortSignal): Promise<TranslationResult | null> {
+  if (signal.aborted || !llmTranslationLimiter.allow()) return null;
 
   const candidates: Array<{ name: string; baseURL: string; apiKey: string; model: string }> = [];
   if (process.env.GEMINI_API_KEY) {
@@ -70,32 +69,35 @@ async function translateViaLlm(text: string): Promise<TranslationResult | null> 
   }
 
   for (const candidate of candidates) {
+    if (signal.aborted) break;
     try {
+      logger.debug({ provider: candidate.name, model: candidate.model }, 'Attempting LLM translation');
       const client = createOpenAI({ baseURL: candidate.baseURL, apiKey: candidate.apiKey });
       const { text: result } = await generateText({
         model: client.chat(candidate.model),
-        system: LLM_TRANSLATE_SYSTEM,
+        system: TRANSLATE_TO_ENGLISH_SYSTEM_PROMPT,
         prompt: text,
         maxOutputTokens: 30,
-        abortSignal: AbortSignal.timeout(TRANSLATION_TIMEOUT_MS),
+        abortSignal: signal,
       });
       const cleaned = result?.trim().replace(/^["']|["']$/g, '');
       if (cleaned) {
         return { text: cleaned, provider: candidate.name, model: candidate.model };
       }
-    } catch {
-      // Degrade to next candidate.
+    } catch (err) {
+      logger.warn({ provider: candidate.name, err }, 'LLM translation attempt failed');
     }
   }
 
   return null;
 }
 
-async function translateViaDeepL(text: string): Promise<TranslationResult | null> {
+async function translateViaDeepL(text: string, signal: AbortSignal): Promise<TranslationResult | null> {
   const deeplKey = process.env.DEEPL_API_KEY?.trim();
-  if (!deeplKey) return null;
+  if (!deeplKey || signal.aborted) return null;
 
   try {
+    logger.debug({ provider: 'deepl' }, 'Attempting DeepL translation');
     const endpoint = deeplKey.endsWith(':fx') ? DEEPL_FREE_API_URL : DEEPL_PRO_API_URL;
     const res = await fetch(endpoint, {
       method: 'POST',
@@ -107,7 +109,7 @@ async function translateViaDeepL(text: string): Promise<TranslationResult | null
         text: [text],
         target_lang: 'EN',
       }),
-      signal: AbortSignal.timeout(TRANSLATION_TIMEOUT_MS),
+      signal,
     });
 
     if (res.ok) {
@@ -122,38 +124,53 @@ async function translateViaDeepL(text: string): Promise<TranslationResult | null
         // Query is already in English; return original text directly without fallback.
         return { text, isIdentical: true };
       }
+      logger.warn({ provider: 'deepl', status: res.status, err: errData }, 'DeepL translation rejected request');
+    } else {
+      logger.warn({ provider: 'deepl', status: res.status }, 'DeepL translation returned non-ok status');
     }
-  } catch {
-    // Degrade to free fallback.
+  } catch (err) {
+    logger.warn({ provider: 'deepl', err }, 'DeepL translation attempt failed');
   }
 
   return null;
 }
 
-async function translateViaMyMemory(text: string): Promise<TranslationResult | null> {
+async function translateViaMyMemory(text: string, signal: AbortSignal): Promise<TranslationResult | null> {
+  if (signal.aborted) return null;
+
   try {
+    logger.debug({ provider: 'mymemory' }, 'Attempting MyMemory translation');
     const url = `${MYMEMORY_API_URL}?q=${encodeURIComponent(text)}&langpair=fr|en`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(TRANSLATION_TIMEOUT_MS) });
+    const res = await fetch(url, { signal });
     if (res.ok) {
       const data = (await res.json()) as { responseData?: { translatedText?: string } };
       const translated = data.responseData?.translatedText?.trim();
       if (translated) return { text: translated, provider: 'mymemory' };
     }
-  } catch {
-    // Degrade to original query.
+    logger.warn({ provider: 'mymemory', status: res.status }, 'MyMemory translation returned non-ok status');
+  } catch (err) {
+    logger.warn({ provider: 'mymemory', err }, 'MyMemory translation attempt failed');
   }
 
   return null;
 }
 
-export async function translateToEnglish(text: string): Promise<TranslationResult> {
-  const llmResult = await translateViaLlm(text);
+export async function translateToEnglish(text: string, signal?: AbortSignal): Promise<TranslationResult> {
+  if (signal?.aborted) return { text };
+
+  // Bound total translation budget to under 2.5s across all cascading providers.
+  const timeoutSignal = AbortSignal.timeout(TRANSLATION_TIMEOUT_MS);
+  const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+
+  const llmResult = await translateViaLlm(text, combinedSignal);
   if (llmResult) return llmResult;
+  if (combinedSignal.aborted) return { text };
 
-  const deeplResult = await translateViaDeepL(text);
+  const deeplResult = await translateViaDeepL(text, combinedSignal);
   if (deeplResult) return deeplResult;
+  if (combinedSignal.aborted) return { text };
 
-  const myMemoryResult = await translateViaMyMemory(text);
+  const myMemoryResult = await translateViaMyMemory(text, combinedSignal);
   if (myMemoryResult) return myMemoryResult;
 
   return { text };

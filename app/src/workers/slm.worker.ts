@@ -1,5 +1,5 @@
 import { pipeline, env, TextStreamer, DynamicCache, type Tensor } from '@huggingface/transformers';
-import { isFrenchLocale } from '@bibleit/engine';
+import { LocaleEnum, resolveLocale } from '@bibleit/engine';
 import { env as appEnv } from '../env';
 import { OpfsStorage, createCacheProxy } from '../adapters/opfs-storage';
 
@@ -37,7 +37,7 @@ function buildChatPrompt(query: string, passages: (string | { text?: string })[]
     .map((c) => (typeof c === 'string' ? c : c.text ?? ''))
     .join('\n\n');
 
-  const answerInstruction = isFrenchLocale(locale)
+  const answerInstruction = resolveLocale(locale) === LocaleEnum.FR
     ? 'Direct answer in French (plain text, no preamble):'
     : 'Direct answer (plain text, no preamble):';
 

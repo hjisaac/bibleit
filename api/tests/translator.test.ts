@@ -30,9 +30,11 @@ describe('translateToEnglish', () => {
   it('translates and refines via Gemini when GEMINI_API_KEY is configured', async () => {
     process.env.GEMINI_API_KEY = 'test_gemini_key';
     let calledUrl = '';
+    let calledBody = '';
 
-    globalThis.fetch = async (input: RequestInfo | URL) => {
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       calledUrl = String(input);
+      calledBody = String(init?.body || '');
       return new Response(
         JSON.stringify({
           id: 'chatcmpl-test',
@@ -41,7 +43,7 @@ describe('translateToEnglish', () => {
           choices: [
             {
               index: 0,
-              message: { role: 'assistant', content: 'peace anxiety fear comfort' },
+              message: { role: 'assistant', content: 'peace in anxiety' },
               finish_reason: 'stop',
             },
           ],
@@ -51,9 +53,11 @@ describe('translateToEnglish', () => {
     };
 
     const result = await translateToEnglish("paix dans l'anxiété");
-    assert.strictEqual(result.text, 'peace anxiety fear comfort');
+    assert.strictEqual(result.text, 'peace in anxiety');
     assert.strictEqual(result.provider, 'gemini');
     assert.ok(calledUrl.includes('generativelanguage.googleapis.com'));
+    assert.ok(calledBody.includes('natural English search query'));
+    assert.ok(!calledBody.includes('concise English keywords'));
   });
 
   it('degrades to DeepL when LLM rate limit is reached', async () => {
@@ -169,5 +173,45 @@ describe('translateToEnglish', () => {
     const result = await translateToEnglish("paix dans l'anxiété");
     assert.strictEqual(result.text, "paix dans l'anxiété");
     assert.strictEqual(result.provider, undefined);
+  });
+
+  it('returns original query immediately if incoming signal is already aborted', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    let fetchCalled = false;
+    globalThis.fetch = async () => {
+      fetchCalled = true;
+      return new Response('{}', { status: 200 });
+    };
+
+    const result = await translateToEnglish("paix dans l'anxiété", controller.signal);
+    assert.strictEqual(result.text, "paix dans l'anxiété");
+    assert.strictEqual(result.provider, undefined);
+    assert.strictEqual(fetchCalled, false);
+  });
+
+  it('skips subsequent providers if signal is aborted during first provider attempt', async () => {
+    process.env.GEMINI_API_KEY = 'test_gemini_key';
+    process.env.DEEPL_API_KEY = 'mock_key:fx';
+
+    const controller = new AbortController();
+    let deeplCalled = false;
+
+    globalThis.fetch = async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('generativelanguage.googleapis.com')) {
+        controller.abort();
+        throw new Error('Aborted');
+      }
+      if (url.includes('deepl.com')) {
+        deeplCalled = true;
+        return new Response(JSON.stringify({ translations: [{ text: 'peace' }] }), { status: 200 });
+      }
+      throw new Error(`Unexpected url: ${url}`);
+    };
+
+    const result = await translateToEnglish("paix dans l'anxiété", controller.signal);
+    assert.strictEqual(result.text, "paix dans l'anxiété");
+    assert.strictEqual(deeplCalled, false);
   });
 });

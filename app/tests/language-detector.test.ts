@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { detectQueryLanguage, resetLanguageDetectorCacheForTesting } from '../src/core/language-detector';
 
 describe('detectQueryLanguage', () => {
@@ -59,5 +59,33 @@ describe('detectQueryLanguage', () => {
     expect(await detectQueryLanguage('   ')).toBe(null);
     expect(await detectQueryLanguage('David')).toBe(null);
     expect(await detectQueryLanguage('Jerusalem')).toBe(null);
+  });
+
+  it('detects French for unaccented phrases like "grace de Dieu"', async () => {
+    expect(await detectQueryLanguage('grace de Dieu')).toBe('fr');
+    expect(await detectQueryLanguage('amour de Dieu')).toBe('fr');
+  });
+
+  it('skips browser detector when availability returns "no"', async () => {
+    const createMock = vi.fn();
+    (globalThis as any).LanguageDetector = {
+      availability: async () => 'no',
+      create: createMock,
+    };
+
+    expect(await detectQueryLanguage('paix dans le Seigneur')).toBe('fr');
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it('caches detector failure and does not repeatedly call create', async () => {
+    const createMock = vi.fn().mockRejectedValue(new Error('Model unsupported'));
+    (globalThis as any).LanguageDetector = {
+      create: createMock,
+    };
+
+    await detectQueryLanguage('peace in anxiety');
+    await detectQueryLanguage('peace in anxiety');
+
+    expect(createMock).toHaveBeenCalledTimes(1);
   });
 });

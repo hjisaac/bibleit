@@ -15,15 +15,24 @@ export class BibleitApiClient {
     signal?: AbortSignal,
     locale?: string,
     translate?: boolean,
+    clientBypassReason?: string,
   ): Promise<RetrievalResult | null> {
-    const queryParams: { q: string; k: string; locale?: string; translate?: string } = {
-      q: query,
-      k: String(k),
+    const jsonBody: {
+      query: string;
+      k: number;
+      locale?: string;
+      translate?: boolean;
+      clientBypassReason?: string;
+    } = {
+      query,
+      k,
     };
-    if (locale && locale !== 'en') queryParams.locale = locale;
-    if (translate === false) queryParams.translate = 'false';
-    const res = await this.client.api.v1.search.$get(
-      { query: queryParams },
+    if (locale && locale !== 'en') jsonBody.locale = locale;
+    if (translate === false) jsonBody.translate = false;
+    if (clientBypassReason) jsonBody.clientBypassReason = clientBypassReason;
+
+    const res = await this.client.api.v1.search.$post(
+      { json: jsonBody },
       { init: { signal } },
     );
     if (!res.ok) return null;

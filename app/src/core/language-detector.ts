@@ -1,11 +1,11 @@
 const FRENCH_DIACRITICS_REGEX = /[éèêëàâîïôùûçœæ]/i;
 const FRENCH_ELISIONS_REGEX = /\b(c|d|j|l|m|n|s|t|qu)['’][a-zà-ÿ]/i;
 const FRENCH_WORDS_REGEX =
-  /\b(dans|avec|sous|vers|sans|chez|les|des|du|une|est|sont|ont|qui|que|quoi|dont|cette|ces|cet|notre|votre|leur|leurs|pourquoi|quand|aussi|mais|tous|toute|toutes|seigneur|paix)\b/i;
+  /\b(de|du|des|le|la|les|un|une|dans|avec|pour|sur|sous|vers|sans|chez|par|est|sont|ont|qui|que|quoi|dont|ce|cet|cette|ces|notre|votre|leur|leurs|pourquoi|comment|quand|aussi|mais|tous|toute|toutes|dieu|seigneur|paix|coeur|foi)\b/i;
 
 const ENGLISH_CONTRACTIONS_REGEX = /\b[a-z]+['’](s|t|re|ve|ll|d)\b/i;
 const ENGLISH_WORDS_REGEX =
-  /\b(the|and|of|to|in|is|are|that|for|with|was|at|by|from|this|which|they|have|has|had|what|when|where|who|whom|whose|how|why|not|be|been|shall|will|should|would|could|unto|thee|thou|thy|thine|peace|lord|god|faith|grace|love|hope|fear|heart|prayer|sin|truth|light|anxiety)\b/i;
+  /\b(the|and|of|to|in|is|are|that|for|with|was|at|by|from|this|which|they|have|has|had|what|when|where|who|whom|whose|how|why|not|be|been|shall|will|should|would|could|unto|thee|thou|thy|thine|peace|lord|god|faith|love|hope|fear|heart|prayer|sin|truth|light|anxiety)\b/i;
 
 let cachedDetector: { detect: (text: string) => Promise<Array<{ detectedLanguage: string; confidence: number }>> } | null = null;
 let detectorSupported: boolean | null = null;
@@ -16,17 +16,31 @@ export function resetLanguageDetectorCacheForTesting(): void {
 }
 
 async function getBrowserDetector() {
-  if (detectorSupported === false && typeof self !== 'undefined' && !('LanguageDetector' in self)) {
+  if (detectorSupported === false) {
     return null;
   }
-  if (cachedDetector && typeof self !== 'undefined' && 'LanguageDetector' in self) {
+  if (cachedDetector) {
     return cachedDetector;
   }
 
   if (typeof self !== 'undefined' && 'LanguageDetector' in self) {
     try {
-      const create = (self as unknown as { LanguageDetector: { create: () => Promise<typeof cachedDetector> } }).LanguageDetector.create;
-      cachedDetector = await create();
+      const DetectorClass = (self as unknown as {
+        LanguageDetector: {
+          availability?: () => Promise<string>;
+          create: () => Promise<typeof cachedDetector>;
+        };
+      }).LanguageDetector;
+
+      if (typeof DetectorClass.availability === 'function') {
+        const status = await DetectorClass.availability();
+        if (status === 'no' || status === 'unavailable') {
+          detectorSupported = false;
+          return null;
+        }
+      }
+
+      cachedDetector = await DetectorClass.create();
       detectorSupported = true;
       return cachedDetector;
     } catch {

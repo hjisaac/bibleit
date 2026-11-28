@@ -75,4 +75,15 @@ describe('i18n Locale Resolution & Multilingual Feature Gating', () => {
     $localeSetting.set('fr');
     expect($searchMode.get()).toBe(SearchModeEnum.AUTO);
   });
+
+  it('resolves raw locale strings to LocaleEnum', async () => {
+    const { LocaleEnum, resolveLocale } = await import('../src/core/types');
+    expect(resolveLocale('fr')).toBe(LocaleEnum.FR);
+    expect(resolveLocale('fr-FR')).toBe(LocaleEnum.FR);
+    expect(resolveLocale('FR')).toBe(LocaleEnum.FR);
+    expect(resolveLocale('en')).toBe(LocaleEnum.EN);
+    expect(resolveLocale('en-US')).toBe(LocaleEnum.EN);
+    expect(resolveLocale('es')).toBe(LocaleEnum.EN);
+    expect(resolveLocale(undefined)).toBe(LocaleEnum.EN);
+  });
 });

@@ -16,7 +16,9 @@ import {
   type ArtifactStore,
   type SearchEngine,
   type HealthCheckable,
-  isFrenchLocale,
+  LocaleEnum,
+  resolveLocale,
+  DEFAULT_LOCALE,
 } from '@bibleit/engine';
 import { fileURLToPath } from 'node:url';
 import { FsArtifactStore } from './adapters/fs-artifact-store';
@@ -33,6 +35,8 @@ import {
   MAX_QUERY_LENGTH,
   MAX_PASSAGES,
   MAX_PASSAGE_TEXT_LENGTH,
+  DEFAULT_SEARCH_K,
+  MAX_SEARCH_K,
 } from './constants';
 import { rateLimiter } from 'hono-rate-limiter';
 import type { Context } from 'hono';
@@ -193,66 +197,99 @@ app.get(API_ROUTES.STATUS, (c) => {
   return c.html(renderStatusHtml(isReady, providers, health), status);
 });
 
-const routes = app
-  .get(API_ROUTES.SEARCH, searchLimiter, async (c) => {
-    const q = c.req.query('q')?.trim() || '';
-    const k = Math.min(Number(c.req.query('k')) || 10, 50);
-    const locale = c.req.query('locale') || c.req.query('lang') || 'en';
-    const shouldTranslate = c.req.query('translate') !== 'false';
+interface SearchParams {
+  q: string;
+  k: number;
+  locale: string;
+  shouldTranslate: boolean;
+  clientBypassReason?: string;
+}
 
-    if (!q) {
-      return c.json({ passages: [], parsedRefs: [], origin: SearchOriginEnum.REMOTE });
-    }
+const handleSearch = async (c: Context, params: SearchParams) => {
+  const { q, k, locale, shouldTranslate, clientBypassReason } = params;
 
-    try {
-      let searchQuery = q;
-      let translatedBy: string | undefined;
-      let translationBypassReason: string | undefined;
+  if (!q) {
+    return c.json({ passages: [], parsedRefs: [], origin: SearchOriginEnum.REMOTE });
+  }
 
-      const isExplicitRef = refParser.parse(q).length > 0;
-      if (isFrenchLocale(locale)) {
-        if (!shouldTranslate) {
-          translationBypassReason = 'client_opt_out';
-        } else if (isExplicitRef) {
-          translationBypassReason = 'scripture_reference';
-        } else {
-          const translation = await translateToEnglish(q);
-          searchQuery = translation.text;
-          translatedBy = translation.provider;
-          if (translation.isIdentical) {
-            translationBypassReason = 'english_identity';
-          }
+  try {
+    let searchQuery = q;
+    let translatedBy: string | undefined;
+    let translationBypassReason = clientBypassReason;
+
+    const isExplicitRef = refParser.parse(q).length > 0;
+    if (resolveLocale(locale) === LocaleEnum.FR) {
+      if (clientBypassReason) {
+        translationBypassReason = clientBypassReason;
+      } else if (isExplicitRef) {
+        translationBypassReason = 'scripture_reference';
+      } else if (!shouldTranslate) {
+        translationBypassReason = 'client_opt_out';
+      } else {
+        const translation = await translateToEnglish(q, c.req.raw?.signal);
+        searchQuery = translation.text;
+        translatedBy = translation.provider;
+        if (translation.isIdentical) {
+          translationBypassReason = 'english_identity';
         }
       }
-
-      const result = await engine.retrieve(searchQuery, k);
-      const isTranslated = !!(translatedBy && searchQuery.toLowerCase() !== q.toLowerCase());
-      logger.info(
-        {
-          q,
-          searchQuery,
-          locale,
-          shouldTranslate,
-          translatedBy,
-          isTranslated,
-          translationBypassReason,
-          k,
-          hits: result.passages.length,
-        },
-        'Search executed',
-      );
-      return c.json({
-        ...result,
-        query: q,
-        translatedQuery: isTranslated ? searchQuery : undefined,
-        translatedBy: isTranslated ? translatedBy : undefined,
-        translationBypassReason,
-        origin: SearchOriginEnum.REMOTE,
-      });
-    } catch (err) {
-      captureCrash(err, { endpoint: API_ROUTES.SEARCH, q, k, locale });
-      return c.json({ error: 'Search failed' }, StatusCodes.INTERNAL_SERVER_ERROR);
     }
+
+    const result = await engine.retrieve(searchQuery, k);
+    const isTranslated = !!(translatedBy && searchQuery.toLowerCase() !== q.toLowerCase());
+    logger.info(
+      {
+        q,
+        searchQuery,
+        locale,
+        shouldTranslate,
+        translatedBy,
+        isTranslated,
+        translationBypassReason,
+        k,
+        hits: result.passages.length,
+      },
+      'Search executed',
+    );
+    return c.json({
+      ...result,
+      query: q,
+      translatedQuery: isTranslated ? searchQuery : undefined,
+      translatedBy: isTranslated ? translatedBy : undefined,
+      translationBypassReason,
+      origin: SearchOriginEnum.REMOTE,
+    });
+  } catch (err) {
+    captureCrash(err, { endpoint: API_ROUTES.SEARCH, q, k, locale });
+    return c.json({ error: 'Search failed' }, StatusCodes.INTERNAL_SERVER_ERROR);
+  }
+};
+
+const routes = app
+  .post(API_ROUTES.SEARCH, searchLimiter, async (c) => {
+    let body: {
+      query?: string;
+      k?: number;
+      locale?: string;
+      translate?: boolean;
+      clientBypassReason?: string;
+    };
+    try {
+      body = await c.req.json();
+    } catch {
+      body = {};
+    }
+    const q = (body.query ?? '').trim();
+    const k = Math.min(Math.max(1, Number(body.k) || DEFAULT_SEARCH_K), MAX_SEARCH_K);
+    const locale = body.locale || DEFAULT_LOCALE;
+    const shouldTranslate = body.translate !== false;
+    return handleSearch(c, {
+      q,
+      k,
+      locale,
+      shouldTranslate,
+      clientBypassReason: body.clientBypassReason,
+    });
   })
   .post(API_ROUTES.GENERATE, generateLimiter, async (c) => {
     let body: { query?: string; passages?: any[]; locale?: string };
@@ -266,7 +303,7 @@ const routes = app
     if (!query) {
       return c.json({ error: 'Missing "query" parameter' }, StatusCodes.BAD_REQUEST);
     }
-    const locale = body.locale || c.req.query('locale') || c.req.query('lang') || 'en';
+    const locale = body.locale || DEFAULT_LOCALE;
     if (query.length > MAX_QUERY_LENGTH) {
       return c.json(
         { error: `Query exceeds maximum length of ${MAX_QUERY_LENGTH} characters` },

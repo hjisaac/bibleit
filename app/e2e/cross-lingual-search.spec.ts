@@ -17,9 +17,11 @@ test.describe('Cross-lingual Query Translation and Language Detection', () => {
       localStorage.setItem('bibleit:pref:locale', 'fr');
     });
 
-    let interceptedUrl: string | undefined;
+    let interceptedMethod: string | undefined;
+    let interceptedBody: any;
     await page.route('**/api/v1/search*', async (route) => {
-      interceptedUrl = route.request().url();
+      interceptedMethod = route.request().method();
+      interceptedBody = route.request().postDataJSON();
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -55,11 +57,12 @@ test.describe('Cross-lingual Query Translation and Language Detection', () => {
     // Verify card is rendered
     await expect(page.locator('article').filter({ hasText: 'Philippiens 4:7' })).toBeVisible({ timeout: 15000 });
 
-    // Assert that the request URL included translate=false because it detected English
-    expect(interceptedUrl).toBeDefined();
-    const parsed = new URL(interceptedUrl!);
-    expect(parsed.searchParams.get('locale')).toBe('fr');
-    expect(parsed.searchParams.get('translate')).toBe('false');
+    // Assert that the request was POST and JSON body included translate=false and bypass reason
+    expect(interceptedMethod).toBe('POST');
+    expect(interceptedBody).toBeDefined();
+    expect(interceptedBody.locale).toBe('fr');
+    expect(interceptedBody.translate).toBe(false);
+    expect(interceptedBody.clientBypassReason).toBe('client_detected_english');
   });
 
   test('in French mode, executes translation for French topical query', async ({ page }) => {
@@ -67,9 +70,11 @@ test.describe('Cross-lingual Query Translation and Language Detection', () => {
       localStorage.setItem('bibleit:pref:locale', 'fr');
     });
 
-    let interceptedUrl: string | undefined;
+    let interceptedMethod: string | undefined;
+    let interceptedBody: any;
     await page.route('**/api/v1/search*', async (route) => {
-      interceptedUrl = route.request().url();
+      interceptedMethod = route.request().method();
+      interceptedBody = route.request().postDataJSON();
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -103,11 +108,11 @@ test.describe('Cross-lingual Query Translation and Language Detection', () => {
 
     await expect(page.locator('article').filter({ hasText: 'Philippiens 4:7' })).toBeVisible({ timeout: 15000 });
 
-    // In French mode with a French query, translate=false is NOT set
-    expect(interceptedUrl).toBeDefined();
-    const parsed = new URL(interceptedUrl!);
-    expect(parsed.searchParams.get('locale')).toBe('fr');
-    expect(parsed.searchParams.get('translate')).toBeNull();
+    // In French mode with a French query, translate is true (omitted in JSON body)
+    expect(interceptedMethod).toBe('POST');
+    expect(interceptedBody).toBeDefined();
+    expect(interceptedBody.locale).toBe('fr');
+    expect(interceptedBody.translate).toBeUndefined();
   });
 
   test('disabling query translation in Settings forces translate=false for French queries', async ({ page }) => {
@@ -115,9 +120,11 @@ test.describe('Cross-lingual Query Translation and Language Detection', () => {
       localStorage.setItem('bibleit:pref:locale', 'fr');
     });
 
-    let interceptedUrl: string | undefined;
+    let interceptedMethod: string | undefined;
+    let interceptedBody: any;
     await page.route('**/api/v1/search*', async (route) => {
-      interceptedUrl = route.request().url();
+      interceptedMethod = route.request().method();
+      interceptedBody = route.request().postDataJSON();
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -167,11 +174,12 @@ test.describe('Cross-lingual Query Translation and Language Detection', () => {
 
     await expect(page.locator('article').filter({ hasText: 'Philippiens 4:7' })).toBeVisible({ timeout: 15000 });
 
-    // 3. Since user disabled translation, translate=false is sent
-    expect(interceptedUrl).toBeDefined();
-    const parsed = new URL(interceptedUrl!);
-    expect(parsed.searchParams.get('locale')).toBe('fr');
-    expect(parsed.searchParams.get('translate')).toBe('false');
+    // 3. Since user disabled translation, translate=false is sent in POST body
+    expect(interceptedMethod).toBe('POST');
+    expect(interceptedBody).toBeDefined();
+    expect(interceptedBody.locale).toBe('fr');
+    expect(interceptedBody.translate).toBe(false);
+    expect(interceptedBody.clientBypassReason).toBe('user_opt_out');
   });
 
   test('switching interface language from English to French resets stale AI overview answer', async ({ page }) => {

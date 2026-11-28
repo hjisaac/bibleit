@@ -76,7 +76,7 @@ export function createEngine(
       )
     : null;
 
-  return createHybridEngine(remoteEngine, localEngine, isDeviceOnly);
+  return createHybridEngine(remoteEngine, localEngine, isDeviceOnly, () => $locale.get());
 }
 
 export function createNarrator(): AudioNarrator {

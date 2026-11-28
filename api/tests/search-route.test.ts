@@ -4,7 +4,7 @@ import { app } from '../src/index';
 import { API_ROUTES } from '@bibleit/engine';
 import { StatusCodes } from 'http-status-codes';
 
-describe('GET /api/v1/search route', () => {
+describe('POST /api/v1/search route', () => {
   const originalFetch = globalThis.fetch;
   const originalGeminiKey = process.env.GEMINI_API_KEY;
 
@@ -20,7 +20,7 @@ describe('GET /api/v1/search route', () => {
     else delete process.env.GEMINI_API_KEY;
   });
 
-  it('attaches query, translatedQuery, and translatedBy for French topical query', async () => {
+  it('POST: attaches query, translatedQuery, and translatedBy for French topical query', async () => {
     process.env.GEMINI_API_KEY = 'test_key';
 
     globalThis.fetch = async () => {
@@ -41,7 +41,11 @@ describe('GET /api/v1/search route', () => {
       );
     };
 
-    const res = await app.request(`${API_ROUTES.SEARCH}?q=paix%20dans%20l'anxi%C3%A9t%C3%A9&locale=fr`);
+    const res = await app.request(API_ROUTES.SEARCH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: "paix dans l'anxiété", locale: 'fr' }),
+    });
     assert.strictEqual(res.status, StatusCodes.OK);
 
     const data = await res.json();
@@ -51,14 +55,18 @@ describe('GET /api/v1/search route', () => {
     assert.strictEqual(data.origin, 'remote');
   });
 
-  it('does not translate scripture reference in French queries', async () => {
+  it('POST: does not translate scripture reference in French queries', async () => {
     let fetchCalled = false;
     globalThis.fetch = async () => {
       fetchCalled = true;
       throw new Error('Should not fetch translation for reference');
     };
 
-    const res = await app.request(`${API_ROUTES.SEARCH}?q=Jean%203:16&locale=fr`);
+    const res = await app.request(API_ROUTES.SEARCH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'Jean 3:16', locale: 'fr' }),
+    });
     assert.strictEqual(res.status, StatusCodes.OK);
 
     const data = await res.json();
@@ -69,14 +77,18 @@ describe('GET /api/v1/search route', () => {
     assert.strictEqual(fetchCalled, false);
   });
 
-  it('skips translation when translate=false parameter is passed', async () => {
+  it('POST: skips translation when translate=false is passed in body', async () => {
     let fetchCalled = false;
     globalThis.fetch = async () => {
       fetchCalled = true;
       throw new Error('Should not fetch translation when translate=false');
     };
 
-    const res = await app.request(`${API_ROUTES.SEARCH}?q=paix&locale=fr&translate=false`);
+    const res = await app.request(API_ROUTES.SEARCH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'paix', locale: 'fr', translate: false }),
+    });
     assert.strictEqual(res.status, StatusCodes.OK);
 
     const data = await res.json();
@@ -85,6 +97,63 @@ describe('GET /api/v1/search route', () => {
     assert.strictEqual(data.translatedBy, undefined);
     assert.strictEqual(data.translationBypassReason, 'client_opt_out');
     assert.strictEqual(fetchCalled, false);
+  });
+
+  it('POST: scripture_reference takes precedence over translate=false', async () => {
+    let fetchCalled = false;
+    globalThis.fetch = async () => {
+      fetchCalled = true;
+      throw new Error('Should not fetch translation');
+    };
+
+    const res = await app.request(API_ROUTES.SEARCH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'Jean 3:16', locale: 'fr', translate: false }),
+    });
+    assert.strictEqual(res.status, StatusCodes.OK);
+
+    const data = await res.json();
+    assert.strictEqual(data.translationBypassReason, 'scripture_reference');
+    assert.strictEqual(fetchCalled, false);
+  });
+
+  it('POST: preserves clientBypassReason sent in body', async () => {
+    let fetchCalled = false;
+    globalThis.fetch = async () => {
+      fetchCalled = true;
+      throw new Error('Should not fetch translation when client bypassed');
+    };
+
+    const res = await app.request(API_ROUTES.SEARCH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: 'peace in anxiety',
+        locale: 'fr',
+        translate: false,
+        clientBypassReason: 'client_detected_english',
+      }),
+    });
+    assert.strictEqual(res.status, StatusCodes.OK);
+
+    const data = await res.json();
+    assert.strictEqual(data.query, 'peace in anxiety');
+    assert.strictEqual(data.translatedQuery, undefined);
+    assert.strictEqual(data.translationBypassReason, 'client_detected_english');
+    assert.strictEqual(fetchCalled, false);
+  });
+
+  it('POST: returns empty array for blank query', async () => {
+    const res = await app.request(API_ROUTES.SEARCH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: '   ' }),
+    });
+    assert.strictEqual(res.status, StatusCodes.OK);
+
+    const data = await res.json();
+    assert.deepStrictEqual(data.passages, []);
   });
 
   it('records english_identity bypass reason when DeepL returns 400 identical language', async () => {
@@ -97,12 +166,33 @@ describe('GET /api/v1/search route', () => {
       );
     };
 
-    const res = await app.request(`${API_ROUTES.SEARCH}?q=peace%20in%20anxiety&locale=fr`);
+    const res = await app.request(API_ROUTES.SEARCH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'peace in anxiety', locale: 'fr' }),
+    });
     assert.strictEqual(res.status, StatusCodes.OK);
 
     const data = await res.json();
     assert.strictEqual(data.query, 'peace in anxiety');
     assert.strictEqual(data.translatedQuery, undefined);
     assert.strictEqual(data.translationBypassReason, 'english_identity');
+  });
+
+  it('rejects GET requests with 404 Not Found', async () => {
+    const res = await app.request(`${API_ROUTES.SEARCH}?query=love`);
+    assert.strictEqual(res.status, StatusCodes.NOT_FOUND);
+  });
+
+  it('clamps k to MAX_SEARCH_K (15) when exceeded', async () => {
+    const res = await app.request(API_ROUTES.SEARCH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'grace', k: 50 }),
+    });
+    assert.strictEqual(res.status, StatusCodes.OK);
+
+    const data = await res.json();
+    assert.ok(data.passages.length <= 15);
   });
 });

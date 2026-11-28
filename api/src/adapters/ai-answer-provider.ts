@@ -10,12 +10,10 @@ import {
 } from 'cockatiel';
 import { StatusCodes } from 'http-status-codes';
 import {
-  renderChunk,
   TELEMETRY_HEADERS,
   type AnswerProvider,
   type RetrievalResult,
   type ScoredPassage,
-  isFrenchLocale,
 } from '@bibleit/engine';
 import {
   COHERE_BASE_URL,
@@ -30,6 +28,7 @@ import {
   OPENROUTER_DEFAULT_MODEL,
 } from '../constants';
 import { logger } from '../logger';
+import { buildAnswerPrompt, getAnswerSystemPrompt } from '../prompts';
 
 export interface ProviderConfig {
   name: string;
@@ -55,36 +54,6 @@ interface ProviderBreaker {
 const handleProviderError = handleWhen(
   (err: any) => !(err?.name === 'AbortError' || err?.message?.includes('aborted')),
 );
-
-const SYSTEM_PROMPT = `You are BibleIt, a focused scripture assistant.
-Provide a direct, factual biblical summary using ONLY the provided Bible passages.
-
-Rules:
-- Zero preamble: NEVER include conversational openings or meta-announcements such as "Based on the provided passages", "Here is what the Bible says/teaches", or "According to the verses". Start directly with the core message.
-- Plain text only: Do NOT use markdown syntax (no asterisks, bold, italics, bullet points, headers, or blockquotes).
-- Strict grounding: State only what is explicitly in the passages. Do not invent theology or verses.
-- Citations: Cite specific references in brackets, e.g. [MAT 22:39] or [ROM 13:8-10]. Use a regular hyphen in verse ranges.
-- Length: Keep the summary cohesive, concise, and focused (1 to 2 paragraphs, under 150 words).`;
-
-function getSystemPrompt(locale?: string): string {
-  if (isFrenchLocale(locale)) {
-    return `${SYSTEM_PROMPT}\n- Language: Respond in French (rédige la réponse en français).`;
-  }
-  return SYSTEM_PROMPT;
-}
-
-function buildPrompt(query: string, passages: ScoredPassage[], locale?: string): string {
-  const context = passages
-    .slice(0, 5)
-    .map((p) => renderChunk(p.chunk))
-    .join('\n\n');
-
-  const answerInstruction = isFrenchLocale(locale)
-    ? 'Direct answer in French (plain text, no preamble or introductory phrase):'
-    : 'Direct answer (plain text, no preamble or introductory phrase):';
-
-  return `Passages:\n${context}\n\nTopic / Question: ${query}\n${answerInstruction}`;
-}
 
 /**
  * Parses cooldown duration from 429 response headers or error messages.
@@ -303,8 +272,8 @@ export class AiAnswerProvider implements AnswerProvider {
     const candidates = this.getCandidateList();
     if (candidates.length === 0) return;
 
-    const prompt = buildPrompt(query, context.passages, locale);
-    const system = getSystemPrompt(locale);
+    const prompt = buildAnswerPrompt(query, context.passages, locale);
+    const system = getAnswerSystemPrompt(locale);
 
     for (const provider of candidates) {
       const breaker = this.getBreaker(provider.name).policy;
@@ -366,8 +335,8 @@ export class AiAnswerProvider implements AnswerProvider {
       );
     }
 
-    const prompt = buildPrompt(query, passages, locale);
-    const system = getSystemPrompt(locale);
+    const prompt = buildAnswerPrompt(query, passages, locale);
+    const system = getAnswerSystemPrompt(locale);
 
     for (let i = 0; i < candidates.length; i++) {
       const provider = candidates[i]!;

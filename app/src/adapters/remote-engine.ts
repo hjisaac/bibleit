@@ -1,5 +1,5 @@
 import type { AnswerProvider, SearchEngine } from '../core/ports';
-import { SearchOriginEnum, type RetrievalResult, isFrenchLocale } from '../core/types';
+import { SearchOriginEnum, type RetrievalResult, LocaleEnum, resolveLocale } from '../core/types';
 import { detectQueryLanguage } from '../core/language-detector';
 import { BibleitApiClient } from './api-client';
 import { HttpAnswerProvider } from './http-answer-provider';
@@ -30,7 +30,7 @@ export class RemoteEngine implements SearchEngine {
     let detectedLanguage: 'en' | 'fr' | null = null;
     let clientBypassReason: string | undefined = undefined;
 
-    if (isFrenchLocale(locale)) {
+    if (resolveLocale(locale) === LocaleEnum.FR) {
       if (this.getTranslate?.() === false) {
         shouldTranslate = false;
         clientBypassReason = 'user_opt_out';
@@ -44,7 +44,14 @@ export class RemoteEngine implements SearchEngine {
       }
     }
 
-    const result = await this.apiClient.search(query, k, signal, locale, shouldTranslate);
+    const result = await this.apiClient.search(
+      query,
+      k,
+      signal,
+      locale,
+      shouldTranslate,
+      clientBypassReason,
+    );
     if (!result || !Array.isArray(result.passages)) {
       throw new Error('Invalid remote search response: missing passages');
     }

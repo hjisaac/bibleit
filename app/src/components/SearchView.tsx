@@ -248,6 +248,7 @@ export function SearchView({
   }, []);
 
   const searchRunIdRef = useRef(0);
+  const synthesisRunIdRef = useRef(0);
 
   const prevOfflineTextStatusRef = useRef(offlineTextStatus);
   useEffect(() => {
@@ -271,6 +272,7 @@ export function SearchView({
   const runSearch = (targetQuery: string) => {
     const trimmed = targetQuery.trim();
     const runId = ++searchRunIdRef.current;
+    synthesisRunIdRef.current++;
     if (!trimmed) {
       setPassages([]);
       setSearchOrigin(undefined);
@@ -425,6 +427,7 @@ export function SearchView({
     if (prevTranslationRef.current !== activeTranslation || prevLocaleRef.current !== currentLocale) {
       prevTranslationRef.current = activeTranslation;
       prevLocaleRef.current = currentLocale;
+      synthesisRunIdRef.current++;
       setIsSynthesizing(false);
       setAnswerText('');
       setSynthesisError(null);
@@ -548,6 +551,7 @@ export function SearchView({
   const handleSynthesize = async () => {
     const trimmed = query.trim();
     if (!trimmed || isSynthesizing || !isAiEnabled) return;
+    const runId = ++synthesisRunIdRef.current;
     lastSubmittedQueryRef.current = trimmed;
     setIsPanelOpen(false);
     inputRef.current?.blur();
@@ -566,10 +570,14 @@ export function SearchView({
     try {
       const startTime = performance.now();
       const res = await engine.retrieve(trimmed);
+      if (synthesisRunIdRef.current !== runId) return;
+
       const duration = Math.round(performance.now() - startTime);
       setSearchDurationMs(duration);
       setPassages(res.passages);
       setSearchOrigin(res.origin);
+      setTranslatedQuery(res.translatedQuery);
+      setTranslatedBy(res.translatedBy);
       setIsSearching(false);
       telemetry?.capture('search', {
         query: trimmed,
@@ -605,6 +613,7 @@ export function SearchView({
             return text ? { ...p, chunk: { ...p.chunk, text } } : p;
           }),
         );
+        if (synthesisRunIdRef.current !== runId) return;
         contextForAnswer = { ...res, passages: [...localizedTop, ...res.passages.slice(5)] };
       }
 
@@ -612,6 +621,7 @@ export function SearchView({
       let firstTokenTime: number | null = null;
       let totalChars = 0;
       const onMeta = (meta: { model?: string; provider?: string }) => {
+        if (synthesisRunIdRef.current !== runId) return;
         const modelName = meta.model || meta.provider;
         if (modelName) setSynthesisModel(modelName);
       };
@@ -622,6 +632,7 @@ export function SearchView({
       let receivedAny = false;
       let tokenCount = 0;
       for await (const chunk of stream) {
+        if (synthesisRunIdRef.current !== runId) break;
         receivedAny = true;
         tokenCount++;
         if (firstTokenTime === null) {
@@ -631,6 +642,7 @@ export function SearchView({
         totalChars += chunk.length;
         setAnswerText((prev) => stripPreamble(prev + chunk));
       }
+      if (synthesisRunIdRef.current !== runId) return;
       if (firstTokenTime !== null) {
         const generationDurationSec = (performance.now() - firstTokenTime) / 1000;
         const tokens = Math.max(tokenCount, Math.round(totalChars / 4));
@@ -644,11 +656,14 @@ export function SearchView({
         onToast(tt.toastAiOverviewUnavailable);
       }
     } catch (err) {
+      if (synthesisRunIdRef.current !== runId) return;
       console.error('[SearchView] AI overview failed:', err);
       onToast(tt.toastAiOverviewUnavailable);
     } finally {
-      setIsSearching(false);
-      setIsSynthesizing(false);
+      if (synthesisRunIdRef.current === runId) {
+        setIsSearching(false);
+        setIsSynthesizing(false);
+      }
     }
   };
 
@@ -803,6 +818,7 @@ export function SearchView({
               onClick={(e) => {
                 e.stopPropagation();
                 searchRunIdRef.current++;
+                synthesisRunIdRef.current++;
                 setQuery('');
                 setSearchDurationMs(null);
                 inputRef.current?.focus();

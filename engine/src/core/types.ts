@@ -154,10 +154,20 @@ export interface NarrationState {
   rate: number;
 }
 
-export const LOCALES = ['en', 'fr'] as const;
-export type Locale = (typeof LOCALES)[number];
-export const DEFAULT_LOCALE: Locale = 'en';
+export enum LocaleEnum {
+  EN = 'en',
+  FR = 'fr',
+}
 
-export function isFrenchLocale(locale?: string): boolean {
-  return Boolean(locale && locale.toLowerCase().startsWith('fr'));
+export const LOCALES = [LocaleEnum.EN, LocaleEnum.FR] as const;
+export type Locale = `${LocaleEnum}`;
+export const DEFAULT_LOCALE: LocaleEnum = LocaleEnum.EN;
+
+export function resolveLocale(locale?: string): LocaleEnum {
+  if (locale) {
+    const normalized = locale.toLowerCase().trim();
+    if (normalized.startsWith(LocaleEnum.FR)) return LocaleEnum.FR;
+    if (normalized.startsWith(LocaleEnum.EN)) return LocaleEnum.EN;
+  }
+  return DEFAULT_LOCALE;
 }

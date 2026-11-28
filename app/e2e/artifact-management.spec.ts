@@ -26,7 +26,7 @@ test.describe('Artifact Management & OPFS Storage', () => {
     const clearBtn = page.getByRole('button', { name: 'Free Up Local Space (Clear Artifacts)' });
     await expect(downloadBtn).toBeVisible();
     await expect(clearBtn).toBeDisabled();
-    await expect(page.getByText('0 MB cached')).toBeVisible();
+    await expect(page.getByText('0 MB in OPFS')).toBeVisible();
 
     // Trigger download & canonical verification
     await downloadBtn.click();
@@ -87,18 +87,20 @@ test.describe('Artifact Management & OPFS Storage', () => {
 
     // Verify UI resets to clean state
     await expect(page.getByRole('button', { name: 'Download (1.2 MB)' })).toBeVisible();
-    await expect(page.getByText('0 MB cached')).toBeVisible();
+    await expect(page.getByText('0 MB in OPFS')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Free Up Local Space (Clear Artifacts)' })).toBeDisabled();
 
-    // Verify artifacts directory is purged from OPFS
-    const remainingFiles = await page.evaluate(async () => {
+    // Verify downloaded translation artifacts are purged from OPFS
+    const remainingWebDir = await page.evaluate(async () => {
       const root = await navigator.storage.getDirectory();
-      const names: string[] = [];
-      for await (const name of (root as any).keys?.() ?? []) {
-        names.push(name);
+      try {
+        const artifactsDir = await root.getDirectoryHandle('bibleit-artifacts');
+        await artifactsDir.getDirectoryHandle('web');
+        return true;
+      } catch {
+        return false;
       }
-      return names;
     });
-    expect(remainingFiles).not.toContain('bibleit-artifacts');
+    expect(remainingWebDir).toBe(false);
   });
 });
