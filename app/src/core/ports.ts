@@ -7,6 +7,7 @@
  */
 import type {
   Chunk,
+  LanguageDetectionResult,
   Manifest,
   NarrationSegment,
   NarrationState,
@@ -170,5 +171,9 @@ export interface AudioNarrator {
 export interface Telemetry {
   capture(event: string, properties?: Record<string, unknown>): void;
   dispose?(): void;
+}
+
+export interface LanguageDetectorPort {
+  detect(text: string): Promise<LanguageDetectionResult>;
 }
 

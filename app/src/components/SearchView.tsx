@@ -588,6 +588,7 @@ export function SearchView({
         translated_query: res.translatedQuery,
         translated_by: res.translatedBy,
         detected_language: res.detectedLanguage,
+        detection_method: res.detectionMethod,
         translation_bypass_reason: res.translationBypassReason,
         query_translation_enabled: isQueryTranslationEnabled,
         is_scripture_reference: res.parsedRefs.length > 0,

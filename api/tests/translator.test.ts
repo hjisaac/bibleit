@@ -1,34 +1,15 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
-import { translateToEnglish, llmTranslationLimiter } from '../src/translator';
+import { QueryTranslator, MinuteRateLimiter } from '../src/translator';
 
-describe('translateToEnglish', () => {
+describe('QueryTranslator', () => {
   const originalFetch = globalThis.fetch;
-  const originalDeeplEnv = process.env.DEEPL_API_KEY;
-  const originalGeminiEnv = process.env.GEMINI_API_KEY;
-  const originalGroqEnv = process.env.GROQ_API_KEY;
-
-  beforeEach(() => {
-    delete process.env.DEEPL_API_KEY;
-    delete process.env.GEMINI_API_KEY;
-    delete process.env.GROQ_API_KEY;
-    llmTranslationLimiter.reset();
-  });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    if (originalDeeplEnv !== undefined) process.env.DEEPL_API_KEY = originalDeeplEnv;
-    else delete process.env.DEEPL_API_KEY;
-
-    if (originalGeminiEnv !== undefined) process.env.GEMINI_API_KEY = originalGeminiEnv;
-    else delete process.env.GEMINI_API_KEY;
-
-    if (originalGroqEnv !== undefined) process.env.GROQ_API_KEY = originalGroqEnv;
-    else delete process.env.GROQ_API_KEY;
   });
 
-  it('translates and refines via Gemini when GEMINI_API_KEY is configured', async () => {
-    process.env.GEMINI_API_KEY = 'test_gemini_key';
+  it('translates and refines via Gemini when geminiApiKey is configured', async () => {
     let calledUrl = '';
     let calledBody = '';
 
@@ -52,7 +33,8 @@ describe('translateToEnglish', () => {
       );
     };
 
-    const result = await translateToEnglish("paix dans l'anxiété");
+    const translator = new QueryTranslator({ geminiApiKey: 'test_gemini_key' });
+    const result = await translator.translate("paix dans l'anxiété");
     assert.strictEqual(result.text, 'peace in anxiety');
     assert.strictEqual(result.provider, 'gemini');
     assert.ok(calledUrl.includes('generativelanguage.googleapis.com'));
@@ -61,10 +43,6 @@ describe('translateToEnglish', () => {
   });
 
   it('degrades to DeepL when LLM rate limit is reached', async () => {
-    process.env.GEMINI_API_KEY = 'test_gemini_key';
-    process.env.DEEPL_API_KEY = 'mock_key:fx';
-    process.env.RATE_LIMIT_LLM_TRANSLATION = '1';
-
     let geminiCalls = 0;
     let deeplCalls = 0;
 
@@ -98,22 +76,26 @@ describe('translateToEnglish', () => {
       throw new Error(`Unexpected url: ${url}`);
     };
 
+    const limiter = new MinuteRateLimiter(() => 1);
+    const translator = new QueryTranslator({
+      geminiApiKey: 'test_gemini_key',
+      deeplApiKey: 'mock_key:fx',
+      rateLimiter: limiter,
+    });
+
     // First call: allowed by LLM limiter
-    const res1 = await translateToEnglish("paix dans l'anxiété");
+    const res1 = await translator.translate("paix dans l'anxiété");
     assert.strictEqual(res1.provider, 'gemini');
     assert.strictEqual(geminiCalls, 1);
 
     // Second call: exceeds limit of 1 per min, falls back to DeepL
-    const res2 = await translateToEnglish("paix dans l'anxiété");
+    const res2 = await translator.translate("paix dans l'anxiété");
     assert.strictEqual(res2.provider, 'deepl');
     assert.strictEqual(res2.text, 'peace in anxiety');
     assert.strictEqual(deeplCalls, 1);
-
-    delete process.env.RATE_LIMIT_LLM_TRANSLATION;
   });
 
   it('translates via DeepL when no LLM key is configured', async () => {
-    process.env.DEEPL_API_KEY = 'mock_key:fx';
     let calledUrl = '';
     let calledHeaders: Record<string, string> = {};
 
@@ -126,7 +108,8 @@ describe('translateToEnglish', () => {
       );
     };
 
-    const result = await translateToEnglish("paix dans l'anxiété");
+    const translator = new QueryTranslator({ deeplApiKey: 'mock_key:fx' });
+    const result = await translator.translate("paix dans l'anxiété");
     assert.strictEqual(result.text, 'peace in anxiety');
     assert.strictEqual(result.provider, 'deepl');
     assert.ok(calledUrl.includes('api-free.deepl.com'));
@@ -134,8 +117,6 @@ describe('translateToEnglish', () => {
   });
 
   it('returns text as-is when DeepL detects identical source and target language (HTTP 400)', async () => {
-    process.env.DEEPL_API_KEY = 'mock_key:fx';
-
     globalThis.fetch = async () => {
       return new Response(
         JSON.stringify({ message: 'Source and target language are equal.' }),
@@ -143,7 +124,8 @@ describe('translateToEnglish', () => {
       );
     };
 
-    const result = await translateToEnglish('peace in anxiety');
+    const translator = new QueryTranslator({ deeplApiKey: 'mock_key:fx' });
+    const result = await translator.translate('peace in anxiety');
     assert.strictEqual(result.text, 'peace in anxiety');
     assert.strictEqual(result.provider, undefined);
   });
@@ -159,7 +141,8 @@ describe('translateToEnglish', () => {
       );
     };
 
-    const result = await translateToEnglish("paix dans l'anxiété");
+    const translator = new QueryTranslator({});
+    const result = await translator.translate("paix dans l'anxiété");
     assert.strictEqual(result.text, 'peace in anxiety');
     assert.strictEqual(result.provider, 'mymemory');
     assert.ok(calledUrl.includes('api.mymemory.translated.net'));
@@ -170,7 +153,8 @@ describe('translateToEnglish', () => {
       throw new Error('Network error');
     };
 
-    const result = await translateToEnglish("paix dans l'anxiété");
+    const translator = new QueryTranslator({});
+    const result = await translator.translate("paix dans l'anxiété");
     assert.strictEqual(result.text, "paix dans l'anxiété");
     assert.strictEqual(result.provider, undefined);
   });
@@ -184,16 +168,14 @@ describe('translateToEnglish', () => {
       return new Response('{}', { status: 200 });
     };
 
-    const result = await translateToEnglish("paix dans l'anxiété", controller.signal);
+    const translator = new QueryTranslator({});
+    const result = await translator.translate("paix dans l'anxiété", controller.signal);
     assert.strictEqual(result.text, "paix dans l'anxiété");
     assert.strictEqual(result.provider, undefined);
     assert.strictEqual(fetchCalled, false);
   });
 
   it('skips subsequent providers if signal is aborted during first provider attempt', async () => {
-    process.env.GEMINI_API_KEY = 'test_gemini_key';
-    process.env.DEEPL_API_KEY = 'mock_key:fx';
-
     const controller = new AbortController();
     let deeplCalled = false;
 
@@ -210,7 +192,11 @@ describe('translateToEnglish', () => {
       throw new Error(`Unexpected url: ${url}`);
     };
 
-    const result = await translateToEnglish("paix dans l'anxiété", controller.signal);
+    const translator = new QueryTranslator({
+      geminiApiKey: 'test_gemini_key',
+      deeplApiKey: 'mock_key:fx',
+    });
+    const result = await translator.translate("paix dans l'anxiété", controller.signal);
     assert.strictEqual(result.text, "paix dans l'anxiété");
     assert.strictEqual(deeplCalled, false);
   });

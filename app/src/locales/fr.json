@@ -203,6 +203,7 @@
     "onDeviceDescUnsupportedLocale": "Indisponible en français pour le moment (la recherche utilise une traduction en ligne). La prochaine version corrigera cela.",
     "storageTitle": "Paquets & stockage hors-ligne",
     "storageDesc": "Gérer les données locales stockées dans l'Origin Private File System (OPFS).",
+    "storageInOpfs": "{size} Mo dans l'OPFS",
     "storageRestrictedTitle": "Stockage hors-ligne restreint",
     "storageRestrictedDesc": "Votre navigateur désactive le stockage local (fréquent en navigation privée). Utilisez une fenêtre standard pour télécharger les Écritures pour une utilisation hors-ligne.",
     "pkgTextTitle": "Texte biblique essentiel",

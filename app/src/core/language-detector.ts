@@ -1,3 +1,6 @@
+import type { LanguageDetectorPort } from './ports';
+import type { LanguageDetectionResult } from './types';
+
 const FRENCH_DIACRITICS_REGEX = /[éèêëàâîïôùûçœæ]/i;
 const FRENCH_ELISIONS_REGEX = /\b(c|d|j|l|m|n|s|t|qu)['’][a-zà-ÿ]/i;
 const FRENCH_WORDS_REGEX =
@@ -7,85 +10,82 @@ const ENGLISH_CONTRACTIONS_REGEX = /\b[a-z]+['’](s|t|re|ve|ll|d)\b/i;
 const ENGLISH_WORDS_REGEX =
   /\b(the|and|of|to|in|is|are|that|for|with|was|at|by|from|this|which|they|have|has|had|what|when|where|who|whom|whose|how|why|not|be|been|shall|will|should|would|could|unto|thee|thou|thy|thine|peace|lord|god|faith|love|hope|fear|heart|prayer|sin|truth|light|anxiety)\b/i;
 
-let cachedDetector: { detect: (text: string) => Promise<Array<{ detectedLanguage: string; confidence: number }>> } | null = null;
-let detectorSupported: boolean | null = null;
-
-export function resetLanguageDetectorCacheForTesting(): void {
-  cachedDetector = null;
-  detectorSupported = null;
+interface NativeLanguageDetector {
+  detect: (text: string) => Promise<Array<{ detectedLanguage: string; confidence: number }>>;
 }
 
-async function getBrowserDetector() {
-  if (detectorSupported === false) {
+export class BrowserLanguageDetector implements LanguageDetectorPort {
+  private cachedDetector: NativeLanguageDetector | null = null;
+  private detectorSupported: boolean | null = null;
+
+  private async getBrowserDetector(): Promise<NativeLanguageDetector | null> {
+    if (this.detectorSupported === false) {
+      return null;
+    }
+    if (this.cachedDetector) {
+      return this.cachedDetector;
+    }
+
+    if (typeof self !== 'undefined' && 'LanguageDetector' in self) {
+      try {
+        const DetectorClass = (self as unknown as {
+          LanguageDetector: {
+            availability?: () => Promise<string>;
+            create: () => Promise<NativeLanguageDetector>;
+          };
+        }).LanguageDetector;
+
+        if (typeof DetectorClass.availability === 'function') {
+          const status = await DetectorClass.availability();
+          if (status === 'no' || status === 'unavailable') {
+            this.detectorSupported = false;
+            return null;
+          }
+        }
+
+        this.cachedDetector = await DetectorClass.create();
+        this.detectorSupported = true;
+        return this.cachedDetector;
+      } catch {
+        this.detectorSupported = false;
+      }
+    }
+    this.detectorSupported = false;
     return null;
   }
-  if (cachedDetector) {
-    return cachedDetector;
-  }
 
-  if (typeof self !== 'undefined' && 'LanguageDetector' in self) {
-    try {
-      const DetectorClass = (self as unknown as {
-        LanguageDetector: {
-          availability?: () => Promise<string>;
-          create: () => Promise<typeof cachedDetector>;
-        };
-      }).LanguageDetector;
+  async detect(text: string): Promise<LanguageDetectionResult> {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return { language: null, detectionMethod: 'none' };
+    }
 
-      if (typeof DetectorClass.availability === 'function') {
-        const status = await DetectorClass.availability();
-        if (status === 'no' || status === 'unavailable') {
-          detectorSupported = false;
-          return null;
+    const detector = await this.getBrowserDetector();
+    if (detector) {
+      try {
+        const results = await detector.detect(trimmed);
+        const top = results[0];
+        if (top && top.confidence > 0.6) {
+          if (top.detectedLanguage === 'en') return { language: 'en', detectionMethod: 'browser_ai' };
+          if (top.detectedLanguage === 'fr') return { language: 'fr', detectionMethod: 'browser_ai' };
         }
+      } catch {
+        // Degrade to heuristics on detector error
       }
-
-      cachedDetector = await DetectorClass.create();
-      detectorSupported = true;
-      return cachedDetector;
-    } catch {
-      detectorSupported = false;
     }
-  }
-  detectorSupported = false;
-  return null;
-}
 
-/**
- * Detects whether the query text is already in English or French.
- * Checks native browser AI LanguageDetector first, then applies strict heuristics.
- */
-export async function detectQueryLanguage(text: string): Promise<'en' | 'fr' | null> {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-
-  // 1. On-device browser LanguageDetector API (Chromium Built-in AI)
-  const detector = await getBrowserDetector();
-  if (detector) {
-    try {
-      const results = await detector.detect(trimmed);
-      const top = results[0];
-      if (top && top.confidence > 0.6) {
-        if (top.detectedLanguage === 'en') return 'en';
-        if (top.detectedLanguage === 'fr') return 'fr';
-      }
-    } catch {
-      // Degrade to heuristics
+    const hasFrenchDiacritics = FRENCH_DIACRITICS_REGEX.test(trimmed);
+    const hasFrenchElisions = FRENCH_ELISIONS_REGEX.test(trimmed);
+    if (hasFrenchDiacritics || hasFrenchElisions) {
+      return { language: 'fr', detectionMethod: 'heuristic' };
     }
+
+    const hasFrenchWords = FRENCH_WORDS_REGEX.test(trimmed);
+    const hasEnglishWords = ENGLISH_WORDS_REGEX.test(trimmed) || ENGLISH_CONTRACTIONS_REGEX.test(trimmed);
+
+    if (hasFrenchWords && !hasEnglishWords) return { language: 'fr', detectionMethod: 'heuristic' };
+    if (hasEnglishWords && !hasFrenchWords) return { language: 'en', detectionMethod: 'heuristic' };
+
+    return { language: null, detectionMethod: 'none' };
   }
-
-  // 2. Strict French marker heuristics (diacritics and clitic elisions are unambiguous)
-  const hasFrenchDiacritics = FRENCH_DIACRITICS_REGEX.test(trimmed);
-  const hasFrenchElisions = FRENCH_ELISIONS_REGEX.test(trimmed);
-  if (hasFrenchDiacritics || hasFrenchElisions) {
-    return 'fr';
-  }
-
-  const hasFrenchWords = FRENCH_WORDS_REGEX.test(trimmed);
-  const hasEnglishWords = ENGLISH_WORDS_REGEX.test(trimmed) || ENGLISH_CONTRACTIONS_REGEX.test(trimmed);
-
-  if (hasFrenchWords && !hasEnglishWords) return 'fr';
-  if (hasEnglishWords && !hasFrenchWords) return 'en';
-
-  return null;
 }

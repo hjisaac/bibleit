@@ -25,7 +25,7 @@ import { FsArtifactStore } from './adapters/fs-artifact-store';
 import { HttpArtifactStore } from './adapters/http-artifact-store';
 import { NodeQueryEmbedder } from './adapters/node-query-embedder';
 import { AiAnswerProvider } from './adapters/ai-answer-provider';
-import { translateToEnglish } from './translator';
+import { QueryTranslator } from './translator';
 import { StatusCodes } from 'http-status-codes';
 import {
   DEFAULT_PORT,
@@ -98,6 +98,8 @@ const engine: SearchEngine & HealthCheckable = new LocalEngine(
   },
   { eagerSemantic },
 );
+
+const translator = new QueryTranslator();
 
 let isReady = false;
 engine.ready
@@ -226,7 +228,7 @@ const handleSearch = async (c: Context, params: SearchParams) => {
       } else if (!shouldTranslate) {
         translationBypassReason = 'client_opt_out';
       } else {
-        const translation = await translateToEnglish(q, c.req.raw?.signal);
+        const translation = await translator.translate(q, c.req.raw?.signal);
         searchQuery = translation.text;
         translatedBy = translation.provider;
         if (translation.isIdentical) {

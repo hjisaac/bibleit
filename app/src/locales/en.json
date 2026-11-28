@@ -203,6 +203,7 @@
     "onDeviceDescUnsupportedLocale": "Not yet available for this language (search currently relies on online translation). The next version will fix this.",
     "storageTitle": "Offline Packages & Storage",
     "storageDesc": "Manage local data stored in Origin Private File System (OPFS).",
+    "storageInOpfs": "{size} MB in OPFS",
     "storageRestrictedTitle": "Offline storage restricted",
     "storageRestrictedDesc": "Your browser disables device storage (common in Private/Incognito windows). Switch to a standard window to download scripture for offline use.",
     "pkgTextTitle": "Essential Scripture Text",

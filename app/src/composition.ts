@@ -26,6 +26,7 @@ import { HttpAnswerProvider } from './adapters/http-answer-provider';
 import { RemoteEngine } from './adapters/remote-engine';
 import { createHybridEngine } from './adapters/hybrid-engine';
 import { PostHogTelemetry } from './adapters/posthog-telemetry';
+import { BrowserLanguageDetector } from './core/language-detector';
 import { env } from './env';
 import { $locale } from './stores/i18n';
 import { $queryTranslationEnabled } from './stores/preferences';
@@ -73,6 +74,7 @@ export function createEngine(
         new HttpAnswerProvider(remoteUrl, isDeviceOnly),
         () => $locale.get(),
         () => $queryTranslationEnabled.get(),
+        new BrowserLanguageDetector(),
       )
     : null;
 

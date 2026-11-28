@@ -72,6 +72,13 @@ export enum SubsystemStateEnum {
   DISABLED = 'disabled',
 }
 
+export type DetectionMethod = 'browser_ai' | 'heuristic' | 'none';
+
+export interface LanguageDetectionResult {
+  language: 'en' | 'fr' | null;
+  detectionMethod: DetectionMethod;
+}
+
 /** Final, merged result the UI renders. */
 export interface RetrievalResult {
   passages: ScoredPassage[];
@@ -89,6 +96,8 @@ export interface RetrievalResult {
   fallbackReason?: 'timeout' | 'error';
   /** Detected query language (e.g. 'en', 'fr'). */
   detectedLanguage?: 'en' | 'fr' | null;
+  /** Method used to detect the query language. */
+  detectionMethod?: DetectionMethod;
   /** Reason why query translation was bypassed, if applicable. */
   translationBypassReason?: string;
 }

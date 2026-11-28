@@ -20,6 +20,7 @@ export const messages = i18n('settings/view', {
   ...en['settings/view'],
   downloadButton: params<{ size: string }>(en['settings/view'].downloadButton),
   downloadingSlmProgress: params<{ percent: number }>(en['settings/view'].downloadingSlmProgress),
+  storageInOpfs: params<{ size: string }>(en['settings/view'].storageInOpfs),
 });
 
 interface SettingsViewProps {
@@ -344,41 +345,74 @@ export function SettingsView({
 
       {/* Interface Language (Available when multilingual feature is enabled) */}
       {isMultilingual && (
-        <div
-          class="p-4 rounded-2xl border space-y-2.5"
-          style={{
-            backgroundColor: 'var(--bg-surface-elevated)',
-            borderColor: 'var(--border-subtle)',
-          }}
-        >
-          <div>
-            <div class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
-              {tt.languageTitle}
-            </div>
-            <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {tt.languageDesc}
-            </p>
-          </div>
-          <select
-            value={currentLocale}
-            onChange={(e) => {
-              const next = (e.target as HTMLSelectElement).value as Locale;
-              $localeSetting.set(next);
-            }}
-            class="w-full p-2.5 rounded-xl border text-xs outline-none"
+        <>
+          <div
+            class="p-4 rounded-2xl border space-y-2.5"
             style={{
-              backgroundColor: 'var(--bg-surface)',
+              backgroundColor: 'var(--bg-surface-elevated)',
               borderColor: 'var(--border-subtle)',
-              color: 'var(--text-main)',
             }}
           >
-            {LOCALES.map((loc) => (
-              <option key={loc} value={loc}>
-                {({ en: tt.languageEnglish, fr: tt.languageFrench } satisfies Record<Locale, string>)[loc]}
-              </option>
-            ))}
-          </select>
-        </div>
+            <div>
+              <div class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                {tt.languageTitle}
+              </div>
+              <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                {tt.languageDesc}
+              </p>
+            </div>
+            <select
+              value={currentLocale}
+              onChange={(e) => {
+                const next = (e.target as HTMLSelectElement).value as Locale;
+                $localeSetting.set(next);
+              }}
+              class="w-full p-2.5 rounded-xl border text-xs outline-none"
+              style={{
+                backgroundColor: 'var(--bg-surface)',
+                borderColor: 'var(--border-subtle)',
+                color: 'var(--text-main)',
+              }}
+            >
+              {LOCALES.map((loc) => (
+                <option key={loc} value={loc}>
+                  {({ en: tt.languageEnglish, fr: tt.languageFrench } satisfies Record<Locale, string>)[loc]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Automatic Query Translation Toggle */}
+          <div
+            class="p-4 rounded-2xl border space-y-3"
+            style={{
+              backgroundColor: 'var(--bg-surface-elevated)',
+              borderColor: 'var(--border-subtle)',
+            }}
+          >
+            <div class="flex items-center justify-between">
+              <div class="pr-3">
+                <div class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                  {tt.queryTranslationTitle}
+                </div>
+                <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  {tt.queryTranslationDesc}
+                </p>
+              </div>
+
+              <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  aria-label={tt.queryTranslationTitle}
+                  checked={isQueryTranslationEnabled}
+                  onChange={(e) => $queryTranslationEnabled.set((e.target as HTMLInputElement).checked)}
+                  class="sr-only peer"
+                />
+                <div class="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
+              </label>
+            </div>
+          </div>
+        </>
       )}
 
       {/* On-Device Only Search Toggle */}
@@ -463,8 +497,8 @@ export function SettingsView({
                 if (aiPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 2.1;
                 if (modelPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 137;
                 if (slmPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 370;
-                if (mb === 0) return '0 MB in OPFS';
-                return `${mb.toFixed(1)} MB in OPFS`;
+                if (mb === 0) return tt.storageInOpfs({ size: '0' });
+                return tt.storageInOpfs({ size: mb.toFixed(1) });
               })()}
             </span>
           </div>
@@ -928,37 +962,6 @@ export function SettingsView({
               aria-label={tt.telemetryTitle}
               checked={isTelemetryEnabled}
               onChange={(e) => setTelemetryEnabled((e.target as HTMLInputElement).checked)}
-              class="sr-only peer"
-            />
-            <div class="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
-          </label>
-        </div>
-      </div>
-
-      {/* Automatic Query Translation Toggle */}
-      <div
-        class="p-4 rounded-2xl border space-y-3"
-        style={{
-          backgroundColor: 'var(--bg-surface-elevated)',
-          borderColor: 'var(--border-subtle)',
-        }}
-      >
-        <div class="flex items-center justify-between">
-          <div class="pr-3">
-            <div class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
-              {tt.queryTranslationTitle}
-            </div>
-            <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {tt.queryTranslationDesc}
-            </p>
-          </div>
-
-          <label class="relative inline-flex items-center cursor-pointer shrink-0">
-            <input
-              type="checkbox"
-              aria-label={tt.queryTranslationTitle}
-              checked={isQueryTranslationEnabled}
-              onChange={(e) => $queryTranslationEnabled.set((e.target as HTMLInputElement).checked)}
               class="sr-only peer"
             />
             <div class="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />

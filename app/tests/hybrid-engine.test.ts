@@ -290,5 +290,25 @@ describe('createHybridEngine & RemoteEngine', () => {
     expect(clearTimeoutSpy).toHaveBeenCalled();
     expect(removeListenerSpy).toHaveBeenCalledWith('abort', expect.any(Function));
   });
+
+  it('passes detectionMethod from injected languageDetector to retrieval result', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(mockRemoteResult), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+    const mockDetector = {
+      detect: vi.fn().mockResolvedValue({ language: 'en', detectionMethod: 'browser_ai' as const }),
+    };
+    const remote = new RemoteEngine(
+      'https://api.bibleit.test',
+      undefined,
+      () => 'fr',
+      undefined,
+      mockDetector,
+    );
+    const result = await remote.retrieve('peace in anxiety');
+    expect(result.detectionMethod).toBe('browser_ai');
+    expect(result.detectedLanguage).toBe('en');
+    expect(result.translationBypassReason).toBe('client_detected_english');
+  });
 });
 

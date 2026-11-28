@@ -1,45 +1,46 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
-import { detectQueryLanguage, resetLanguageDetectorCacheForTesting } from '../src/core/language-detector';
+import { BrowserLanguageDetector } from '../src/core/language-detector';
 
-describe('detectQueryLanguage', () => {
+describe('BrowserLanguageDetector', () => {
+  let detector: BrowserLanguageDetector;
+
   beforeEach(() => {
-    resetLanguageDetectorCacheForTesting();
+    detector = new BrowserLanguageDetector();
   });
 
   afterEach(() => {
     delete (globalThis as any).LanguageDetector;
-    resetLanguageDetectorCacheForTesting();
   });
 
   it('detects French via accents and diacritics', async () => {
-    expect(await detectQueryLanguage("l'anxiété")).toBe('fr');
-    expect(await detectQueryLanguage('espérance et foi')).toBe('fr');
-    expect(await detectQueryLanguage('grâce divine')).toBe('fr');
-    expect(await detectQueryLanguage('péché et rédemption')).toBe('fr');
+    expect(await detector.detect("l'anxiété")).toEqual({ language: 'fr', detectionMethod: 'heuristic' });
+    expect(await detector.detect('espérance et foi')).toEqual({ language: 'fr', detectionMethod: 'heuristic' });
+    expect(await detector.detect('grâce divine')).toEqual({ language: 'fr', detectionMethod: 'heuristic' });
+    expect(await detector.detect('péché et rédemption')).toEqual({ language: 'fr', detectionMethod: 'heuristic' });
   });
 
   it('detects French via clitic elisions', async () => {
-    expect(await detectQueryLanguage("l'amour de Dieu")).toBe('fr');
-    expect(await detectQueryLanguage("d'un seul coeur")).toBe('fr');
-    expect(await detectQueryLanguage("qu'il soit beni")).toBe('fr');
-    expect(await detectQueryLanguage("c'est la voie")).toBe('fr');
+    expect(await detector.detect("l'amour de Dieu")).toEqual({ language: 'fr', detectionMethod: 'heuristic' });
+    expect(await detector.detect("d'un seul coeur")).toEqual({ language: 'fr', detectionMethod: 'heuristic' });
+    expect(await detector.detect("qu'il soit beni")).toEqual({ language: 'fr', detectionMethod: 'heuristic' });
+    expect(await detector.detect("c'est la voie")).toEqual({ language: 'fr', detectionMethod: 'heuristic' });
   });
 
   it('detects French via unambiguous French vocabulary', async () => {
-    expect(await detectQueryLanguage('paix dans le Seigneur')).toBe('fr');
-    expect(await detectQueryLanguage('qui sont ces hommes')).toBe('fr');
-    expect(await detectQueryLanguage('pourquoi avoir peur')).toBe('fr');
+    expect(await detector.detect('paix dans le Seigneur')).toEqual({ language: 'fr', detectionMethod: 'heuristic' });
+    expect(await detector.detect('qui sont ces hommes')).toEqual({ language: 'fr', detectionMethod: 'heuristic' });
+    expect(await detector.detect('pourquoi avoir peur')).toEqual({ language: 'fr', detectionMethod: 'heuristic' });
   });
 
   it('detects English via vocabulary and contractions', async () => {
-    expect(await detectQueryLanguage('peace in anxiety')).toBe('en');
-    expect(await detectQueryLanguage('God is love')).toBe('en');
-    expect(await detectQueryLanguage('how to pray')).toBe('en');
-    expect(await detectQueryLanguage("don't be afraid")).toBe('en');
-    expect(await detectQueryLanguage('light and truth')).toBe('en');
+    expect(await detector.detect('peace in anxiety')).toEqual({ language: 'en', detectionMethod: 'heuristic' });
+    expect(await detector.detect('God is love')).toEqual({ language: 'en', detectionMethod: 'heuristic' });
+    expect(await detector.detect('how to pray')).toEqual({ language: 'en', detectionMethod: 'heuristic' });
+    expect(await detector.detect("don't be afraid")).toEqual({ language: 'en', detectionMethod: 'heuristic' });
+    expect(await detector.detect('light and truth')).toEqual({ language: 'en', detectionMethod: 'heuristic' });
   });
 
-  it('uses browser LanguageDetector when available', async () => {
+  it('uses browser LanguageDetector and returns browser_ai when available', async () => {
     (globalThis as any).LanguageDetector = {
       create: async () => ({
         detect: async (text: string) => {
@@ -51,19 +52,20 @@ describe('detectQueryLanguage', () => {
       }),
     };
 
-    expect(await detectQueryLanguage('comfort')).toBe('en');
+    expect(await detector.detect('comfort')).toEqual({ language: 'en', detectionMethod: 'browser_ai' });
+    expect(await detector.detect('consolation')).toEqual({ language: 'fr', detectionMethod: 'browser_ai' });
   });
 
-  it('returns null for ambiguous queries or empty strings', async () => {
-    expect(await detectQueryLanguage('')).toBe(null);
-    expect(await detectQueryLanguage('   ')).toBe(null);
-    expect(await detectQueryLanguage('David')).toBe(null);
-    expect(await detectQueryLanguage('Jerusalem')).toBe(null);
+  it('returns none for ambiguous queries or empty strings', async () => {
+    expect(await detector.detect('')).toEqual({ language: null, detectionMethod: 'none' });
+    expect(await detector.detect('   ')).toEqual({ language: null, detectionMethod: 'none' });
+    expect(await detector.detect('David')).toEqual({ language: null, detectionMethod: 'none' });
+    expect(await detector.detect('Jerusalem')).toEqual({ language: null, detectionMethod: 'none' });
   });
 
   it('detects French for unaccented phrases like "grace de Dieu"', async () => {
-    expect(await detectQueryLanguage('grace de Dieu')).toBe('fr');
-    expect(await detectQueryLanguage('amour de Dieu')).toBe('fr');
+    expect(await detector.detect('grace de Dieu')).toEqual({ language: 'fr', detectionMethod: 'heuristic' });
+    expect(await detector.detect('amour de Dieu')).toEqual({ language: 'fr', detectionMethod: 'heuristic' });
   });
 
   it('skips browser detector when availability returns "no"', async () => {
@@ -73,7 +75,7 @@ describe('detectQueryLanguage', () => {
       create: createMock,
     };
 
-    expect(await detectQueryLanguage('paix dans le Seigneur')).toBe('fr');
+    expect(await detector.detect('paix dans le Seigneur')).toEqual({ language: 'fr', detectionMethod: 'heuristic' });
     expect(createMock).not.toHaveBeenCalled();
   });
 
@@ -83,8 +85,8 @@ describe('detectQueryLanguage', () => {
       create: createMock,
     };
 
-    await detectQueryLanguage('peace in anxiety');
-    await detectQueryLanguage('peace in anxiety');
+    await detector.detect('peace in anxiety');
+    await detector.detect('peace in anxiety');
 
     expect(createMock).toHaveBeenCalledTimes(1);
   });
