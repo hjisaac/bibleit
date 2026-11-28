@@ -92,7 +92,7 @@ test.describe('i18n End-to-End Translations', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
 
     // Reload without clearing localStorage (addInitScript only clears on first nav if guarded; use evaluate instead)
-    const persistedLocale = await page.evaluate(() => localStorage.getItem('bibleit_locale'));
+    const persistedLocale = await page.evaluate(() => localStorage.getItem('bibleit:pref:locale'));
     expect(persistedLocale).toBe('fr');
   });
 
@@ -149,9 +149,9 @@ test.describe('i18n End-to-End Translations', () => {
 });
 
 test.describe('i18n Reload Persistence & Browser Locale Detection', () => {
-  test('boots directly in French when bibleit_locale is persisted', async ({ page }) => {
+  test('boots directly in French when bibleit:pref:locale is persisted', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('bibleit_locale', 'fr');
+      localStorage.setItem('bibleit:pref:locale', 'fr');
     });
     await page.goto('/');
 

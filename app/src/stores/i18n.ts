@@ -6,26 +6,32 @@ import {
   DEFAULT_LOCALE,
   DEFAULT_TRANSLATION,
   LOCALES,
+  LocaleEnum,
+  resolveLocale,
+  SearchModeEnum,
   type Locale,
   type TranslationId,
 } from '../core/types';
-import { $activeTranslation } from './preferences';
+import { $activeTranslation, $searchMode } from './preferences';
 
-export { DEFAULT_LOCALE, LOCALES, type Locale };
+export { DEFAULT_LOCALE, LOCALES, LocaleEnum, resolveLocale, type Locale };
+
+export function isOnDeviceSupported(locale: Locale): boolean {
+  return resolveLocale(locale) === LocaleEnum.EN;
+}
 
 // Multilingual feature gate: in-memory state driven by Vite configuration (enabled in dev, disabled in prod).
 export const $isMultilingualEnabled = atom<boolean>(env.isMultilingualEnabled);
 
-// Manual user override from settings (persisted). Undefined initially so device language takes effect.
-export const $localeSetting = persistentAtom<Locale | undefined>('bibleit_locale', undefined);
+export const $localeSetting = persistentAtom<Locale | undefined>('bibleit:pref:locale', undefined);
 
 // Match regional tags like 'fr-FR' or 'fr-CA' against supported base locales.
 function detectBrowserLocale(): Locale {
   if (typeof navigator === 'undefined') return DEFAULT_LOCALE;
   const languages = navigator.languages?.length ? navigator.languages : [navigator.language];
   for (const lang of languages) {
-    const base = lang?.toLowerCase().split('-')[0] as Locale;
-    if (LOCALES.includes(base)) return base;
+    const base = lang?.toLowerCase().split('-')[0];
+    if (LOCALES.some((l) => l === base)) return resolveLocale(base);
   }
   return DEFAULT_LOCALE;
 }
@@ -60,10 +66,13 @@ export const i18n = createI18n($locale, {
   },
 });
 
-// Sync html lang attribute and default active translation with locale
+// Sync html lang attribute, active translation, and on-device eligibility with locale
 $locale.subscribe((code) => {
   if (typeof document !== 'undefined') {
     document.documentElement.lang = code;
   }
   $activeTranslation.set(LOCALE_DEFAULT_TRANSLATION[code as Locale] ?? DEFAULT_TRANSLATION);
+  if (!isOnDeviceSupported(code as Locale) && $searchMode.get() === SearchModeEnum.DEVICE) {
+    $searchMode.set(SearchModeEnum.AUTO);
+  }
 });

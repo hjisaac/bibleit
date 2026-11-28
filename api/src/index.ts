@@ -16,12 +16,16 @@ import {
   type ArtifactStore,
   type SearchEngine,
   type HealthCheckable,
+  LocaleEnum,
+  resolveLocale,
+  DEFAULT_LOCALE,
 } from '@bibleit/engine';
 import { fileURLToPath } from 'node:url';
 import { FsArtifactStore } from './adapters/fs-artifact-store';
 import { HttpArtifactStore } from './adapters/http-artifact-store';
 import { NodeQueryEmbedder } from './adapters/node-query-embedder';
 import { AiAnswerProvider } from './adapters/ai-answer-provider';
+import { QueryTranslator } from './translator';
 import { StatusCodes } from 'http-status-codes';
 import {
   DEFAULT_PORT,
@@ -31,6 +35,8 @@ import {
   MAX_QUERY_LENGTH,
   MAX_PASSAGES,
   MAX_PASSAGE_TEXT_LENGTH,
+  DEFAULT_SEARCH_K,
+  MAX_SEARCH_K,
 } from './constants';
 import { rateLimiter } from 'hono-rate-limiter';
 import type { Context } from 'hono';
@@ -77,12 +83,13 @@ const store: ArtifactStore = artifactBaseUrl
   : new FsArtifactStore(dataDir);
 const embedder = new NodeQueryEmbedder();
 const answerProvider = new AiAnswerProvider();
+const refParser = new RegexRefParser();
 
 const eagerSemantic = process.env.EAGER_SEMANTIC === 'true';
 const engine: SearchEngine & HealthCheckable = new LocalEngine(
   {
     artifactStore: store,
-    refParser: new RegexRefParser(),
+    refParser,
     lexicalIndex: new MiniSearchLexicalIndex(),
     queryEmbedder: embedder,
     vectorIndex: new BruteForceVectorIndex(),
@@ -91,6 +98,8 @@ const engine: SearchEngine & HealthCheckable = new LocalEngine(
   },
   { eagerSemantic },
 );
+
+const translator = new QueryTranslator();
 
 let isReady = false;
 engine.ready
@@ -190,26 +199,102 @@ app.get(API_ROUTES.STATUS, (c) => {
   return c.html(renderStatusHtml(isReady, providers, health), status);
 });
 
+interface SearchParams {
+  q: string;
+  k: number;
+  locale: string;
+  shouldTranslate: boolean;
+  clientBypassReason?: string;
+}
+
+const handleSearch = async (c: Context, params: SearchParams) => {
+  const { q, k, locale, shouldTranslate, clientBypassReason } = params;
+
+  if (!q) {
+    return c.json({ passages: [], parsedRefs: [], origin: SearchOriginEnum.REMOTE });
+  }
+
+  try {
+    let searchQuery = q;
+    let translatedBy: string | undefined;
+    let translationBypassReason = clientBypassReason;
+
+    const isExplicitRef = refParser.parse(q).length > 0;
+    if (resolveLocale(locale) === LocaleEnum.FR) {
+      if (clientBypassReason) {
+        translationBypassReason = clientBypassReason;
+      } else if (isExplicitRef) {
+        translationBypassReason = 'scripture_reference';
+      } else if (!shouldTranslate) {
+        translationBypassReason = 'client_opt_out';
+      } else {
+        const translation = await translator.translate(q, c.req.raw?.signal);
+        searchQuery = translation.text;
+        translatedBy = translation.provider;
+        if (translation.isIdentical) {
+          translationBypassReason = 'english_identity';
+        }
+      }
+    }
+
+    const result = await engine.retrieve(searchQuery, k);
+    const isTranslated = !!(translatedBy && searchQuery.toLowerCase() !== q.toLowerCase());
+    logger.info(
+      {
+        q,
+        searchQuery,
+        locale,
+        shouldTranslate,
+        translatedBy,
+        isTranslated,
+        translationBypassReason,
+        k,
+        hits: result.passages.length,
+      },
+      'Search executed',
+    );
+    return c.json({
+      ...result,
+      query: q,
+      translatedQuery: isTranslated ? searchQuery : undefined,
+      translatedBy: isTranslated ? translatedBy : undefined,
+      translationBypassReason,
+      origin: SearchOriginEnum.REMOTE,
+    });
+  } catch (err) {
+    captureCrash(err, { endpoint: API_ROUTES.SEARCH, q, k, locale });
+    return c.json({ error: 'Search failed' }, StatusCodes.INTERNAL_SERVER_ERROR);
+  }
+};
+
 const routes = app
-  .get(API_ROUTES.SEARCH, searchLimiter, async (c) => {
-    const q = c.req.query('q')?.trim() || '';
-    const k = Math.min(Number(c.req.query('k')) || 10, 50);
-
-    if (!q) {
-      return c.json({ passages: [], parsedRefs: [], origin: SearchOriginEnum.REMOTE });
-    }
-
+  .post(API_ROUTES.SEARCH, searchLimiter, async (c) => {
+    let body: {
+      query?: string;
+      k?: number;
+      locale?: string;
+      translate?: boolean;
+      clientBypassReason?: string;
+    };
     try {
-      const result = await engine.retrieve(q, k);
-      logger.debug({ q, k, hits: result.passages.length }, 'Search executed');
-      return c.json({ ...result, origin: SearchOriginEnum.REMOTE });
-    } catch (err) {
-      captureCrash(err, { endpoint: API_ROUTES.SEARCH, q, k });
-      return c.json({ error: 'Search failed' }, StatusCodes.INTERNAL_SERVER_ERROR);
+      body = await c.req.json();
+    } catch {
+      body = {};
     }
+    const q = (body.query ?? '').trim();
+    const k = Math.min(Math.max(1, Number(body.k) || DEFAULT_SEARCH_K), MAX_SEARCH_K);
+    const locale = body.locale || DEFAULT_LOCALE;
+    const shouldTranslate = body.translate !== false;
+    return handleSearch(c, {
+      q,
+      k,
+      locale,
+      shouldTranslate,
+      clientBypassReason: body.clientBypassReason,
+    });
   })
   .post(API_ROUTES.GENERATE, generateLimiter, async (c) => {
-    let body: { query?: string; passages?: any[] };
+    let body: { query?: string; passages?: any[]; locale?: string };
     try {
       body = await c.req.json();
     } catch {
@@ -220,6 +305,7 @@ const routes = app
     if (!query) {
       return c.json({ error: 'Missing "query" parameter' }, StatusCodes.BAD_REQUEST);
     }
+    const locale = body.locale || DEFAULT_LOCALE;
     if (query.length > MAX_QUERY_LENGTH) {
       return c.json(
         { error: `Query exceeds maximum length of ${MAX_QUERY_LENGTH} characters` },
@@ -256,7 +342,7 @@ const routes = app
         );
       }
 
-      return await answerProvider.streamResponse(query, passages, c.req.raw.signal);
+      return await answerProvider.streamResponse(query, passages, c.req.raw.signal, locale);
     } catch (err) {
       captureCrash(err, { endpoint: API_ROUTES.GENERATE, query });
       return c.json({ error: 'Failed to generate answer' }, StatusCodes.INTERNAL_SERVER_ERROR);

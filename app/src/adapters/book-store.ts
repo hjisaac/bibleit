@@ -1,4 +1,4 @@
-import { getBibleManifest, verifyBookIntegrity } from '../core/bible-manifest';
+import { getBibleManifest, getManifestContentHash, verifyBookIntegrity } from '../core/bible-manifest';
 import { DEFAULT_TRANSLATION, type TranslationId } from '../core/types';
 import { $activeTranslation } from '../stores/preferences';
 
@@ -24,7 +24,13 @@ export const VERSE_ALIASES: Readonly<Record<string, { chapter: number; verse: nu
   'ROM:16:27': { chapter: 14, verse: 23 },
 };
 
-const CACHE_NAME = 'bibleit-books-v1';
+// Suffix is a manifest content CRC32 hash (not a git commit hash) so caches rotate on text edits.
+export function getBookCacheName(translation?: string): string {
+  const trans = getActiveTrans(translation);
+  const contentHash = getManifestContentHash(getBibleManifest(trans));
+  return `bibleit-books-${trans}@${contentHash}`;
+}
+
 const memoryCache = new Map<string, BookData>();
 
 /** Canonical in-memory address index for instant O(1) verse lookups */
@@ -164,7 +170,7 @@ export async function loadBook(bookId: string, translation?: string): Promise<Bo
   // Check persistent Cache API if available in browser
   if (typeof caches !== 'undefined') {
     try {
-      const cache = await caches.open(CACHE_NAME);
+      const cache = await caches.open(getBookCacheName(trans));
       const match = await cache.match(url);
       if (match) {
         try {
@@ -203,7 +209,7 @@ export async function loadBook(bookId: string, translation?: string): Promise<Bo
   // Persist verified book into Cache API
   if (typeof caches !== 'undefined') {
     try {
-      const cache = await caches.open(CACHE_NAME);
+      const cache = await caches.open(getBookCacheName(trans));
       await cache.put(
         url,
         new Response(text, {
@@ -221,13 +227,22 @@ export async function loadBook(bookId: string, translation?: string): Promise<Bo
   return data;
 }
 
-/** Clears all locally cached Scripture books from both memory and browser Cache API. */
-export async function clearBookCache(): Promise<void> {
+/** Clears locally cached Scripture books from memory and browser Cache API. */
+export async function clearBookCache(translation?: string): Promise<void> {
   memoryCache.clear();
   verseIndex.clear();
   if (typeof caches !== 'undefined') {
     try {
-      await caches.delete(CACHE_NAME);
+      if (translation) {
+        await caches.delete(getBookCacheName(translation));
+      } else {
+        const keys = await caches.keys();
+        for (const key of keys) {
+          if (key.startsWith('bibleit-books-')) {
+            await caches.delete(key);
+          }
+        }
+      }
     } catch {
       // Ignore cache deletion error
     }

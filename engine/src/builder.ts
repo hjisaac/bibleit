@@ -177,7 +177,7 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
     }
   }
 
-  public async retrieve(query: string, k = 10): Promise<RetrievalResult> {
+  public async retrieve(query: string, k = 10, _signal?: AbortSignal): Promise<RetrievalResult> {
     await this.ready;
     if (this.currentSync) {
       await this.currentSync;
@@ -195,6 +195,7 @@ export class LocalEngine implements SearchEngine, HealthCheckable {
             : [];
         })
       : [];
+
     const lexical = this.lexicalState === SubsystemStateEnum.READY ? this.ports.lexicalIndex.search(query, k) : [];
     let semantic: ScoredPassage[] = [];
     if (this.semanticState === SubsystemStateEnum.READY) {

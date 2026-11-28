@@ -2,9 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { findBookByPrefix, getLocalizedBookName } from '@bibleit/engine';
-import { getBibleManifest } from '../src/core/bible-manifest';
+import { getBibleManifest, getManifestContentHash } from '../src/core/bible-manifest';
 import {
   clearBookCache,
+  getBookCacheName,
   loadBook,
   resolveVerseText,
   VERSE_ALIASES,
@@ -72,6 +73,26 @@ describe('French & English Multi-Translation Support', () => {
     const webKeys = Object.keys(web.books).sort();
     const lsgKeys = Object.keys(lsg.books).sort();
     expect(webKeys).toEqual(lsgKeys);
+  });
+
+  it('derives distinct deterministic content-hash cache names from each manifest', () => {
+    const web = getBibleManifest('web');
+    const lsg = getBibleManifest('lsg');
+
+    const webHash = getManifestContentHash(web);
+    const lsgHash = getManifestContentHash(lsg);
+    expect(webHash).toMatch(/^[0-9a-f]{8}$/);
+    expect(lsgHash).toMatch(/^[0-9a-f]{8}$/);
+    expect(webHash).not.toBe(lsgHash);
+    expect(getBookCacheName('web')).toBe(`bibleit-books-web@${webHash}`);
+    expect(getBookCacheName('lsg')).toBe(`bibleit-books-lsg@${lsgHash}`);
+
+    // Changing any single book's CRC32 rotates the manifest content hash automatically.
+    const mutated = {
+      ...web,
+      books: { ...web.books, GEN: { ...web.books.GEN!, crc32: 'deadbeef' } },
+    };
+    expect(getManifestContentHash(mutated)).not.toBe(webHash);
   });
 
   it('contains the 7 Textus Receptus verse aliases', () => {

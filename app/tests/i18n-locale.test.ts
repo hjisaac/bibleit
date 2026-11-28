@@ -60,4 +60,30 @@ describe('i18n Locale Resolution & Multilingual Feature Gating', () => {
     expect($locale.get()).toBe('en');
     expect($activeTranslation.get()).toBe('web');
   });
+
+  it('disables on-device search mode when switching to French', async () => {
+    const { $searchMode } = await import('../src/stores/preferences');
+    const { SearchModeEnum } = await import('../src/core/types');
+    const { isOnDeviceSupported } = await import('../src/stores/i18n');
+
+    $isMultilingualEnabled.set(true);
+    $localeSetting.set('en');
+    $searchMode.set(SearchModeEnum.DEVICE);
+    expect(isOnDeviceSupported('en')).toBe(true);
+    expect(isOnDeviceSupported('fr')).toBe(false);
+
+    $localeSetting.set('fr');
+    expect($searchMode.get()).toBe(SearchModeEnum.AUTO);
+  });
+
+  it('resolves raw locale strings to LocaleEnum', async () => {
+    const { LocaleEnum, resolveLocale } = await import('../src/core/types');
+    expect(resolveLocale('fr')).toBe(LocaleEnum.FR);
+    expect(resolveLocale('fr-FR')).toBe(LocaleEnum.FR);
+    expect(resolveLocale('FR')).toBe(LocaleEnum.FR);
+    expect(resolveLocale('en')).toBe(LocaleEnum.EN);
+    expect(resolveLocale('en-US')).toBe(LocaleEnum.EN);
+    expect(resolveLocale('es')).toBe(LocaleEnum.EN);
+    expect(resolveLocale(undefined)).toBe(LocaleEnum.EN);
+  });
 });

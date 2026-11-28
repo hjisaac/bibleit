@@ -8,7 +8,7 @@ import { OpfsStorage } from './opfs-storage';
  * Protects Interaction to Next Paint (INP) by offloading neural generation.
  */
 export class WorkerSlmAnswerProvider implements AnswerProvider {
-  readonly modelId = 'HuggingFaceTB/SmolLM2-360M-Instruct';
+  readonly modelId: string;
 
   private worker: Worker | null = null;
   private loadPromise: Promise<void> | null = null;
@@ -24,7 +24,12 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
     }
   >();
 
-  constructor(private isInstalled?: () => boolean) {}
+  constructor(
+    private isInstalled?: () => boolean,
+    modelId = 'HuggingFaceTB/SmolLM2-360M-Instruct',
+  ) {
+    this.modelId = modelId;
+  }
 
   get available(): boolean {
     if (this.isInstalled && !this.isInstalled()) {
@@ -105,7 +110,7 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
         }
       };
       worker.addEventListener('message', handler);
-      worker.postMessage({ type: 'load' });
+      worker.postMessage({ type: 'load', modelId: this.modelId });
     });
 
     return this.loadPromise;
@@ -130,18 +135,22 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
   }
 
   async hasModel(): Promise<boolean> {
-    return isSlmModelCached();
+    return isSlmModelCached(this.modelId);
   }
 
   async *answer(
     query: string,
     context: RetrievalResult,
     onMeta?: (meta: AnswerMetadata) => void,
+    locale?: string,
   ): AsyncIterable<string> {
     if (!this.available || context.passages.length === 0) return;
 
     if (onMeta) {
-      onMeta({ provider: 'local', model: 'SmolLM2-360M' });
+      const displayName = this.modelId === 'HuggingFaceTB/SmolLM2-360M-Instruct'
+        ? 'SmolLM2-360M'
+        : (this.modelId.split('/')[1] || this.modelId);
+      onMeta({ provider: 'local', model: displayName });
     }
 
     const worker = this.getWorker();
@@ -176,7 +185,7 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
     });
 
     const passages = context.passages.slice(0, 5).map((p) => renderChunk(p.chunk));
-    worker.postMessage({ type: 'generate', id, query, passages });
+    worker.postMessage({ type: 'generate', id, query, passages, locale, modelId: this.modelId });
 
     try {
       while (true) {
@@ -198,41 +207,21 @@ export class WorkerSlmAnswerProvider implements AnswerProvider {
   }
 }
 
-export async function isSlmModelCached(): Promise<boolean> {
+export async function isSlmModelCached(modelId = 'HuggingFaceTB/SmolLM2-360M-Instruct'): Promise<boolean> {
   try {
     const storage = new OpfsStorage();
     const files = await storage.list('models');
+    const segment = modelId.replace(/[^a-zA-Z0-9]/g, '_');
     for (const name of files) {
-      if (name.includes('SmolLM2-360M-Instruct') && name.includes('model_q4.onnx')) {
+      if ((name.includes(segment) || name.includes('SmolLM2-360M-Instruct')) && name.includes('model_q4.onnx')) {
         const blob = await storage.read(`models/${name}`);
         if (blob && blob.size > 300_000_000) return true;
       }
     }
   } catch {
-    // Fall back to Cache API
+    // Return false on storage read failure
   }
-
-  if (typeof caches === 'undefined') return false;
-  try {
-    const cacheNames = await caches.keys();
-    for (const name of cacheNames) {
-      if (name.includes('transformers') || name.includes('onnx')) {
-        const cache = await caches.open(name);
-        const keys = await cache.keys();
-        for (const req of keys) {
-          if (req.url.includes('SmolLM2-360M-Instruct') && req.url.includes('.onnx')) {
-            const res = await cache.match(req);
-            if (res && res.ok) {
-              return true;
-            }
-          }
-        }
-      }
-    }
-    return false;
-  } catch {
-    return false;
-  }
+  return false;
 }
 
 export async function clearSlmModelCache(): Promise<void> {
@@ -241,23 +230,5 @@ export async function clearSlmModelCache(): Promise<void> {
     await storage.delete('models');
   } catch {
     // Ignore OPFS removal errors
-  }
-
-  if (typeof caches === 'undefined') return;
-  try {
-    const cacheNames = await caches.keys();
-    for (const name of cacheNames) {
-      if (name.includes('transformers') || name.includes('onnx')) {
-        const cache = await caches.open(name);
-        const keys = await cache.keys();
-        for (const req of keys) {
-          if (req.url.includes('SmolLM2-360M-Instruct')) {
-            await cache.delete(req);
-          }
-        }
-      }
-    }
-  } catch {
-    // Ignore cache deletion errors
   }
 }

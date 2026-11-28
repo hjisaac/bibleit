@@ -9,7 +9,14 @@ from bibleit_ingest.artifacts import (
     read_lock_file,
     resolve_matching_artifacts,
 )
-from bibleit_ingest.constants import APP_DATA_DIR, EMBED_CORPUS_OUTPUTS, QUERY_PREFIX, REPO, WEB_PATH
+from bibleit_ingest.constants import (
+    APP_DATA_DIR,
+    DEFAULT_GENERATION_MODEL,
+    EMBED_CORPUS_OUTPUTS,
+    QUERY_PREFIX,
+    REPO,
+    WEB_PATH,
+)
 from bibleit_ingest.sinks import StaticArtifactSink
 from bibleit_ingest.types import BookCorpus
 from bibleit_ingest.walkers import WebCorpusWalker
@@ -23,6 +30,7 @@ def export_artifacts(
     model: str | None = typer.Option(None, help="Disambiguate when the hash was embedded with several models."),
     out_dir: Path = typer.Option(APP_DATA_DIR, help="Destination for the static artifacts."),
     quantized: bool = typer.Option(True, help="Export int8 quantized embeddings with scales."),
+    generation_model: str = typer.Option(DEFAULT_GENERATION_MODEL, help="On-device SLM model ID for manifest."),
 ) -> None:
     """Publish a hash-addressed embedding run as the PWA's static artifacts."""
     if quantized:
@@ -55,6 +63,7 @@ def export_artifacts(
         model=model_name,
         query_prefix=QUERY_PREFIX,
         chunk_meta={"hash": run_hash, **chunk_params},
+        generation_model=generation_model,
     )
     typer.echo(f"Exported {run_hash} ({model_name}, {len(chunks)} chunks, quantized={quantized}) -> {out_dir}")
 

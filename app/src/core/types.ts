@@ -72,15 +72,34 @@ export enum SubsystemStateEnum {
   DISABLED = 'disabled',
 }
 
+export type DetectionMethod = 'browser_ai' | 'heuristic' | 'none';
+
+export interface LanguageDetectionResult {
+  language: 'en' | 'fr' | null;
+  detectionMethod: DetectionMethod;
+}
+
 /** Final, merged result the UI renders. */
 export interface RetrievalResult {
   passages: ScoredPassage[];
   /** References parsed out of the query, if any (always shown first). */
   parsedRefs: RefRange[];
+  /** Original user query. */
+  query?: string;
+  /** Cross-lingual translated query when applicable. */
+  translatedQuery?: string;
+  /** Provider that translated the query (e.g. 'gemini', 'groq', 'deepl', 'mymemory'). */
+  translatedBy?: string;
   /** Execution origin declared by the engine resolving the query. */
   origin?: SearchOriginEnum;
   /** Optional reason if degraded to local engine after remote failure. */
   fallbackReason?: 'timeout' | 'error';
+  /** Detected query language (e.g. 'en', 'fr'). */
+  detectedLanguage?: 'en' | 'fr' | null;
+  /** Method used to detect the query language. */
+  detectionMethod?: DetectionMethod;
+  /** Reason why query translation was bypassed, if applicable. */
+  translationBypassReason?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +126,9 @@ export interface Manifest {
     quantization: { type: 'int8'; scales: string } | { type: 'float32' };
     count: number;
     sha256?: string;
+  };
+  generation?: {
+    model: string;
   };
 }
 
@@ -170,9 +192,11 @@ export enum ThemeEnum {
   OBSIDIAN = 'obsidian',
 }
 
-export { LOCALES, DEFAULT_LOCALE, type Locale } from '@bibleit/engine';
+export { LOCALES, DEFAULT_LOCALE, LocaleEnum, resolveLocale, type Locale } from '@bibleit/engine';
 
 export const TRANSLATIONS = ['web', 'lsg'] as const;
 export type TranslationId = (typeof TRANSLATIONS)[number];
 export const DEFAULT_TRANSLATION: TranslationId = 'web';
+
+export type VoteDirection = 'up' | 'down';
 

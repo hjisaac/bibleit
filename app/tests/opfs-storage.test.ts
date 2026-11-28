@@ -81,7 +81,11 @@ function createMockOpfs() {
       async removeEntry(name: string, options?: { recursive?: boolean }) {
         const fullPath = prefix ? `${prefix}/${name}` : name;
         if (options?.recursive) {
-          dirs.delete(fullPath);
+          for (const key of Array.from(dirs.keys())) {
+            if (key === fullPath || key.startsWith(`${fullPath}/`)) {
+              dirs.delete(key);
+            }
+          }
           for (const key of Array.from(files.keys())) {
             if (key === fullPath || key.startsWith(`${fullPath}/`)) {
               files.delete(key);
@@ -269,23 +273,24 @@ describe('opfs-storage', () => {
       const m = await store.manifest();
       expect(m.translation.id).toBe('WEB');
 
-      const cached = opfs.files.get('manifest.json');
+      const cached = opfs.files.get('bibleit-artifacts/manifest.json');
       expect(cached).toBeDefined();
       expect(JSON.parse(new TextDecoder().decode(cached!)).translation.id).toBe('WEB');
     });
 
     it('falls back to cached manifest when offline', async () => {
-      opfs.files.set('manifest.json', new TextEncoder().encode(JSON.stringify(mockManifest)));
+      const storage = new OpfsStorage();
+      await storage.write('bibleit-artifacts/manifest.json', JSON.stringify(mockManifest));
       vi.stubGlobal('fetch', vi.fn(async () => {
         throw new Error('Offline');
       }));
 
-      const store = createArtifactStore();
+      const store = createArtifactStore(storage);
       const m = await store.manifest();
       expect(m.translation.id).toBe('WEB');
     });
 
-    it('loads verses and triggers book cache eviction', async () => {
+    it('loads verses under translation namespace with SHA-256 content hash', async () => {
       const versesData = { 'GEN 1:1': 'In the beginning' };
       const versesJson = JSON.stringify(versesData);
       const hash = await sha256Hex(versesJson);
@@ -304,6 +309,7 @@ describe('opfs-storage', () => {
       const store = createArtifactStore();
       const result = await store.verses();
       expect(result).toEqual(versesData);
+      expect(opfs.files.has(`bibleit-artifacts/web/verses-${hash.slice(0, 8)}.json.gz`)).toBe(true);
       expect(await store.hasVerses!()).toBe(true);
     });
 
@@ -314,9 +320,11 @@ describe('opfs-storage', () => {
         ...mockManifest,
         corpus: { verses: 'verses.json', count: 1, sha256: validHash },
       };
+      const expectedPath = `bibleit-artifacts/web/verses-${validHash.slice(0, 8)}.json.gz`;
 
-      opfs.files.set('manifest.json', new TextEncoder().encode(JSON.stringify(manifestWithHash)));
-      opfs.files.set('verses-v3.json.gz', new TextEncoder().encode('corrupted content'));
+      const storage = new OpfsStorage();
+      await storage.write('bibleit-artifacts/manifest.json', JSON.stringify(manifestWithHash));
+      await storage.write(expectedPath, 'corrupted content');
 
       vi.stubGlobal('fetch', vi.fn(async (url: string) => {
         if (url.includes('manifest.json')) {
@@ -325,26 +333,48 @@ describe('opfs-storage', () => {
         return new Response('{}');
       }));
 
-      const store = createArtifactStore();
+      const store = createArtifactStore(storage);
       await expect(store.verses()).rejects.toThrow(CorruptArtifactError);
-      expect(opfs.files.has('verses-v3.json.gz')).toBe(false);
+      expect(opfs.files.has(expectedPath)).toBe(false);
     });
 
-    it('clears all artifacts from storage on clear()', async () => {
+    it('rotates embeddings path and reports uninstalled when model changes on identical chunks.hash', async () => {
+      const oldEmbBytes = new Uint8Array([1, 2, 3, 4]);
+      const oldHashBuf = await crypto.subtle.digest('SHA-256', oldEmbBytes);
+      const oldSha = Array.from(new Uint8Array(oldHashBuf))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+      const newSha = 'ffffffff00000000000000000000000000000000000000000000000000000000';
+
       const storage = new OpfsStorage();
-      await storage.write('manifest.json', 'm');
-      await storage.write('verses-v3.json.gz', 'v');
-      await storage.write('chunks-123.json.gz', 'c');
-      await storage.write('embeddings-123.i8.bin', 'e');
+      await storage.write(`bibleit-artifacts/web/embeddings-${oldSha.slice(0, 8)}.f32.bin`, oldEmbBytes);
+
+      const upgradedManifest: Manifest = {
+        ...mockManifest,
+        embeddings: { ...mockManifest.embeddings, model: 'multilingual-v2', sha256: newSha },
+      };
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(upgradedManifest))));
+
+      const store = createArtifactStore(storage);
+      // Old model file exists in OPFS, but current manifest expects newSha -> must NOT falsely report installed.
+      expect(await store.hasEmbeddings!()).toBe(false);
+    });
+
+    it('clears all artifacts from storage on clear() while preserving models/', async () => {
+      const storage = new OpfsStorage();
+      await storage.write('bibleit-artifacts/manifest.json', 'm');
+      await storage.write('bibleit-artifacts/web/verses-aaaaaaaa.json.gz', 'v');
+      await storage.write('bibleit-artifacts/web/chunks-bbbbbbbb.json.gz', 'c');
+      await storage.write('bibleit-artifacts/web/embeddings-cccccccc.i8.bin', 'e');
       await storage.write('models/model.onnx', 'keep-model');
 
       const store = createArtifactStore(storage);
       await store.clear();
 
-      expect(await storage.read('manifest.json')).toBeNull();
-      expect(await storage.read('verses-v3.json.gz')).toBeNull();
-      expect(await storage.read('chunks-123.json.gz')).toBeNull();
-      expect(await storage.read('embeddings-123.i8.bin')).toBeNull();
+      expect(await storage.read('bibleit-artifacts/manifest.json')).toBeNull();
+      expect(await storage.read('bibleit-artifacts/web/verses-aaaaaaaa.json.gz')).toBeNull();
+      expect(await storage.read('bibleit-artifacts/web/chunks-bbbbbbbb.json.gz')).toBeNull();
+      expect(await storage.read('bibleit-artifacts/web/embeddings-cccccccc.i8.bin')).toBeNull();
       // Models are preserved during artifact clearing
       expect(await storage.read('models/model.onnx')).not.toBeNull();
     });

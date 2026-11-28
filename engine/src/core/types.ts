@@ -72,15 +72,34 @@ export enum SubsystemStateEnum {
   DISABLED = 'disabled',
 }
 
+export type DetectionMethod = 'browser_ai' | 'heuristic' | 'none';
+
+export interface LanguageDetectionResult {
+  language: 'en' | 'fr' | null;
+  detectionMethod: DetectionMethod;
+}
+
 /** Final, merged result the UI renders. */
 export interface RetrievalResult {
   passages: ScoredPassage[];
   /** References parsed out of the query, if any (always shown first). */
   parsedRefs: RefRange[];
+  /** Original user query. */
+  query?: string;
+  /** Cross-lingual translated query when applicable. */
+  translatedQuery?: string;
+  /** Provider that translated the query (e.g. 'gemini', 'groq', 'deepl', 'mymemory'). */
+  translatedBy?: string;
   /** Execution origin declared by the engine resolving the query. */
   origin?: SearchOriginEnum;
   /** Optional reason if degraded to local engine after remote failure. */
   fallbackReason?: 'timeout' | 'error';
+  /** Detected query language (e.g. 'en', 'fr'). */
+  detectedLanguage?: 'en' | 'fr' | null;
+  /** Method used to detect the query language. */
+  detectionMethod?: DetectionMethod;
+  /** Reason why query translation was bypassed, if applicable. */
+  translationBypassReason?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +126,9 @@ export interface Manifest {
     quantization: { type: 'int8'; scales: string } | { type: 'float32' };
     count: number;
     sha256?: string;
+  };
+  generation?: {
+    model: string;
   };
 }
 
@@ -141,6 +163,20 @@ export interface NarrationState {
   rate: number;
 }
 
-export const LOCALES = ['en', 'fr'] as const;
-export type Locale = (typeof LOCALES)[number];
-export const DEFAULT_LOCALE: Locale = 'en';
+export enum LocaleEnum {
+  EN = 'en',
+  FR = 'fr',
+}
+
+export const LOCALES = [LocaleEnum.EN, LocaleEnum.FR] as const;
+export type Locale = `${LocaleEnum}`;
+export const DEFAULT_LOCALE: LocaleEnum = LocaleEnum.EN;
+
+export function resolveLocale(locale?: string): LocaleEnum {
+  if (locale) {
+    const normalized = locale.toLowerCase().trim();
+    if (normalized.startsWith(LocaleEnum.FR)) return LocaleEnum.FR;
+    if (normalized.startsWith(LocaleEnum.EN)) return LocaleEnum.EN;
+  }
+  return DEFAULT_LOCALE;
+}

@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE, LOCALES, type Locale } from './types';
+import { DEFAULT_LOCALE, LOCALES, resolveLocale, type Locale } from './types';
 
 export interface BibleBook {
   readonly id: string;
@@ -188,7 +188,7 @@ export const BIBLE_BOOKS_BY_ID: Readonly<Record<string, BibleBook>> = Object.fre
 /** Returns localized book title for a book id. */
 export function getLocalizedBookName(bookId: string, locale: string = DEFAULT_LOCALE): string {
   const upper = bookId.toUpperCase();
-  const table = LOCALIZED_BOOK_TABLES[locale as Locale];
+  const table = LOCALIZED_BOOK_TABLES[resolveLocale(locale)];
   return table?.names[upper] ?? BIBLE_BOOKS_BY_ID[upper]?.name ?? bookId;
 }
 
@@ -208,7 +208,7 @@ export function findBookByPrefix(query: string, locale: string = DEFAULT_LOCALE)
   const byId = BIBLE_BOOKS_BY_ID[q.toUpperCase()];
   if (byId) return byId;
 
-  const active = (LOCALES as readonly string[]).includes(locale) ? (locale as Locale) : DEFAULT_LOCALE;
+  const active = resolveLocale(locale);
   const orderedLocales: Locale[] = [active, ...LOCALES.filter((l) => l !== active)];
 
   // Check exact aliases before prefixes so short localized aliases (e.g. "mc", "ap") aren't shadowed.

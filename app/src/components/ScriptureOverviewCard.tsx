@@ -3,7 +3,6 @@ import { useStore } from '@nanostores/preact';
 import type { AudioNarrator } from '../core/ports';
 import type { NarrationState, ScoredPassage } from '../core/types';
 import { renderHighlightedText } from './SearchView';
-import { VoteButtons, type VoteDirection } from './VoteButtons';
 import { i18n } from '../stores/i18n';
 import { params } from '@nanostores/i18n';
 import en from '../locales/en.json';
@@ -31,8 +30,6 @@ export interface ScriptureOverviewCardProps {
   isSynthesisCollapsed: boolean;
   onToggleCollapse: () => void;
   onDismissError: () => void;
-  vote?: VoteDirection | null;
-  onVote?: (direction: VoteDirection) => void;
   narrator?: AudioNarrator;
   narrationState?: NarrationState;
   firstPassage?: ScoredPassage;
@@ -50,8 +47,6 @@ export function ScriptureOverviewCard({
   isSynthesisCollapsed,
   onToggleCollapse,
   onDismissError,
-  vote,
-  onVote,
   narrator,
   narrationState,
   firstPassage,
@@ -187,15 +182,6 @@ export function ScriptureOverviewCard({
                 </svg>
               )}
             </button>
-          )}
-
-          {hasContent && !isSynthesizing && onVote && (
-            <VoteButtons
-              vote={vote}
-              onVote={onVote}
-              helpfulTitle={tt.voteHelpfulTitle}
-              notHelpfulTitle={tt.voteNotHelpfulTitle}
-            />
           )}
         </div>
       </div>

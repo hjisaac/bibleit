@@ -130,4 +130,71 @@ describe('SettingsView Component', () => {
 
     expect(screen.getByText('Ready for offline AI overviews')).toBeDefined();
   });
+
+  it('renders Help improve search toggle and clears telemetry data when disabled', async () => {
+    const { $telemetryEnabled } = await import('../src/stores/preferences');
+    const { $telemetryQueue, $telemetryInstanceId, enqueueTelemetryEvent } = await import(
+      '../src/stores/telemetry'
+    );
+    $telemetryEnabled.set(true);
+    $telemetryInstanceId.set('inst-123');
+    enqueueTelemetryEvent('search', { query: 'peace' });
+
+    render(<SettingsView {...defaultProps} />);
+
+    const checkbox = screen.getByRole('checkbox', { name: 'Help improve search' }) as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+
+    fireEvent.change(checkbox, { target: { checked: false } });
+    expect($telemetryEnabled.get()).toBe(false);
+    expect($telemetryQueue.get()).toEqual([]);
+    expect($telemetryInstanceId.get()).toBe('');
+
+    // Reset shared preference for subsequent test files.
+    $telemetryEnabled.set(true);
+  });
+
+  it('disables On-Device Only switch and explains next version support when French is active', async () => {
+    const { $isMultilingualEnabled, $localeSetting } = await import('../src/stores/i18n');
+    $isMultilingualEnabled.set(true);
+    $localeSetting.set('fr');
+
+    render(
+      <SettingsView
+        {...defaultProps}
+        textPackageStatus={PackageStatusEnum.DOWNLOADED}
+        searchMode={SearchModeEnum.DEVICE}
+      />,
+    );
+
+    const checkbox = (await screen.findByRole('checkbox', {
+      name: 'Appareil uniquement',
+    })) as HTMLInputElement;
+    expect(checkbox.disabled).toBe(true);
+    expect(checkbox.checked).toBe(false);
+    expect(screen.getByText('Prochaine version')).toBeDefined();
+    expect(
+      screen.getByText(/La prochaine version corrigera cela/i),
+    ).toBeDefined();
+
+    // Reset locale state for subsequent tests.
+    $localeSetting.set('en');
+    $isMultilingualEnabled.set(false);
+  });
+
+  it('displays educational notice when automatic query translation is toggled off', async () => {
+    const { $isMultilingualEnabled } = await import('../src/stores/i18n');
+    const { $queryTranslationEnabled } = await import('../src/stores/preferences');
+    $isMultilingualEnabled.set(true);
+    $queryTranslationEnabled.set(false);
+
+    render(<SettingsView {...defaultProps} />);
+
+    expect(
+      screen.getByText(/Disabling translation matches raw French text against the current English index/i),
+    ).toBeDefined();
+
+    $queryTranslationEnabled.set(true);
+    $isMultilingualEnabled.set(false);
+  });
 });

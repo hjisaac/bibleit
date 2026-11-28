@@ -2,22 +2,22 @@ import { persistentAtom } from '@nanostores/persistent';
 import { PackageStatusEnum } from '../core/types';
 
 export const $textPackageStatus = persistentAtom<PackageStatusEnum>(
-  'bibleit_text_status',
+  'bibleit:status:text',
   PackageStatusEnum.NOT_DOWNLOADED,
 );
 
 export const $aiPackageStatus = persistentAtom<PackageStatusEnum>(
-  'bibleit_ai_status',
+  'bibleit:status:ai',
   PackageStatusEnum.NOT_DOWNLOADED,
 );
 
 export const $modelPackageStatus = persistentAtom<PackageStatusEnum>(
-  'bibleit_model_status',
+  'bibleit:status:model',
   PackageStatusEnum.NOT_DOWNLOADED,
 );
 
 export const $slmPackageStatus = persistentAtom<PackageStatusEnum>(
-  'bibleit_slm_status',
+  'bibleit:status:slm',
   PackageStatusEnum.NOT_DOWNLOADED,
 );
 

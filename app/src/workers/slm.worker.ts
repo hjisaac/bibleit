@@ -1,4 +1,5 @@
 import { pipeline, env, TextStreamer, DynamicCache, type Tensor } from '@huggingface/transformers';
+import { LocaleEnum, resolveLocale } from '@bibleit/engine';
 import { env as appEnv } from '../env';
 import { OpfsStorage, createCacheProxy } from '../adapters/opfs-storage';
 
@@ -30,13 +31,17 @@ Rules:
 
 const SYSTEM_PREFIX = `<|im_start|>system\n${SYSTEM_PROMPT}<|im_end|>\n<|im_start|>user\n`;
 
-function buildChatPrompt(query: string, passages: (string | { text?: string })[]): string {
+function buildChatPrompt(query: string, passages: (string | { text?: string })[], locale?: string): string {
   const context = (passages || [])
     .slice(0, 5)
     .map((c) => (typeof c === 'string' ? c : c.text ?? ''))
     .join('\n\n');
 
-  return `${SYSTEM_PREFIX}Passages:\n${context}\n\nTopic / Question: ${query}\nDirect answer (plain text, no preamble):<|im_end|>\n<|im_start|>assistant\n`;
+  const answerInstruction = resolveLocale(locale) === LocaleEnum.FR
+    ? 'Direct answer in French (plain text, no preamble):'
+    : 'Direct answer (plain text, no preamble):';
+
+  return `${SYSTEM_PREFIX}Passages:\n${context}\n\nTopic / Question: ${query}\n${answerInstruction}<|im_end|>\n<|im_start|>assistant\n`;
 }
 
 let systemPromptCacheEntries: Record<string, Tensor> | null = null;
@@ -83,7 +88,7 @@ function getClonedSystemPromptCache(): DynamicCache | null {
 }
 
 
-const MODEL_REPO = 'HuggingFaceTB/SmolLM2-360M-Instruct';
+const DEFAULT_MODEL_REPO = 'HuggingFaceTB/SmolLM2-360M-Instruct';
 const MODEL_FILES = [
   'config.json',
   'generation_config.json',
@@ -93,8 +98,8 @@ const MODEL_FILES = [
   'onnx/model_q4.onnx',
 ];
 
-async function downloadModelFiles(onProgress: (fraction: number) => void): Promise<void> {
-  const base = `https://huggingface.co/${MODEL_REPO}/resolve/main`;
+async function downloadModelFiles(modelRepo: string, onProgress: (fraction: number) => void): Promise<void> {
+  const base = `https://huggingface.co/${modelRepo}/resolve/main`;
   const TOTAL_ESTIMATED_BYTES = 372 * 1024 * 1024;
   let totalLoaded = 0;
 
@@ -129,38 +134,41 @@ async function downloadModelFiles(onProgress: (fraction: number) => void): Promi
 }
 
 let generatorPromise: Promise<any> | null = null;
+let currentGeneratorModel: string | null = null;
 let lastReportedProgress = 0;
 
-function createPipeline(device: 'webgpu' | 'wasm') {
+function createPipeline(modelRepo: string, device: 'webgpu' | 'wasm') {
   // dtype: 'q4' automatically resolves to onnx/model_q4.onnx matching OPFS cache keys.
-  return pipeline('text-generation', MODEL_REPO, {
+  return pipeline('text-generation', modelRepo, {
     dtype: 'q4',
     device,
   });
 }
 
-async function initGenerator() {
+async function initGenerator(modelRepo: string) {
   lastReportedProgress = 0;
   if (typeof navigator !== 'undefined' && 'gpu' in navigator && (navigator as any).gpu) {
     try {
       const adapter = await (navigator as any).gpu.requestAdapter();
       if (adapter) {
-        return await createPipeline('webgpu');
+        return await createPipeline(modelRepo, 'webgpu');
       }
     } catch {
       // fall through to WASM
     }
   }
-  return await createPipeline('wasm');
+  return await createPipeline(modelRepo, 'wasm');
 }
 
-async function getGenerator() {
-  if (!generatorPromise) {
+async function getGenerator(modelRepo: string) {
+  if (!generatorPromise || currentGeneratorModel !== modelRepo) {
+    currentGeneratorModel = modelRepo;
     generatorPromise = (async () => {
       try {
-        return await initGenerator();
+        return await initGenerator(modelRepo);
       } catch (err) {
         generatorPromise = null;
+        currentGeneratorModel = null;
         lastReportedProgress = 0;
         throw err;
       }
@@ -175,9 +183,11 @@ self.onmessage = async (e: MessageEvent) => {
   const data = e.data;
   if (!data || typeof data !== 'object') return;
 
+  const modelRepo = (data.modelId as string) || DEFAULT_MODEL_REPO;
+
   if (data.type === 'load') {
     try {
-      await downloadModelFiles((frac) => {
+      await downloadModelFiles(modelRepo, (frac) => {
         if (frac > lastReportedProgress) {
           lastReportedProgress = frac;
           self.postMessage({ type: 'progress', progress: frac });
@@ -199,11 +209,11 @@ self.onmessage = async (e: MessageEvent) => {
     activeGenerations.add(id);
 
     try {
-      const generator = await getGenerator();
+      const generator = await getGenerator(modelRepo);
       await warmSystemPromptCache(generator);
       if (!activeGenerations.has(id)) return;
 
-      const prompt = buildChatPrompt(data.query, data.passages);
+      const prompt = buildChatPrompt(data.query, data.passages, data.locale);
       const prefixCache = getClonedSystemPromptCache();
 
       const streamer = new TextStreamer(generator.tokenizer, {

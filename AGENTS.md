@@ -49,6 +49,11 @@ The user is building this project to learn by doing and to have full ownership o
 - `constants` modules must hold only true runtime immutable values (paths, filenames, regexes).
 - Types, type aliases (`Literal`, `TypeVar`), and Enums must never be placed in `constants/`; place them in dedicated `types.py` modules or scope them directly to the domain package that uses them.
 
+### 7. No Backward Compatibility Baggage (Full Propagation)
+- Never maintain legacy aliases, backward-compatible shims, deprecated routes, or dual implementations.
+- When an interface, protocol, or endpoint changes (e.g., switching from GET to POST), propagate the change completely across the entire codebase, tests, mocks, cassettes, and documentation.
+- Remove obsolete code immediately without leaving transition baggage.
+
 ---
 
 ## Repository Structure & Architecture

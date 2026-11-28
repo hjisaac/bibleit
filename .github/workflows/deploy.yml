@@ -39,6 +39,8 @@ jobs:
           VITE_BACKEND_API_URL: ${{ vars.VITE_BACKEND_API_URL }}
           VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY }}
           VITE_POSTHOG_HOST: ${{ vars.VITE_POSTHOG_HOST }}
+          VITE_TELEMETRY_BATCH_SIZE: ${{ vars.VITE_TELEMETRY_BATCH_SIZE }}
+          VITE_MULTILINGUAL_ENABLED: ${{ vars.VITE_MULTILINGUAL_ENABLED }}
         run: |
           export VITE_CLOUDFLARE_R2_URL=$(echo "$VITE_CLOUDFLARE_R2_URL" | tr -d '[:space:]')
           export VITE_FEEDBACK_EMAIL=$(echo "$VITE_FEEDBACK_EMAIL" | tr -d '[:space:]')

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
+from bibleit_ingest.constants import DEFAULT_GENERATION_MODEL
 from bibleit_ingest.sinks import StaticArtifactSink
 from bibleit_ingest.types import BookCorpus, Passage
 
@@ -50,6 +51,7 @@ def test_static_artifact_sink(tmp_path: Path) -> None:
     assert manifest["embeddings"]["count"] == 1
     assert manifest["embeddings"]["query_prefix"] == "search_query: "
     assert manifest["embeddings"]["quantization"]["type"] == "float32"
+    assert manifest["generation"]["model"] == DEFAULT_GENERATION_MODEL
     assert "sha256" in manifest["corpus"] and len(manifest["corpus"]["sha256"]) == 64
     assert "sha256" in manifest["chunks"] and len(manifest["chunks"]["sha256"]) == 64
     assert "sha256" in manifest["embeddings"] and len(manifest["embeddings"]["sha256"]) == 64

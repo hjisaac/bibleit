@@ -41,12 +41,16 @@ describe('createHybridEngine & RemoteEngine', () => {
     };
   });
 
-  const createManager = (remoteUrl: string | null, isDeviceOnly?: () => boolean) => {
+  const createManager = (
+    remoteUrl: string | null,
+    isDeviceOnly?: () => boolean,
+    getLocale?: () => string,
+  ) => {
     const cleanUrl = remoteUrl?.trim().replace(/\/+$/, '');
     const remote = cleanUrl
-      ? new RemoteEngine(cleanUrl, new HttpAnswerProvider(cleanUrl, isDeviceOnly))
+      ? new RemoteEngine(cleanUrl, new HttpAnswerProvider(cleanUrl, isDeviceOnly), getLocale)
       : null;
-    return createHybridEngine(remote, mockLocalEngine, isDeviceOnly);
+    return createHybridEngine(remote, mockLocalEngine, isDeviceOnly, getLocale);
   };
 
   it('delegates to RemoteEngine when online and healthy', async () => {
@@ -229,4 +233,82 @@ describe('createHybridEngine & RemoteEngine', () => {
     expect(chunks.join('')).toBe('God is love');
     fetchSpy.mockRestore();
   });
+
+  it('does not fall back to localEngine when French locale and remote fetch rejects', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Network error'));
+
+    const engine = createManager('https://api.bibleit.test', undefined, () => 'fr');
+    const result = await engine.retrieve('paix');
+
+    expect(mockLocalEngine.retrieve).not.toHaveBeenCalled();
+    expect(result.passages).toEqual([]);
+    expect(result.fallbackReason).toBe('error');
+    expect(result.origin).toBe(SearchOriginEnum.LOCAL);
+  });
+
+  it('does not fall back to localEngine when French locale and remote times out', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce((_url, init) => {
+      return new Promise((_, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('The user aborted a request.', 'AbortError'));
+        });
+      });
+    });
+
+    const engine = createManager('https://api.bibleit.test', undefined, () => 'fr');
+    const retrievePromise = engine.retrieve('paix');
+    await vi.advanceTimersByTimeAsync(4100);
+    const result = await retrievePromise;
+
+    expect(mockLocalEngine.retrieve).not.toHaveBeenCalled();
+    expect(result.passages).toEqual([]);
+    expect(result.fallbackReason).toBe('timeout');
+    expect(result.origin).toBe(SearchOriginEnum.LOCAL);
+    vi.useRealTimers();
+  });
+
+  it('bypasses localEngine when French locale and isDeviceOnly callback returns true', async () => {
+    const engine = createManager('https://api.bibleit.test', () => true, () => 'fr');
+    const result = await engine.retrieve('paix');
+
+    expect(mockLocalEngine.retrieve).not.toHaveBeenCalled();
+    expect(result.passages).toEqual([]);
+    expect(result.origin).toBe(SearchOriginEnum.LOCAL);
+  });
+
+  it('cleans up timeout timer and abort listener in finally block upon remote error', async () => {
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+    const callerController = new AbortController();
+    const removeListenerSpy = vi.spyOn(callerController.signal, 'removeEventListener');
+
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Network failure'));
+
+    const engine = createManager('https://api.bibleit.test');
+    await engine.retrieve('love', 10, callerController.signal);
+
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    expect(removeListenerSpy).toHaveBeenCalledWith('abort', expect.any(Function));
+  });
+
+  it('passes detectionMethod from injected languageDetector to retrieval result', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(mockRemoteResult), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+    const mockDetector = {
+      detect: vi.fn().mockResolvedValue({ language: 'en', detectionMethod: 'browser_ai' as const }),
+    };
+    const remote = new RemoteEngine(
+      'https://api.bibleit.test',
+      undefined,
+      () => 'fr',
+      undefined,
+      mockDetector,
+    );
+    const result = await remote.retrieve('peace in anxiety');
+    expect(result.detectionMethod).toBe('browser_ai');
+    expect(result.detectedLanguage).toBe('en');
+    expect(result.translationBypassReason).toBe('client_detected_english');
+  });
 });
+

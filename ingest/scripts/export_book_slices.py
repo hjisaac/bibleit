@@ -76,14 +76,14 @@ def main() -> None:
             continue
         manifest = export_translation_slices(catalog_path, trans_id, names_dict)
         print(f"Exported {trans_id.upper()} ({manifest['totalBytes']} bytes) -> data/books/{trans_id}/")
-        if trans_id == "lsg":
-            ts_content = (
-                "import type { BibleManifest } from './bible-manifest';\n\n"
-                f"export const LSG_BIBLE_MANIFEST: BibleManifest = {json.dumps(manifest, indent=2)};\n"
-            )
-            manifest_ts_path = REPO / "app/src/core/lsg-manifest.ts"
-            manifest_ts_path.write_text(ts_content)
-            print(f"Wrote {manifest_ts_path}")
+        const_name = f"{trans_id.upper()}_BIBLE_MANIFEST"
+        ts_content = (
+            "import type { BibleManifest } from './bible-manifest';\n\n"
+            f"export const {const_name}: BibleManifest = {json.dumps(manifest, indent=2)};\n"
+        )
+        manifest_ts_path = REPO / f"app/src/core/{trans_id}-manifest.ts"
+        manifest_ts_path.write_text(ts_content)
+        print(f"Wrote {manifest_ts_path}")
 
 
 if __name__ == "__main__":

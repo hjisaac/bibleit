@@ -1,14 +1,34 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { streamText, createTextStreamResponse } from 'ai';
+import {
+  CircuitState,
+  ConsecutiveBreaker,
+  DelegateBackoff,
+  circuitBreaker,
+  handleWhen,
+  type CircuitBreakerPolicy,
+} from 'cockatiel';
 import { StatusCodes } from 'http-status-codes';
 import {
-  renderChunk,
   TELEMETRY_HEADERS,
   type AnswerProvider,
   type RetrievalResult,
   type ScoredPassage,
 } from '@bibleit/engine';
+import {
+  COHERE_BASE_URL,
+  COHERE_DEFAULT_MODEL,
+  GEMINI_BASE_URL,
+  GEMINI_DEFAULT_MODEL,
+  GROQ_BASE_URL,
+  GROQ_DEFAULT_MODEL,
+  MISTRAL_BASE_URL,
+  MISTRAL_DEFAULT_MODEL,
+  OPENROUTER_BASE_URL,
+  OPENROUTER_DEFAULT_MODEL,
+} from '../constants';
 import { logger } from '../logger';
+import { buildAnswerPrompt, getAnswerSystemPrompt } from '../prompts';
 
 export interface ProviderConfig {
   name: string;
@@ -26,24 +46,14 @@ export interface ProviderStatus {
   cooldownRemainingSec?: number;
 }
 
-const SYSTEM_PROMPT = `You are BibleIt, a focused scripture assistant.
-Provide a direct, factual biblical summary using ONLY the provided Bible passages.
-
-Rules:
-- Zero preamble: NEVER include conversational openings or meta-announcements such as "Based on the provided passages", "Here is what the Bible says/teaches", or "According to the verses". Start directly with the core message.
-- Plain text only: Do NOT use markdown syntax (no asterisks, bold, italics, bullet points, headers, or blockquotes).
-- Strict grounding: State only what is explicitly in the passages. Do not invent theology or verses.
-- Citations: Cite specific references in brackets, e.g. [MAT 22:39] or [ROM 13:8-10]. Use a regular hyphen in verse ranges.
-- Length: Keep the summary cohesive, concise, and focused (1 to 2 paragraphs, under 150 words).`;
-
-function buildPrompt(query: string, passages: ScoredPassage[]): string {
-  const context = passages
-    .slice(0, 5)
-    .map((p) => renderChunk(p.chunk))
-    .join('\n\n');
-
-  return `Passages:\n${context}\n\nTopic / Question: ${query}\nDirect answer (plain text, no preamble or introductory phrase):`;
+interface ProviderBreaker {
+  readonly policy: CircuitBreakerPolicy;
+  openUntil: number;
 }
+
+const handleProviderError = handleWhen(
+  (err: any) => !(err?.name === 'AbortError' || err?.message?.includes('aborted')),
+);
 
 /**
  * Parses cooldown duration from 429 response headers or error messages.
@@ -95,11 +105,62 @@ export function parseCooldownMs(err: unknown): number {
 
 // Free tier endpoints catalog: https://github.com/mnfst/awesome-free-llm-apis
 export class AiAnswerProvider implements AnswerProvider {
-  private cooldowns = new Map<string, number>();
+  private breakers = new Map<string, ProviderBreaker>();
   private roundRobinCounter = 0;
 
   get available(): boolean {
     return this.getProviders().length > 0;
+  }
+
+  private getBreaker(providerName: string): ProviderBreaker {
+    let entry = this.breakers.get(providerName);
+    if (!entry) {
+      let openUntil = 0;
+      const policy = circuitBreaker(handleProviderError, {
+        breaker: new ConsecutiveBreaker(1),
+        halfOpenAfter: new DelegateBackoff((ctx) => {
+          const err = 'error' in ctx.result ? ctx.result.error : undefined;
+          const cooldownMs = parseCooldownMs(err);
+          openUntil = Date.now() + cooldownMs;
+          logger.warn(
+            { provider: providerName, cooldownSec: Math.round(cooldownMs / 1000) },
+            'Provider cooled down after error or rate limit',
+          );
+          return cooldownMs;
+        }),
+      });
+      policy.onReset(() => {
+        openUntil = 0;
+      });
+      entry = {
+        policy,
+        get openUntil() {
+          return openUntil;
+        },
+        set openUntil(v: number) {
+          openUntil = v;
+        },
+      };
+      this.breakers.set(providerName, entry);
+    }
+    return entry;
+  }
+
+  private isCooling(providerName: string, now = Date.now()): boolean {
+    const entry = this.breakers.get(providerName);
+    if (!entry) return false;
+    return entry.policy.state === CircuitState.Open && entry.openUntil > now;
+  }
+
+  /** Trips a provider's cockatiel circuit breaker with the given error. */
+  recordFailure(providerName: string, err: unknown): Promise<void> {
+    const wrapped =
+      err instanceof Error
+        ? err
+        : Object.assign(new Error('Provider error'), typeof err === 'object' && err ? err : {});
+    return this.getBreaker(providerName)
+      .policy.execute(() => Promise.reject(wrapped))
+      .catch(() => {});
   }
 
   getProviders(): ProviderConfig[] {
@@ -108,45 +169,45 @@ export class AiAnswerProvider implements AnswerProvider {
     if (process.env.GROQ_API_KEY) {
       list.push({
         name: 'groq',
-        baseURL: 'https://api.groq.com/openai/v1',
+        baseURL: GROQ_BASE_URL,
         apiKey: process.env.GROQ_API_KEY,
-        model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
+        model: process.env.GROQ_MODEL || GROQ_DEFAULT_MODEL,
         tier: 1,
       });
     }
     if (process.env.GEMINI_API_KEY) {
       list.push({
         name: 'gemini',
-        baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+        baseURL: GEMINI_BASE_URL,
         apiKey: process.env.GEMINI_API_KEY,
-        model: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
+        model: process.env.GEMINI_MODEL || GEMINI_DEFAULT_MODEL,
         tier: 1,
       });
     }
     if (process.env.OPENROUTER_API_KEY) {
       list.push({
         name: 'openrouter',
-        baseURL: 'https://openrouter.ai/api/v1',
+        baseURL: OPENROUTER_BASE_URL,
         apiKey: process.env.OPENROUTER_API_KEY,
-        model: process.env.OPENROUTER_MODEL || 'openrouter/free',
+        model: process.env.OPENROUTER_MODEL || OPENROUTER_DEFAULT_MODEL,
         tier: 2,
       });
     }
     if (process.env.MISTRAL_API_KEY) {
       list.push({
         name: 'mistral',
-        baseURL: 'https://api.mistral.ai/v1',
+        baseURL: MISTRAL_BASE_URL,
         apiKey: process.env.MISTRAL_API_KEY,
-        model: process.env.MISTRAL_MODEL || 'mistral-small-latest',
+        model: process.env.MISTRAL_MODEL || MISTRAL_DEFAULT_MODEL,
         tier: 2,
       });
     }
     if (process.env.COHERE_API_KEY) {
       list.push({
         name: 'cohere',
-        baseURL: 'https://api.cohere.ai/compatibility/v1',
+        baseURL: COHERE_BASE_URL,
         apiKey: process.env.COHERE_API_KEY,
-        model: process.env.COHERE_MODEL || 'command-r',
+        model: process.env.COHERE_MODEL || COHERE_DEFAULT_MODEL,
         tier: 2,
       });
     }
@@ -163,10 +224,10 @@ export class AiAnswerProvider implements AnswerProvider {
     if (all.length === 0) return [];
 
     const now = Date.now();
-    const isCool = (p: ProviderConfig) => now >= (this.cooldowns.get(p.name) || 0);
+    const isHealthy = (p: ProviderConfig) => !this.isCooling(p.name, now);
 
-    const tier1Healthy = all.filter((p) => p.tier === 1 && isCool(p));
-    const tier2Healthy = all.filter((p) => p.tier === 2 && isCool(p));
+    const tier1Healthy = all.filter((p) => p.tier === 1 && isHealthy(p));
+    const tier2Healthy = all.filter((p) => p.tier === 2 && isHealthy(p));
 
     const candidates: ProviderConfig[] = [];
     if (tier1Healthy.length > 0) {
@@ -178,7 +239,7 @@ export class AiAnswerProvider implements AnswerProvider {
 
     if (candidates.length === 0) {
       const cooling = [...all].sort(
-        (a, b) => (this.cooldowns.get(a.name) || 0) - (this.cooldowns.get(b.name) || 0),
+        (a, b) => (this.breakers.get(a.name)?.openUntil || 0) - (this.breakers.get(b.name)?.openUntil || 0),
       );
       candidates.push(...cooling);
     }
@@ -186,69 +247,74 @@ export class AiAnswerProvider implements AnswerProvider {
     return candidates;
   }
 
-  /** Alias for getCandidateList */
-  getCandidateQueue(): ProviderConfig[] {
-    return this.getCandidateList();
-  }
-
   /** Returns live health and cooldown status for all configured providers. */
   getProviderStatuses(): ProviderStatus[] {
     const now = Date.now();
     return this.getProviders().map((p) => {
-      const cooldownUntil = this.cooldowns.get(p.name) || 0;
-      const isCooling = cooldownUntil > now;
+      const openUntil = this.breakers.get(p.name)?.openUntil || 0;
+      const isCooling = this.isCooling(p.name, now);
       return {
         name: p.name,
         tier: p.tier,
         model: p.model,
         status: isCooling ? 'cooldown' : 'healthy',
-        ...(isCooling ? { cooldownRemainingSec: Math.ceil((cooldownUntil - now) / 1000) } : {}),
+        ...(isCooling ? { cooldownRemainingSec: Math.ceil((openUntil - now) / 1000) } : {}),
       };
     });
   }
 
-  markCooldown(providerName: string, err: unknown): void {
-    if (err instanceof Error && (err.name === 'AbortError' || err.message?.includes('aborted'))) {
-      return;
-    }
-    const cooldownMs = parseCooldownMs(err);
-    const cooldownUntil = Date.now() + cooldownMs;
-    this.cooldowns.set(providerName, cooldownUntil);
-    logger.warn(
-      { provider: providerName, cooldownSec: Math.round(cooldownMs / 1000) },
-      'Provider cooled down after error or rate limit',
-    );
-  }
-
-  async *answer(query: string, context: RetrievalResult): AsyncIterable<string> {
+  async *answer(
+    query: string,
+    context: RetrievalResult,
+    _onMeta?: unknown,
+    locale?: string,
+  ): AsyncIterable<string> {
     const candidates = this.getCandidateList();
     if (candidates.length === 0) return;
 
-    const prompt = buildPrompt(query, context.passages);
+    const prompt = buildAnswerPrompt(query, context.passages, locale);
+    const system = getAnswerSystemPrompt(locale);
 
     for (const provider of candidates) {
+      const breaker = this.getBreaker(provider.name).policy;
       let yieldedAny = false;
       try {
-        const client = createOpenAI({
-          baseURL: provider.baseURL,
-          apiKey: provider.apiKey,
-        });
-        const result = streamText({
-          model: client.chat(provider.model),
-          system: SYSTEM_PROMPT,
-          prompt,
-          maxOutputTokens: 300,
+        const iterator = await breaker.execute(async () => {
+          const client = createOpenAI({
+            baseURL: provider.baseURL,
+            apiKey: provider.apiKey,
+          });
+          const result = streamText({
+            model: client.chat(provider.model),
+            system,
+            prompt,
+            maxOutputTokens: 300,
+          });
+          const it = result.textStream[Symbol.asyncIterator]();
+          const first = await it.next();
+          if (first.done && !first.value) {
+            throw new Error('Provider returned empty stream');
+          }
+          return { it, first };
         });
 
-        for await (const chunk of result.textStream) {
+        if (iterator.first.value) {
           yieldedAny = true;
-          yield chunk;
+          yield iterator.first.value;
+        }
+        while (true) {
+          const { done, value } = await iterator.it.next();
+          if (done) break;
+          yieldedAny = true;
+          yield value;
         }
 
         return;
       } catch (err) {
-        this.markCooldown(provider.name, err);
-        if (yieldedAny) return;
+        if (yieldedAny) {
+          await this.recordFailure(provider.name, err);
+          return;
+        }
       }
     }
   }
@@ -257,6 +323,7 @@ export class AiAnswerProvider implements AnswerProvider {
     query: string,
     passages: ScoredPassage[],
     signal?: AbortSignal,
+    locale?: string,
   ): Promise<Response> {
     const candidates = this.getCandidateList();
     if (candidates.length === 0) {
@@ -268,32 +335,39 @@ export class AiAnswerProvider implements AnswerProvider {
       );
     }
 
-    const prompt = buildPrompt(query, passages);
+    const prompt = buildAnswerPrompt(query, passages, locale);
+    const system = getAnswerSystemPrompt(locale);
 
     for (let i = 0; i < candidates.length; i++) {
       const provider = candidates[i]!;
+      const breaker = this.getBreaker(provider.name).policy;
       try {
-        const client = createOpenAI({
-          baseURL: provider.baseURL,
-          apiKey: provider.apiKey,
+        const { iterator, first } = await breaker.execute(async () => {
+          const client = createOpenAI({
+            baseURL: provider.baseURL,
+            apiKey: provider.apiKey,
+          });
+
+          const result = streamText({
+            model: client.chat(provider.model),
+            system,
+            prompt,
+            abortSignal: signal,
+            maxOutputTokens: 300,
+          });
+
+          const it = result.textStream[Symbol.asyncIterator]();
+          const firstChunk = await it.next();
+
+          if (firstChunk.done && !firstChunk.value) {
+            throw new Error('Provider returned empty stream');
+          }
+          return { iterator: it, first: firstChunk };
         });
 
-        const result = streamText({
-          model: client.chat(provider.model),
-          system: SYSTEM_PROMPT,
-          prompt,
-          abortSignal: signal,
-          maxOutputTokens: 300,
-        });
-
-        const iterator = result.textStream[Symbol.asyncIterator]();
-        const first = await iterator.next();
-
-        if (first.done && !first.value) {
-          throw new Error('Provider returned empty stream');
-        }
-
-        const markCd = (err: unknown) => this.markCooldown(provider.name, err);
+        const onStreamErr = (err: unknown) => {
+          void this.recordFailure(provider.name, err);
+        };
         const responseStream = new ReadableStream<string>({
           async start(controller) {
             if (first.value) {
@@ -307,7 +381,7 @@ export class AiAnswerProvider implements AnswerProvider {
               }
               controller.close();
             } catch (err) {
-              markCd(err);
+              onStreamErr(err);
               controller.error(err);
             }
           },
@@ -327,7 +401,6 @@ export class AiAnswerProvider implements AnswerProvider {
           },
         });
       } catch (err) {
-        this.markCooldown(provider.name, err);
         if (i === candidates.length - 1) {
           throw err;
         }

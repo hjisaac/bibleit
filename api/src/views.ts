@@ -168,7 +168,7 @@ export function renderStatusHtml(
         ${operationalPill}
       </div>
       <div class="item">
-        <span class="name">GET /api/v1/search</span>
+        <span class="name">POST /api/v1/search</span>
         ${isReady ? operationalPill : initPill}
       </div>
       <div class="item">

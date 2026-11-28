@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/preact';
 import { SearchView } from '../src/components/SearchView';
+import { SEARCH_STORAGE_KEY } from '../src/stores/search';
 import { createHybridEngine } from '../src/adapters/hybrid-engine';
 import { RemoteEngine } from '../src/adapters/remote-engine';
 import type { SearchEngine, AudioNarrator } from '../src/core/ports';
@@ -80,9 +81,9 @@ describe('SearchView Result Cards & User Actions', () => {
 
   function renderSearchView(overrides: Partial<SearchViewProps> = {}) {
     // Pre-populate search in localStorage if not already provided
-    if (!localStorage.getItem('bibleit_last_search')) {
+    if (!localStorage.getItem(SEARCH_STORAGE_KEY)) {
       localStorage.setItem(
-        'bibleit_last_search',
+        SEARCH_STORAGE_KEY,
         JSON.stringify({
           query: 'peace and joy',
           passages: samplePassages,
@@ -164,46 +165,37 @@ describe('SearchView Result Cards & User Actions', () => {
     expect(onOpenReaderSpy).toHaveBeenCalledWith('PHP', 4, 4);
   });
 
-  it('captures passage_feedback and toggles pressed state when voting thumbs up or down', () => {
+  it('captures search_feedback, fires toast and removes prompt from the results feed', () => {
     const captureSpy = vi.fn();
-    renderSearchView({ telemetry: { capture: captureSpy } });
+    renderSearchView({ telemetry: { capture: captureSpy }, onToast: onToastSpy });
 
-    const upBtn = screen.getByTitle('Relevant passage');
-    const downBtn = screen.getByTitle('Not relevant');
-    expect(upBtn.getAttribute('aria-pressed')).toBe('false');
+    // Passage cards themselves have no vote buttons
+    expect(screen.queryByTitle('Relevant passage')).toBeNull();
+    expect(screen.queryByTitle('Not relevant')).toBeNull();
 
-    fireEvent.click(upBtn);
-    expect(upBtn.getAttribute('aria-pressed')).toBe('true');
-    expect(captureSpy).toHaveBeenCalledWith('passage_feedback', {
+    const yesBtn = screen.getByText('Yes, helpful');
+    expect(screen.getByText('Not quite')).toBeDefined();
+
+    fireEvent.click(yesBtn);
+    expect(captureSpy).toHaveBeenCalledWith('search_feedback', {
       query: 'peace and joy',
-      ref: 'Philippians 4:4–7',
-      rank: 0,
       vote: 'up',
+      result_count: 1,
       locale: 'en',
     });
 
-    fireEvent.click(downBtn);
-    expect(downBtn.getAttribute('aria-pressed')).toBe('true');
-    expect(upBtn.getAttribute('aria-pressed')).toBe('false');
-    expect(captureSpy).toHaveBeenCalledWith('passage_feedback', {
-      query: 'peace and joy',
-      ref: 'Philippians 4:4–7',
-      rank: 0,
-      vote: 'down',
-      locale: 'en',
-    });
+    // Toast is displayed
+    expect(onToastSpy).toHaveBeenCalledWith('Thank you for your feedback!');
 
-    // Clicking active vote again clears selection without emitting another event
-    captureSpy.mockClear();
-    fireEvent.click(downBtn);
-    expect(downBtn.getAttribute('aria-pressed')).toBe('false');
-    expect(captureSpy).not.toHaveBeenCalled();
+    // Once voted, the question and buttons disappear completely from the DOM
+    expect(screen.queryByText('Yes, helpful')).toBeNull();
+    expect(screen.queryByText('Not quite')).toBeNull();
+    expect(screen.queryByText('Did these passages answer your search?')).toBeNull();
   });
 
-  it('captures overview_feedback when rating Grounded Summary', () => {
-    const captureSpy = vi.fn();
+  it('renders Grounded Summary card without vote buttons', () => {
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({
         query: 'peace and joy',
         passages: samplePassages,
@@ -212,17 +204,9 @@ describe('SearchView Result Cards & User Actions', () => {
       }),
     );
 
-    renderSearchView({ isAiEnabled: true, telemetry: { capture: captureSpy } });
-
-    const upBtn = screen.getByTitle('Helpful summary');
-    fireEvent.click(upBtn);
-    expect(upBtn.getAttribute('aria-pressed')).toBe('true');
-    expect(captureSpy).toHaveBeenCalledWith('overview_feedback', {
-      query: 'peace and joy',
-      model: 'SmolLM2-360M',
-      vote: 'up',
-      locale: 'en',
-    });
+    renderSearchView({ isAiEnabled: true });
+    expect(screen.queryByTitle('Helpful summary')).toBeNull();
+    expect(screen.queryByTitle('Not helpful')).toBeNull();
   });
 
   it('renders passage with collapsed height by default and expands with inside-scroll on toggle', () => {
@@ -263,7 +247,7 @@ describe('SearchView Result Cards & User Actions', () => {
     ];
 
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({
         query: 'love and joy',
         passages: twoPassages,
@@ -328,7 +312,7 @@ describe('SearchView Result Cards & User Actions', () => {
     };
 
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({
         query: 'love your neighbor',
         passages: [multiHeadingPassage],
@@ -382,7 +366,7 @@ describe('SearchView Result Cards & User Actions', () => {
     };
 
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({
         query: 'peace and joy',
         passages: [samplePassages[0]!, passage2],
@@ -483,7 +467,7 @@ describe('SearchView Result Cards & User Actions', () => {
 
   it('automatically refreshes and retrieves passages when offlineTextStatus transitions to DOWNLOADED', async () => {
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({ query: 'love your neighbor', passages: [], answerText: '' })
     );
 
@@ -510,7 +494,7 @@ describe('SearchView Result Cards & User Actions', () => {
 
   it('re-runs a persisted empty search on remount when text is already downloaded', async () => {
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({ query: 'love your neighbor', passages: [], answerText: '', origin: 'local' })
     );
 
@@ -525,7 +509,7 @@ describe('SearchView Result Cards & User Actions', () => {
 
   it('renders search timing and source telemetry when isInspectorMode is enabled', () => {
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({
         query: 'rejoice',
         passages: samplePassages,
@@ -545,7 +529,7 @@ describe('SearchView Result Cards & User Actions', () => {
 
   it('renders TTFT and throughput tok/s in Inspector Mode when available', () => {
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({
         query: 'peace',
         passages: samplePassages,
@@ -595,7 +579,7 @@ describe('SearchView Result Cards & User Actions', () => {
 
   it('renders Grounded Summary badge with restored palette styling', () => {
     localStorage.setItem(
-      'bibleit_last_search',
+      SEARCH_STORAGE_KEY,
       JSON.stringify({
         query: 'peace',
         passages: samplePassages,

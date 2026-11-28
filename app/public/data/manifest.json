@@ -36,5 +36,8 @@
     },
     "count": 2655,
     "sha256": "cd0ca18c6cec6a3130986d37f1fd837027a646d4bca96de085d60ce7998fae7f"
+  },
+  "generation": {
+    "model": "HuggingFaceTB/SmolLM2-360M-Instruct"
   }
 }

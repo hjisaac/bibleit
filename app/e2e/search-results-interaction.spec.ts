@@ -3,9 +3,9 @@ import { test, expect } from '@playwright/test';
 test.describe('Search Results - Card Expansion & Inside-Scroll', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('bibleit_active_tab', 'search');
+      localStorage.setItem('bibleit:ui:active_tab', 'search');
       localStorage.setItem(
-        'bibleit_last_search',
+        'bibleit:ui:last_search',
         JSON.stringify({
           query: 'love your neighbor',
           passages: [
@@ -115,18 +115,12 @@ test.describe('Search Results - Card Expansion & Inside-Scroll', () => {
     await expect(page.getByText('Popular Topics')).toBeHidden();
   });
 
-  test('toggles discrete relevance thumbs up and down buttons on passage cards', async ({ page }) => {
-    const card1 = page.locator('article').nth(0);
-    const upBtn = card1.getByRole('button', { name: 'Relevant passage' });
-    const downBtn = card1.getByRole('button', { name: 'Not relevant' });
-
-    await expect(upBtn).toHaveAttribute('aria-pressed', 'false');
-    await upBtn.click();
-    await expect(upBtn).toHaveAttribute('aria-pressed', 'true');
-    await expect(downBtn).toHaveAttribute('aria-pressed', 'false');
-
-    await downBtn.click();
-    await expect(downBtn).toHaveAttribute('aria-pressed', 'true');
-    await expect(upBtn).toHaveAttribute('aria-pressed', 'false');
+  test('submits end-of-results search feedback and displays toast confirmation', async ({ page }) => {
+    await expect(page.getByText('Did these passages answer your search?')).toBeVisible();
+    const yesBtn = page.getByRole('button', { name: 'Yes, helpful' });
+    await expect(yesBtn).toBeVisible();
+    await yesBtn.click();
+    await expect(page.getByText('Thank you for your feedback!')).toBeVisible();
+    await expect(page.getByText('Did these passages answer your search?')).toBeHidden();
   });
 });

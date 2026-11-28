@@ -1,14 +1,30 @@
 import type { QueryEmbedder } from '../core/ports';
 
+export interface QueryEmbedderConfig {
+  readonly modelId: string;
+  readonly dim: number;
+  readonly queryPrefix?: string;
+}
+
+const TRANSFORMERS_CACHE_NAME = 'transformers-cache';
+
 export class WorkerQueryEmbedder implements QueryEmbedder {
-  readonly modelId = 'nomic-ai/nomic-embed-text-v1.5';
-  readonly dim = 768;
+  readonly modelId: string;
+  readonly dim: number;
+  private readonly queryPrefix: string;
 
   private worker: Worker | null = null;
   private loadPromise: Promise<void> | null = null;
+  private loadReject: ((err: Error) => void) | null = null;
   private nextId = 1;
   private pending = new Map<number, { resolve: (v: Float32Array) => void; reject: (err: Error) => void }>();
   private progressListeners = new Set<(fraction: number) => void>();
+
+  constructor(config: QueryEmbedderConfig) {
+    this.modelId = config.modelId;
+    this.dim = config.dim;
+    this.queryPrefix = config.queryPrefix ?? '';
+  }
 
   onProgress(cb: (fraction: number) => void): () => void {
     this.progressListeners.add(cb);
@@ -41,8 +57,6 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
     return this.worker;
   }
 
-  private loadReject: ((err: Error) => void) | null = null;
-
   async load(onProgress?: (fraction: number) => void): Promise<void> {
     if (onProgress) this.progressListeners.add(onProgress);
     if (this.loadPromise) return this.loadPromise;
@@ -64,7 +78,7 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
         }
       };
       worker.addEventListener('message', handler);
-      worker.postMessage({ type: 'load' });
+      worker.postMessage({ type: 'load', modelId: this.modelId });
     });
 
     return this.loadPromise;
@@ -86,11 +100,11 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
   async clear(): Promise<void> {
     this.cancelLoad();
     this.progressListeners.clear();
-    await clearQueryModelCache();
+    await clearQueryModelCache(this.modelId);
   }
 
   async hasModel(): Promise<boolean> {
-    return isQueryModelCached();
+    return isQueryModelCached(this.modelId);
   }
 
   async embed(query: string): Promise<Float32Array> {
@@ -105,7 +119,12 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
 
     return new Promise<Float32Array>((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
-      worker.postMessage({ type: 'embed', id, text: `search_query: ${query}` });
+      worker.postMessage({
+        type: 'embed',
+        id,
+        modelId: this.modelId,
+        text: `${this.queryPrefix}${query}`,
+      });
     });
   }
 
@@ -130,22 +149,17 @@ export class WorkerQueryEmbedder implements QueryEmbedder {
   }
 }
 
-export async function isQueryModelCached(): Promise<boolean> {
+export async function isQueryModelCached(modelId: string): Promise<boolean> {
   if (typeof caches === 'undefined') return false;
   try {
-    const cacheNames = await caches.keys();
-    for (const name of cacheNames) {
-      if (name.includes('transformers') || name.includes('onnx')) {
-        const cache = await caches.open(name);
-        const keys = await cache.keys();
-        for (const req of keys) {
-          if (req.url.includes('model_quantized.onnx')) {
-            const res = await cache.match(req);
-            if (res && res.ok) {
-              return true;
-            }
-          }
-        }
+    const hasCache = await caches.has(TRANSFORMERS_CACHE_NAME);
+    if (!hasCache) return false;
+    const cache = await caches.open(TRANSFORMERS_CACHE_NAME);
+    const keys = await cache.keys();
+    for (const req of keys) {
+      if (req.url.includes(`/${modelId}/`) && req.url.endsWith('.onnx')) {
+        const res = await cache.match(req);
+        if (res && res.ok) return true;
       }
     }
     return false;
@@ -154,16 +168,22 @@ export async function isQueryModelCached(): Promise<boolean> {
   }
 }
 
-export async function clearQueryModelCache(): Promise<void> {
+export async function clearQueryModelCache(modelId?: string): Promise<void> {
   if (typeof caches === 'undefined') return;
   try {
-    const cacheNames = await caches.keys();
-    for (const name of cacheNames) {
-      if (name.includes('transformers') || name.includes('onnx')) {
-        await caches.delete(name);
+    if (!modelId) {
+      await caches.delete(TRANSFORMERS_CACHE_NAME);
+      return;
+    }
+    const hasCache = await caches.has(TRANSFORMERS_CACHE_NAME);
+    if (!hasCache) return;
+    const cache = await caches.open(TRANSFORMERS_CACHE_NAME);
+    const keys = await cache.keys();
+    for (const req of keys) {
+      if (req.url.includes(`/${modelId}/`)) {
+        await cache.delete(req);
       }
     }
-    await caches.delete('transformers-cache');
   } catch {
     // Ignore cache deletion errors
   }

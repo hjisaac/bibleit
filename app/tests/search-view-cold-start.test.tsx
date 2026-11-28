@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/preact';
 import { SearchView, MAX_HISTORY_ITEMS } from '../src/components/SearchView';
+import { SEARCH_STORAGE_KEY, SEARCH_HISTORY_KEY } from '../src/stores/search';
 import { PackageStatusEnum } from '../src/core/types';
 import { getPopularTopics } from '../src/core/starter-topics';
 import type { SearchEngine } from '../src/core/ports';
@@ -91,7 +92,7 @@ describe('SearchView Cold Start and Search Persistence', () => {
       ],
       answerText: 'Saved synthesis explanation',
     };
-    localStorage.setItem('bibleit_last_search', JSON.stringify(storedState));
+    localStorage.setItem(SEARCH_STORAGE_KEY, JSON.stringify(storedState));
 
     renderSearchView();
 
@@ -142,14 +143,14 @@ describe('SearchView Cold Start and Search Persistence', () => {
     });
 
     await waitFor(() => {
-      const saved = JSON.parse(localStorage.getItem('bibleit_last_search') || '{}');
+      const saved = JSON.parse(localStorage.getItem(SEARCH_STORAGE_KEY) || '{}');
       expect(saved.query).toBe(targetTopic);
     });
   });
 
   it('renders Popular Topics and Recent Searches when search input is empty', async () => {
     localStorage.setItem(
-      'bibleit_search_history',
+      SEARCH_HISTORY_KEY,
       JSON.stringify(['Psalm 23:1', 'faith and hope']),
     );
 
@@ -186,13 +187,13 @@ describe('SearchView Cold Start and Search Persistence', () => {
     fireEvent.input(input, { target: { value: 'Proverbs 3:5' } });
     fireEvent.keyDown(input, { key: 'Enter' });
 
-    let history = JSON.parse(localStorage.getItem('bibleit_search_history') || '[]');
+    let history = JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]');
     expect(history).toContain('Proverbs 3:5');
 
     fireEvent.input(input, { target: { value: 'Matthew 5:14' } });
     fireEvent.blur(input);
 
-    history = JSON.parse(localStorage.getItem('bibleit_search_history') || '[]');
+    history = JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]');
     expect(history[0]).toBe('Matthew 5:14');
   });
 
@@ -213,7 +214,7 @@ describe('SearchView Cold Start and Search Persistence', () => {
 
   it('deduplicates case-insensitively and caps search history at MAX_HISTORY_ITEMS', () => {
     const initialItems = Array.from({ length: MAX_HISTORY_ITEMS }, (_, i) => `item ${i + 1}`);
-    localStorage.setItem('bibleit_search_history', JSON.stringify(initialItems));
+    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(initialItems));
 
     renderSearchView();
 
@@ -223,7 +224,7 @@ describe('SearchView Cold Start and Search Persistence', () => {
     fireEvent.input(input, { target: { value: 'ITEM 2' } });
     fireEvent.keyDown(input, { key: 'Enter' });
 
-    let history = JSON.parse(localStorage.getItem('bibleit_search_history') || '[]');
+    let history = JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]');
     expect(history).toHaveLength(MAX_HISTORY_ITEMS);
     expect(history[0]).toBe('ITEM 2');
 
@@ -231,14 +232,14 @@ describe('SearchView Cold Start and Search Persistence', () => {
     fireEvent.input(input, { target: { value: 'brand new item' } });
     fireEvent.keyDown(input, { key: 'Enter' });
 
-    history = JSON.parse(localStorage.getItem('bibleit_search_history') || '[]');
+    history = JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]');
     expect(history).toHaveLength(MAX_HISTORY_ITEMS);
     expect(history[0]).toBe('brand new item');
     expect(history).not.toContain(initialItems[initialItems.length - 1]);
   });
 
   it('verifies that Recent Searches, Suggestions, and Popular Topics appear in order in the DOM', () => {
-    localStorage.setItem('bibleit_search_history', JSON.stringify(['Psalm 23:1']));
+    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(['Psalm 23:1']));
 
     renderSearchView();
 
@@ -278,7 +279,7 @@ describe('SearchView Cold Start and Search Persistence', () => {
       passages: [],
       answerText: 'Jesus taught that our Heavenly Father knows all our needs.',
     };
-    localStorage.setItem('bibleit_last_search', JSON.stringify(storedState));
+    localStorage.setItem(SEARCH_STORAGE_KEY, JSON.stringify(storedState));
 
     renderSearchView();
 
@@ -327,7 +328,7 @@ describe('SearchView Cold Start and Search Persistence', () => {
       passages: [],
       answerText: 'Jesus taught that our Heavenly Father knows all our needs.',
     };
-    localStorage.setItem('bibleit_last_search', JSON.stringify(storedState));
+    localStorage.setItem(SEARCH_STORAGE_KEY, JSON.stringify(storedState));
 
     renderSearchView({ narrator: mockNarrator });
 
@@ -402,7 +403,7 @@ describe('SearchView Cold Start and Search Persistence', () => {
       ],
       answerText: '',
     };
-    localStorage.setItem('bibleit_last_search', JSON.stringify(storedState));
+    localStorage.setItem(SEARCH_STORAGE_KEY, JSON.stringify(storedState));
 
     renderSearchView();
 
@@ -466,7 +467,7 @@ describe('SearchView Cold Start and Search Persistence', () => {
       ],
       answerText: '',
     };
-    localStorage.setItem('bibleit_last_search', JSON.stringify(storedState));
+    localStorage.setItem(SEARCH_STORAGE_KEY, JSON.stringify(storedState));
 
     renderSearchView();
 
@@ -486,7 +487,7 @@ describe('SearchView Cold Start and Search Persistence', () => {
       passages: [],
       answerText: '',
     };
-    localStorage.setItem('bibleit_last_search', JSON.stringify(storedState));
+    localStorage.setItem(SEARCH_STORAGE_KEY, JSON.stringify(storedState));
 
     renderSearchView();
 

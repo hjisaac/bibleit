@@ -2,7 +2,17 @@ import type { JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import { PackageStatusEnum, ThemeEnum, SearchModeEnum, type Manifest } from '../core/types';
-import { i18n, $locale, $localeSetting, $isMultilingualEnabled, LOCALES, type Locale } from '../stores/i18n';
+import {
+  i18n,
+  $locale,
+  $localeSetting,
+  $isMultilingualEnabled,
+  isOnDeviceSupported,
+  LOCALES,
+  type Locale,
+} from '../stores/i18n';
+import { $telemetryEnabled, $queryTranslationEnabled } from '../stores/preferences';
+import { setTelemetryEnabled } from '../stores/telemetry';
 import { params } from '@nanostores/i18n';
 import en from '../locales/en.json';
 
@@ -10,6 +20,7 @@ export const messages = i18n('settings/view', {
   ...en['settings/view'],
   downloadButton: params<{ size: string }>(en['settings/view'].downloadButton),
   downloadingSlmProgress: params<{ percent: number }>(en['settings/view'].downloadingSlmProgress),
+  storageInOpfs: params<{ size: string }>(en['settings/view'].storageInOpfs),
 });
 
 interface SettingsViewProps {
@@ -82,6 +93,8 @@ export function SettingsView({
   const tt = useStore(messages);
   const currentLocale = useStore($locale);
   const isMultilingual = useStore($isMultilingualEnabled);
+  const isTelemetryEnabled = useStore($telemetryEnabled);
+  const isQueryTranslationEnabled = useStore($queryTranslationEnabled);
 
   const storageSectionRef = useRef<HTMLDivElement>(null);
   const [isPulsing, setIsPulsing] = useState<boolean>(false);
@@ -332,84 +345,150 @@ export function SettingsView({
 
       {/* Interface Language (Available when multilingual feature is enabled) */}
       {isMultilingual && (
-        <div
-          class="p-4 rounded-2xl border space-y-2.5"
-          style={{
-            backgroundColor: 'var(--bg-surface-elevated)',
-            borderColor: 'var(--border-subtle)',
-          }}
-        >
-          <div>
-            <div class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
-              {tt.languageTitle}
-            </div>
-            <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {tt.languageDesc}
-            </p>
-          </div>
-          <select
-            value={currentLocale}
-            onChange={(e) => {
-              const next = (e.target as HTMLSelectElement).value as Locale;
-              $localeSetting.set(next);
-            }}
-            class="w-full p-2.5 rounded-xl border text-xs outline-none"
+        <>
+          <div
+            class="p-4 rounded-2xl border space-y-2.5"
             style={{
-              backgroundColor: 'var(--bg-surface)',
+              backgroundColor: 'var(--bg-surface-elevated)',
               borderColor: 'var(--border-subtle)',
-              color: 'var(--text-main)',
             }}
           >
-            {LOCALES.map((loc) => (
-              <option key={loc} value={loc}>
-                {({ en: tt.languageEnglish, fr: tt.languageFrench } satisfies Record<Locale, string>)[loc]}
-              </option>
-            ))}
-          </select>
-        </div>
+            <div>
+              <div class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                {tt.languageTitle}
+              </div>
+              <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                {tt.languageDesc}
+              </p>
+            </div>
+            <select
+              value={currentLocale}
+              onChange={(e) => {
+                const next = (e.target as HTMLSelectElement).value as Locale;
+                $localeSetting.set(next);
+              }}
+              class="w-full p-2.5 rounded-xl border text-xs outline-none"
+              style={{
+                backgroundColor: 'var(--bg-surface)',
+                borderColor: 'var(--border-subtle)',
+                color: 'var(--text-main)',
+              }}
+            >
+              {LOCALES.map((loc) => (
+                <option key={loc} value={loc}>
+                  {({ en: tt.languageEnglish, fr: tt.languageFrench } satisfies Record<Locale, string>)[loc]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Automatic Query Translation Toggle */}
+          <div
+            class="p-4 rounded-2xl border space-y-3"
+            style={{
+              backgroundColor: 'var(--bg-surface-elevated)',
+              borderColor: 'var(--border-subtle)',
+            }}
+          >
+            <div class="flex items-center justify-between">
+              <div class="pr-3">
+                <div class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                  {tt.queryTranslationTitle}
+                </div>
+                <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  {tt.queryTranslationDesc}
+                </p>
+              </div>
+
+              <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  aria-label={tt.queryTranslationTitle}
+                  checked={isQueryTranslationEnabled}
+                  onChange={(e) => $queryTranslationEnabled.set((e.target as HTMLInputElement).checked)}
+                  class="sr-only peer"
+                />
+                <div class="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
+              </label>
+            </div>
+
+            {!isQueryTranslationEnabled && (
+              <div
+                class="text-[11px] p-2.5 rounded-xl border flex items-start gap-2"
+                style={{
+                  backgroundColor: 'var(--bg-surface)',
+                  borderColor: 'rgba(245, 158, 11, 0.35)',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                <svg class="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>{tt.queryTranslationDisabledNotice}</span>
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {/* On-Device Only Search Toggle */}
-      <div
-        class="p-4 rounded-2xl border space-y-3"
-        style={{
-          backgroundColor: 'var(--bg-surface-elevated)',
-          borderColor: 'var(--border-subtle)',
-        }}
-      >
-        <div class="flex items-center justify-between">
-          <div class="pr-3">
-            <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
-              <span>{tt.onDeviceTitle}</span>
-              <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono font-medium">
-                {tt.onDeviceBadge}
-              </span>
-            </div>
-            <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {textPackageStatus === PackageStatusEnum.DOWNLOADED
-                ? tt.onDeviceDescReady
-                : tt.onDeviceDescDownload}
-            </p>
-          </div>
-
-          <label
-            class={`relative inline-flex items-center shrink-0 ${
-              textPackageStatus === PackageStatusEnum.DOWNLOADED ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
-            }`}
+      {(() => {
+        const onDeviceSupported = isOnDeviceSupported(currentLocale);
+        const canUseOnDevice = onDeviceSupported && textPackageStatus === PackageStatusEnum.DOWNLOADED;
+        return (
+          <div
+            class="p-4 rounded-2xl border space-y-3"
+            style={{
+              backgroundColor: 'var(--bg-surface-elevated)',
+              borderColor: 'var(--border-subtle)',
+            }}
           >
-            <input
-              type="checkbox"
-              disabled={textPackageStatus !== PackageStatusEnum.DOWNLOADED}
-              checked={searchMode === SearchModeEnum.DEVICE}
-              onChange={(e) =>
-                onToggleSearchMode?.((e.target as HTMLInputElement).checked ? SearchModeEnum.DEVICE : SearchModeEnum.AUTO)
-              }
-              class="sr-only peer"
-            />
-            <div class="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
-          </label>
-        </div>
-      </div>
+            <div class="flex items-center justify-between">
+              <div class="pr-3">
+                <div class="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-main)' }}>
+                  <span>{tt.onDeviceTitle}</span>
+                  <span
+                    class={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium ${
+                      onDeviceSupported
+                        ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                        : 'bg-stone-500/15 text-stone-600 dark:text-stone-300'
+                    }`}
+                  >
+                    {onDeviceSupported ? tt.onDeviceBadge : tt.onDeviceBadgeSoon}
+                  </span>
+                </div>
+                <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  {!onDeviceSupported
+                    ? tt.onDeviceDescUnsupportedLocale
+                    : textPackageStatus === PackageStatusEnum.DOWNLOADED
+                    ? tt.onDeviceDescReady
+                    : tt.onDeviceDescDownload}
+                </p>
+              </div>
+
+              <label
+                class={`relative inline-flex items-center shrink-0 ${
+                  canUseOnDevice ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  aria-label={tt.onDeviceTitle}
+                  disabled={!canUseOnDevice}
+                  checked={canUseOnDevice && searchMode === SearchModeEnum.DEVICE}
+                  onChange={(e) =>
+                    onToggleSearchMode?.(
+                      (e.target as HTMLInputElement).checked ? SearchModeEnum.DEVICE : SearchModeEnum.AUTO,
+                    )
+                  }
+                  class="sr-only peer"
+                />
+                <div class="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
+              </label>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Offline Packages & Storage Control */}
       <div
@@ -434,8 +513,8 @@ export function SettingsView({
                 if (aiPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 2.1;
                 if (modelPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 137;
                 if (slmPackageStatus === PackageStatusEnum.DOWNLOADED) mb += 370;
-                if (mb === 0) return '0 MB in OPFS';
-                return `${mb.toFixed(1)} MB in OPFS`;
+                if (mb === 0) return tt.storageInOpfs({ size: '0' });
+                return tt.storageInOpfs({ size: mb.toFixed(1) });
               })()}
             </span>
           </div>
@@ -873,6 +952,37 @@ export function SettingsView({
             {tt.freeSpaceButton}
           </button>
         )}
+      </div>
+
+      {/* Help Improve Search (Anonymous Analytics Toggle) */}
+      <div
+        class="p-4 rounded-2xl border space-y-3"
+        style={{
+          backgroundColor: 'var(--bg-surface-elevated)',
+          borderColor: 'var(--border-subtle)',
+        }}
+      >
+        <div class="flex items-center justify-between">
+          <div class="pr-3">
+            <div class="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+              {tt.telemetryTitle}
+            </div>
+            <p class="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {tt.telemetryDesc}
+            </p>
+          </div>
+
+          <label class="relative inline-flex items-center cursor-pointer shrink-0">
+            <input
+              type="checkbox"
+              aria-label={tt.telemetryTitle}
+              checked={isTelemetryEnabled}
+              onChange={(e) => setTelemetryEnabled((e.target as HTMLInputElement).checked)}
+              class="sr-only peer"
+            />
+            <div class="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
+          </label>
+        </div>
       </div>
 
       {/* App Version & Commit Details */}

@@ -25,9 +25,9 @@ import {
   SEARCH_STORAGE_KEY,
 } from '../stores/search';
 import { ScriptureOverviewCard } from './ScriptureOverviewCard';
-import { VoteButtons, type VoteDirection } from './VoteButtons';
-import { $locale, i18n } from '../stores/i18n';
-import { $activeTranslation } from '../stores/preferences';
+import type { VoteDirection } from '../core/types';
+import { $locale, i18n, isOnDeviceSupported } from '../stores/i18n';
+import { $activeTranslation, $telemetryEnabled, $queryTranslationEnabled } from '../stores/preferences';
 import { params } from '@nanostores/i18n';
 import en from '../locales/en.json';
 
@@ -200,6 +200,8 @@ export function SearchView({
   const tt = useStore(messages);
   const currentLocale = useStore($locale);
   const activeTranslation = useStore($activeTranslation);
+  const isTelemetryEnabled = useStore($telemetryEnabled);
+  const isQueryTranslationEnabled = useStore($queryTranslationEnabled);
   const suggestions = getSearchSuggestions(currentLocale);
   const popularTopics = getPopularTopics(currentLocale);
   const [initialSearch] = useState(() => $lastSearch.get());
@@ -207,11 +209,12 @@ export function SearchView({
   const [passages, setPassages] = useState<ScoredPassage[]>(initialSearch.passages);
   const [searchOrigin, setSearchOrigin] = useState<SearchOriginEnum | undefined>(() => initialSearch.origin);
   const [searchDurationMs, setSearchDurationMs] = useState<number | null>(() => initialSearch.durationMs ?? null);
+  const [translatedQuery, setTranslatedQuery] = useState<string | undefined>(() => initialSearch.translatedQuery);
+  const [translatedBy, setTranslatedBy] = useState<string | undefined>(() => initialSearch.translatedBy);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const lastSubmittedQueryRef = useRef(initialSearch.query);
   const [expandedCardKey, setExpandedCardKey] = useState<string | null>(null);
-  const [cardVotes, setCardVotes] = useState<Record<string, VoteDirection>>({});
-  const [overviewVote, setOverviewVote] = useState<VoteDirection | null>(null);
+  const [searchFeedbackVote, setSearchFeedbackVote] = useState<VoteDirection | null>(null);
   const [localizedTexts, setLocalizedTexts] = useState<Record<string, string>>({});
   const [surroundingVerses, setSurroundingVerses] = useState<
     Record<string, { prev?: string; next?: string }>
@@ -245,6 +248,7 @@ export function SearchView({
   }, []);
 
   const searchRunIdRef = useRef(0);
+  const synthesisRunIdRef = useRef(0);
 
   const prevOfflineTextStatusRef = useRef(offlineTextStatus);
   useEffect(() => {
@@ -268,34 +272,44 @@ export function SearchView({
   const runSearch = (targetQuery: string) => {
     const trimmed = targetQuery.trim();
     const runId = ++searchRunIdRef.current;
+    synthesisRunIdRef.current++;
     if (!trimmed) {
       setPassages([]);
       setSearchOrigin(undefined);
       setSearchDurationMs(null);
+      setTranslatedQuery(undefined);
+      setTranslatedBy(undefined);
       setIsSearching(false);
       setHasSearched(false);
       return;
     }
     setIsSearching(true);
     setPassages([]);
-    setCardVotes({});
-    setOverviewVote(null);
+    setSearchFeedbackVote(null);
     setHasSearched(true);
     const startTime = performance.now();
-    void engine
-      .retrieve(trimmed)
+    const searchPromise = engine.retrieve(trimmed);
+    void searchPromise
       .then((res) => {
         if (searchRunIdRef.current === runId) {
           const duration = Math.round(performance.now() - startTime);
           setSearchDurationMs(duration);
           setPassages(res.passages);
           setSearchOrigin(res.origin);
+          setTranslatedQuery(res.translatedQuery);
+          setTranslatedBy(res.translatedBy);
           telemetry?.capture('search', {
             query: trimmed,
             locale: currentLocale,
             origin: res.origin ?? 'local',
             duration_ms: duration,
             result_count: res.passages.length,
+            translated_query: res.translatedQuery,
+            translated_by: res.translatedBy,
+            detected_language: res.detectedLanguage,
+            translation_bypass_reason: res.translationBypassReason,
+            query_translation_enabled: isQueryTranslationEnabled,
+            is_scripture_reference: res.parsedRefs.length > 0,
           });
           if (res.fallbackReason === 'timeout') {
             onToast(tt.toastServerTimeout);
@@ -380,8 +394,21 @@ export function SearchView({
       model: synthesisModel ?? undefined,
       ttftMs: synthesisTtftMs ?? undefined,
       tokensPerSec: synthesisTokensPerSec ?? undefined,
+      translatedQuery,
+      translatedBy,
     });
-  }, [query, passages, answerText, searchOrigin, searchDurationMs, synthesisModel, synthesisTtftMs, synthesisTokensPerSec]);
+  }, [
+    query,
+    passages,
+    answerText,
+    searchOrigin,
+    searchDurationMs,
+    synthesisModel,
+    synthesisTtftMs,
+    synthesisTokensPerSec,
+    translatedQuery,
+    translatedBy,
+  ]);
 
   useEffect(() => {
     if (!isAiEnabled) {
@@ -393,6 +420,22 @@ export function SearchView({
       setSynthesisTokensPerSec(null);
     }
   }, [isAiEnabled]);
+
+  const prevTranslationRef = useRef(activeTranslation);
+  const prevLocaleRef = useRef(currentLocale);
+  useEffect(() => {
+    if (prevTranslationRef.current !== activeTranslation || prevLocaleRef.current !== currentLocale) {
+      prevTranslationRef.current = activeTranslation;
+      prevLocaleRef.current = currentLocale;
+      synthesisRunIdRef.current++;
+      setIsSynthesizing(false);
+      setAnswerText('');
+      setSynthesisError(null);
+      setSynthesisModel(null);
+      setSynthesisTtftMs(null);
+      setSynthesisTokensPerSec(null);
+    }
+  }, [activeTranslation, currentLocale]);
 
   // Resolve retrieved passage text into the active translation (e.g., WEB -> LSG).
   useEffect(() => {
@@ -494,50 +537,28 @@ export function SearchView({
     setExpandedCardKey((prev) => (prev === key ? null : key));
   };
 
-  const handleVotePassage = (p: ScoredPassage, rank: number, direction: VoteDirection) => {
-    const key = getChunkKey(p.chunk);
-    const nextVote = cardVotes[key] === direction ? undefined : direction;
-    setCardVotes((prev) => {
-      const updated = { ...prev };
-      if (nextVote) updated[key] = nextVote;
-      else delete updated[key];
-      return updated;
+  const handleSearchFeedback = (direction: VoteDirection) => {
+    setSearchFeedbackVote(direction);
+    onToast(tt.searchFeedbackThanks);
+    telemetry?.capture('search_feedback', {
+      query: lastSubmittedQueryRef.current || query.trim(),
+      vote: direction,
+      result_count: passages.length,
+      locale: currentLocale,
     });
-    if (nextVote) {
-      telemetry?.capture('passage_feedback', {
-        query: lastSubmittedQueryRef.current || query.trim(),
-        ref: formatCitation(p.chunk.book, p.chunk.start, p.chunk.end, 'en'),
-        rank,
-        vote: nextVote,
-        locale: currentLocale,
-      });
-    }
-  };
-
-  const handleVoteOverview = (direction: VoteDirection) => {
-    const nextVote = overviewVote === direction ? null : direction;
-    setOverviewVote(nextVote);
-    if (nextVote) {
-      telemetry?.capture('overview_feedback', {
-        query: lastSubmittedQueryRef.current || query.trim(),
-        model: synthesisModel ?? 'unknown',
-        vote: nextVote,
-        locale: currentLocale,
-      });
-    }
   };
 
   const handleSynthesize = async () => {
     const trimmed = query.trim();
     if (!trimmed || isSynthesizing || !isAiEnabled) return;
+    const runId = ++synthesisRunIdRef.current;
     lastSubmittedQueryRef.current = trimmed;
     setIsPanelOpen(false);
     inputRef.current?.blur();
     setIsSynthesizing(true);
     setIsSearching(true);
     setPassages([]);
-    setCardVotes({});
-    setOverviewVote(null);
+    setSearchFeedbackVote(null);
     setAnswerText('');
     setSynthesisModel(null);
     setSynthesisError(null);
@@ -549,10 +570,14 @@ export function SearchView({
     try {
       const startTime = performance.now();
       const res = await engine.retrieve(trimmed);
+      if (synthesisRunIdRef.current !== runId) return;
+
       const duration = Math.round(performance.now() - startTime);
       setSearchDurationMs(duration);
       setPassages(res.passages);
       setSearchOrigin(res.origin);
+      setTranslatedQuery(res.translatedQuery);
+      setTranslatedBy(res.translatedBy);
       setIsSearching(false);
       telemetry?.capture('search', {
         query: trimmed,
@@ -560,6 +585,13 @@ export function SearchView({
         origin: res.origin ?? 'local',
         duration_ms: duration,
         result_count: res.passages.length,
+        translated_query: res.translatedQuery,
+        translated_by: res.translatedBy,
+        detected_language: res.detectedLanguage,
+        detection_method: res.detectionMethod,
+        translation_bypass_reason: res.translationBypassReason,
+        query_translation_enabled: isQueryTranslationEnabled,
+        is_scripture_reference: res.parsedRefs.length > 0,
       });
       if (res.fallbackReason === 'timeout') {
         onToast(tt.toastServerTimeout);
@@ -582,19 +614,26 @@ export function SearchView({
             return text ? { ...p, chunk: { ...p.chunk, text } } : p;
           }),
         );
+        if (synthesisRunIdRef.current !== runId) return;
         contextForAnswer = { ...res, passages: [...localizedTop, ...res.passages.slice(5)] };
       }
 
       const streamStartTime = performance.now();
       let firstTokenTime: number | null = null;
       let totalChars = 0;
-      const stream = engine.answerProvider.answer(trimmed, contextForAnswer, (meta) => {
+      const onMeta = (meta: { model?: string; provider?: string }) => {
+        if (synthesisRunIdRef.current !== runId) return;
         const modelName = meta.model || meta.provider;
         if (modelName) setSynthesisModel(modelName);
-      });
+      };
+      const stream =
+        currentLocale && currentLocale !== 'en'
+          ? engine.answerProvider.answer(trimmed, contextForAnswer, onMeta, currentLocale)
+          : engine.answerProvider.answer(trimmed, contextForAnswer, onMeta);
       let receivedAny = false;
       let tokenCount = 0;
       for await (const chunk of stream) {
+        if (synthesisRunIdRef.current !== runId) break;
         receivedAny = true;
         tokenCount++;
         if (firstTokenTime === null) {
@@ -604,6 +643,7 @@ export function SearchView({
         totalChars += chunk.length;
         setAnswerText((prev) => stripPreamble(prev + chunk));
       }
+      if (synthesisRunIdRef.current !== runId) return;
       if (firstTokenTime !== null) {
         const generationDurationSec = (performance.now() - firstTokenTime) / 1000;
         const tokens = Math.max(tokenCount, Math.round(totalChars / 4));
@@ -617,18 +657,21 @@ export function SearchView({
         onToast(tt.toastAiOverviewUnavailable);
       }
     } catch (err) {
+      if (synthesisRunIdRef.current !== runId) return;
       console.error('[SearchView] AI overview failed:', err);
       onToast(tt.toastAiOverviewUnavailable);
     } finally {
-      setIsSearching(false);
-      setIsSynthesizing(false);
+      if (synthesisRunIdRef.current === runId) {
+        setIsSearching(false);
+        setIsSynthesizing(false);
+      }
     }
   };
 
   return (
     <section class="flex-1 flex flex-col px-4 sm:px-8 pt-4 sm:pt-5 pb-24 sm:pb-24 overflow-y-auto overscroll-y-contain max-w-2xl mx-auto w-full">
       {/* Offline Storage Status Banner / Super Tiny Reminder */}
-      {offlineTextStatus !== PackageStatusEnum.DOWNLOADED && (
+      {isOnDeviceSupported(currentLocale) && offlineTextStatus !== PackageStatusEnum.DOWNLOADED && (
         !hasSeenOnboarding ? (
           <div
             class="mb-3.5 sm:mb-4 px-3 py-1.5 rounded-xl border flex items-center justify-between gap-2.5 animate-fadeIn shrink-0 transition-all bg-amber-500/[0.07] border-amber-500/25"
@@ -776,6 +819,7 @@ export function SearchView({
               onClick={(e) => {
                 e.stopPropagation();
                 searchRunIdRef.current++;
+                synthesisRunIdRef.current++;
                 setQuery('');
                 setSearchDurationMs(null);
                 inputRef.current?.focus();
@@ -989,7 +1033,7 @@ export function SearchView({
               {!isOnline ? tt.offlineTitle : tt.serviceUnavailableTitle}
             </p>
             <p class="text-xs" style={{ color: 'var(--text-muted)' }}>
-              {tt.offlineDesc}
+              {isOnDeviceSupported(currentLocale) ? tt.offlineDesc : tt.offlineDescUnsupportedLocale}
             </p>
           </div>
         ) : (
@@ -1036,8 +1080,6 @@ export function SearchView({
         isSynthesisCollapsed={isSynthesisCollapsed}
         onToggleCollapse={() => setIsSynthesisCollapsed(!isSynthesisCollapsed)}
         onDismissError={() => setSynthesisError(null)}
-        vote={overviewVote}
-        onVote={handleVoteOverview}
         narrator={narrator}
         narrationState={narrationState}
         firstPassage={passages[0]}
@@ -1238,13 +1280,6 @@ export function SearchView({
                       </svg>
                     </button>
                   )}
-
-                  <VoteButtons
-                    vote={cardVotes[chunkKey]}
-                    onVote={(direction) => handleVotePassage(p, cardIdx, direction)}
-                    helpfulTitle={tt.voteHelpfulTitle}
-                    notHelpfulTitle={tt.voteNotHelpfulTitle}
-                  />
                 </div>
               </div>
 
@@ -1359,6 +1394,34 @@ export function SearchView({
             </article>
           );
         })}
+
+        {/* End-of-Results Relevance Feedback (Borderless Editorial Colophon) */}
+        {isTelemetryEnabled && passages.length > 0 && !isSearching && !isSynthesizing && !searchFeedbackVote && (
+          <div class="pt-5 pb-2 flex flex-col items-center justify-center text-xs text-center transition-colors">
+            <div class="flex flex-wrap items-center justify-center gap-1.5" style={{ color: 'var(--text-subtle)' }}>
+              <span>{tt.searchFeedbackPrompt}</span>
+              <span class="inline-flex items-center gap-1.5 font-medium ml-1">
+                <button
+                  type="button"
+                  onClick={() => handleSearchFeedback('up')}
+                  class="hover:underline transition-opacity py-0.5 px-1 rounded"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  {tt.searchFeedbackYes}
+                </button>
+                <span aria-hidden="true" style={{ color: 'var(--text-subtle)' }}>·</span>
+                <button
+                  type="button"
+                  onClick={() => handleSearchFeedback('down')}
+                  class="hover:underline transition-opacity py-0.5 px-1 rounded"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  {tt.searchFeedbackNo}
+                </button>
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
