@@ -181,4 +181,20 @@ describe('SettingsView Component', () => {
     $localeSetting.set('en');
     $isMultilingualEnabled.set(false);
   });
+
+  it('displays educational notice when automatic query translation is toggled off', async () => {
+    const { $isMultilingualEnabled } = await import('../src/stores/i18n');
+    const { $queryTranslationEnabled } = await import('../src/stores/preferences');
+    $isMultilingualEnabled.set(true);
+    $queryTranslationEnabled.set(false);
+
+    render(<SettingsView {...defaultProps} />);
+
+    expect(
+      screen.getByText(/Disabling translation matches raw French text against the current English index/i),
+    ).toBeDefined();
+
+    $queryTranslationEnabled.set(true);
+    $isMultilingualEnabled.set(false);
+  });
 });

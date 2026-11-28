@@ -411,6 +411,22 @@ export function SettingsView({
                 <div class="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
               </label>
             </div>
+
+            {!isQueryTranslationEnabled && (
+              <div
+                class="text-[11px] p-2.5 rounded-xl border flex items-start gap-2"
+                style={{
+                  backgroundColor: 'var(--bg-surface)',
+                  borderColor: 'rgba(245, 158, 11, 0.35)',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                <svg class="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>{tt.queryTranslationDisabledNotice}</span>
+              </div>
+            )}
           </div>
         </>
       )}

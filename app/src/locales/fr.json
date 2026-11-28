@@ -237,8 +237,9 @@
     "languageFrench": "Français (Louis Segond 1910 - LSG)",
     "telemetryTitle": "Aider à améliorer la recherche",
     "telemetryDesc": "Partager anonymement vos recherches et avis sur les passages pour affiner les résultats. Aucune donnée personnelle.",
-    "queryTranslationTitle": "Traduction automatique de requête",
-    "queryTranslationDesc": "Traduit les requêtes non anglophones en anglais pour la recherche de passages. Désactivez pour accélérer si vous recherchez directement en anglais."
+    "queryTranslationTitle": "Traduction automatique des requêtes",
+    "queryTranslationDesc": "Traduit automatiquement les requêtes en français vers l'anglais pour la recherche sémantique. Les requêtes déjà en anglais et les références bibliques sont détectées et recherchées directement sans traduction.",
+    "queryTranslationDisabledNotice": "Désactiver la traduction compare directement le texte français à l'index anglais actuel, ce qui réduit la pertinence. Les modèles multilingues natifs arriveront dans une prochaine version."
   },
   "search/view": {
     "searchPlaceholder": "Rechercher versets, thèmes ou questions...",
